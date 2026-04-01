@@ -1,2 +1,14 @@
+.qoder
+.vscode
+nul
+
+
 .idea
 target
+
+
+out
+node_modules
+
+
+docs
