@@ -28,6 +28,7 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+        <hibernate.version>6.6.44.Final</hibernate.version>
         <agentscope.version>1.0.11</agentscope.version>
     </properties>
     <dependencies>
@@ -61,6 +62,14 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.44</version>
+            <scope>compile</scope>
         </dependency>
 
         <!-- .env 文件支持 -->
