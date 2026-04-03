@@ -8,13 +8,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 智能体对话功能测试 - 通过 Controller 层验证完整对话链路
+ * Session + Chat Controller Test
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -24,47 +26,49 @@ class AgentControllerTest {
     private MockMvc mockMvc;
 
     @Test
-    @DisplayName("自我介绍")
-    void testSimpleChat() throws Exception {
+    @DisplayName("Create session")
+    void testCreateSession() throws Exception {
         String requestBody = """
-                {"message": "你好, 请做一下自我介绍"}
+                {"title": "test session"}
                 """;
 
-        mockMvc.perform(post("/api/agent/chat")
+        mockMvc.perform(post("/api/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reply").isNotEmpty());
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.title").value("test session"));
     }
 
     @Test
-    @DisplayName("调用工具")
-    void testToolCallGetTime() throws Exception {
-        String requestBody = """
-                {"message": "现在北京时间几点了?"}
-                """;
-
-        mockMvc.perform(post("/api/agent/chat")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+    @DisplayName("List sessions")
+    void testListSessions() throws Exception {
+        mockMvc.perform(get("/api/sessions"))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reply").isNotEmpty());
+                .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("调用工具")
-    void testToolCallCalculate() throws Exception {
-        String requestBody = """
-                {"message": "请帮我计算 (3+5)*2-4 的结果"}
-                """;
-
-        mockMvc.perform(post("/api/agent/chat")
+    @DisplayName("SSE stream chat")
+    void testStreamChat() throws Exception {
+        // Create a session first
+        String sessionResult = mockMvc.perform(post("/api/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .content("{\"title\": \"chat test\"}"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String sessionId = com.fasterxml.jackson.databind.ObjectMapper
+                .class.getDeclaredConstructor().newInstance()
+                .readTree(sessionResult).get("id").asText();
+
+        // Test SSE endpoint returns event stream
+        mockMvc.perform(get("/api/chat/stream")
+                        .param("sessionId", sessionId)
+                        .param("message", "hello"))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reply").isNotEmpty());
+                .andExpect(status().isOk());
     }
 }

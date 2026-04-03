@@ -2,10 +2,13 @@
   <aside class="w-60 border-r border-gray-200 bg-gray-50/50 flex flex-col h-full">
     <!-- 新任务按钮 -->
     <div class="px-3 pt-3 pb-1">
-      <router-link to="/chat" class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md">
+      <button
+        class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md w-full"
+        @click="handleNewSession"
+      >
         <el-icon :size="16" class="text-green-600"><Plus /></el-icon>
         <span>新任务</span>
-      </router-link>
+      </button>
     </div>
 
     <!-- 导航菜单 -->
@@ -48,11 +51,26 @@
       <el-scrollbar>
         <div class="px-2 space-y-0.5">
           <div
-            v-for="item in mockTaskList"
-            :key="item"
-            class="px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded cursor-pointer truncate"
+            v-for="session in chatStore.sessions"
+            :key="session.id"
+            class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
+            :class="chatStore.currentSessionId === session.id
+              ? 'bg-green-50 text-green-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-100'"
+            @click="handleSwitchSession(session.id)"
+            @contextmenu.prevent="handleContextMenu($event, session.id)"
           >
-            {{ item }}
+            <span class="flex-1 truncate">{{ session.title }}</span>
+            <el-icon
+              :size="14"
+              class="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+              @click.stop="handleDeleteSession(session.id)"
+            >
+              <Close />
+            </el-icon>
+          </div>
+          <div v-if="chatStore.sessions.length === 0" class="px-2 py-4 text-center">
+            <span class="text-xs text-gray-400">暂无会话</span>
           </div>
         </div>
       </el-scrollbar>
@@ -61,7 +79,7 @@
     <!-- 用户信息 -->
     <div class="px-3 py-3 border-t border-gray-200 flex items-center gap-2">
       <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm">
-        🐶
+        &#x1F436;
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-gray-800 truncate">{{ appStore.currentUser.name }}</div>
@@ -75,12 +93,16 @@
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { Plus, Ticket, Timer, ChatRound, Setting } from '@element-plus/icons-vue'
+import { useChatStore } from '@/stores/chat'
+import { Plus, Ticket, Timer, ChatRound, Setting, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
+const chatStore = useChatStore()
 
 const navItems = [
   { path: '/skills', label: '技能', icon: Ticket, badge: '' },
@@ -93,18 +115,34 @@ const tabs = [
   { label: '频道', value: 'channels' as const }
 ]
 
-const mockTaskList = [
-  '安排计划测试Spring AI',
-  'Image Upload',
-  'Markdown文档转SQL问...',
-  '青岛北换乘查询',
-  '生成一个makdown文档, ...',
-  '技术架构咨询',
-  '车票工作卡管理',
-  '功能测试与流程图设计'
-]
-
 function isActive(path: string): boolean {
   return route.path === path
 }
+
+async function handleNewSession() {
+  const id = await chatStore.createNewSession()
+  router.push(`/chat/${id}`)
+}
+
+function handleSwitchSession(id: string) {
+  chatStore.switchSession(id)
+  router.push(`/chat/${id}`)
+}
+
+async function handleDeleteSession(id: string) {
+  await chatStore.removeSession(id)
+  if (chatStore.currentSessionId) {
+    router.push(`/chat/${chatStore.currentSessionId}`)
+  } else {
+    router.push('/chat')
+  }
+}
+
+function handleContextMenu(_event: MouseEvent, _sessionId: string) {
+  // 未来可扩展右键菜单 (重命名等)
+}
+
+onMounted(() => {
+  chatStore.loadSessions()
+})
 </script>

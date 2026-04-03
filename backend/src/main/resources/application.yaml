@@ -1,9 +1,17 @@
 spring:
   application:
     name: agent-desk
+  mvc:
+    async:
+      request-timeout: 300000
 
 agentscope:
   dashscope:
     api-key: ${DASHSCOPE_API_KEY}
   agent:
     name: assistant
+
+agentdesk:
+  # session 的存放路径
+  session:
+    path: ${user.home}/.agentdesk/sessions
