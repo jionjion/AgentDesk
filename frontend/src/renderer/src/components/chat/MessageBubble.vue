@@ -17,7 +17,7 @@
       >
         <div v-if="isUser">{{ message.content }}</div>
         <div v-else>
-          <span>{{ (message as AssistantMessage).content }}</span>
+          <div class="markdown-body" v-html="renderedContent" />
           <span
             v-if="(message as AssistantMessage).isStreaming"
             class="inline-block w-1.5 h-4 bg-green-500 ml-0.5 animate-pulse align-middle"
@@ -30,11 +30,32 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Marked } from 'marked'
+import { markedHighlight } from 'marked-highlight'
+import hljs from 'highlight.js'
 import type { ChatMessage, AssistantMessage } from '@/types/chat'
+
+const marked = new Marked(
+  markedHighlight({
+    langPrefix: 'hljs language-',
+    highlight(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value
+      }
+      return hljs.highlightAuto(code).value
+    }
+  })
+)
 
 const props = defineProps<{
   message: ChatMessage
 }>()
 
 const isUser = computed(() => props.message.role === 'user')
+
+const renderedContent = computed(() => {
+  const content = (props.message as AssistantMessage).content || ''
+  return marked.parse(content) as string
+})
 </script>
+
