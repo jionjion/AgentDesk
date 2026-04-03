@@ -12,6 +12,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import top.jionjion.agentdesk.agent.AgentHandle;
 import top.jionjion.agentdesk.agent.AgentPool;
 import top.jionjion.agentdesk.dto.ChatEventDto;
+import top.jionjion.agentdesk.entity.ChatMessage;
+import top.jionjion.agentdesk.repository.ChatMessageRepository;
+import top.jionjion.agentdesk.session.SessionService;
 
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -24,9 +27,13 @@ public class ChatController {
     private static final Pattern SESSION_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
 
     private final AgentPool agentPool;
+    private final ChatMessageRepository chatMessageRepository;
+    private final SessionService sessionService;
 
-    public ChatController(AgentPool agentPool) {
+    public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository, SessionService sessionService) {
         this.agentPool = agentPool;
+        this.chatMessageRepository = chatMessageRepository;
+        this.sessionService = sessionService;
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -46,6 +53,9 @@ public class ChatController {
         AgentHandle handle = agentPool.getOrCreate(sessionId);
         SseEmitter emitter = new SseEmitter(300_000L);
         handle.hook().setEmitter(emitter);
+
+        // 持久化用户消息
+        chatMessageRepository.save(new ChatMessage(sessionId, "user", message));
 
         emitter.onTimeout(() -> {
             log.warn("Session {} SSE timeout", sessionId);
@@ -68,7 +78,13 @@ public class ChatController {
         handle.agent().stream(userMsg)
                 .doOnComplete(() -> {
                     try {
+                        // 持久化 Agent 回复: 从 Hook 的 PostCallEvent 中获取最终文本
+                        String reply = handle.hook().getLastReply();
+                        if (reply != null && !reply.isEmpty()) {
+                            chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
+                        }
                         agentPool.save(sessionId);
+                        sessionService.touch(sessionId);
                         emitter.complete();
                     } catch (Exception e) {
                         log.warn("Error completing SSE: {}", e.getMessage());
@@ -101,7 +117,7 @@ public class ChatController {
 
     private void sendErrorEvent(SseEmitter emitter, String message) {
         try {
-            ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            ObjectMapper mapper = new ObjectMapper();
             String json = mapper.writeValueAsString(ChatEventDto.error(message != null ? message : "unknown error"));
             emitter.send(SseEmitter.event().name("error").data(json));
         } catch (Exception e) {

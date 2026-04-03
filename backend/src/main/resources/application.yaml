@@ -4,6 +4,23 @@ spring:
   mvc:
     async:
       request-timeout: 300000
+  # JPA 配置
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_schema: agent_desk
+    show-sql: false
+  # 数据库配置
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?currentSchema=agent_desk
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
 
 agentscope:
   dashscope:
@@ -12,6 +29,5 @@ agentscope:
     name: assistant
 
 agentdesk:
-  # session 的存放路径
-  session:
-    path: ${user.home}/.agentdesk/sessions
+  # 数据库存储, 不再使用本地文件
+  storage: postgresql

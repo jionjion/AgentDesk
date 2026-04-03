@@ -1,13 +1,10 @@
 package top.jionjion.agentdesk.agent;
 
-import io.agentscope.core.session.JsonSession;
 import io.agentscope.core.session.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Path;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -25,11 +22,10 @@ public class AgentPool {
     private final ConcurrentHashMap<String, AgentHandle> agents = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicBoolean> busyFlags = new ConcurrentHashMap<>();
 
-    public AgentPool(AgentFactory agentFactory,
-                     @Value("${agentdesk.session.path:#{systemProperties['user.home'] + '/.agentdesk/sessions'}}") String sessionPath) {
+    public AgentPool(AgentFactory agentFactory, Session session) {
         this.agentFactory = agentFactory;
-        this.session = new JsonSession(Path.of(sessionPath));
-        log.info("Agent 会话存储路径: {}", sessionPath);
+        this.session = session;
+        log.info("Agent 会话状态存储: PostgreSQL (DatabaseSession)");
     }
 
     /**
@@ -39,7 +35,7 @@ public class AgentPool {
         return agents.computeIfAbsent(sessionId, id -> {
             log.info("为会话 {} 创建新的 Agent", id);
             AgentHandle handle = agentFactory.createAgent(id);
-            // 尝试从持久化存储恢复状态
+            // 尝试从数据库恢复状态
             try {
                 handle.agent().loadIfExists(session, id);
                 log.info("已恢复会话 {} 的状态", id);
@@ -51,14 +47,14 @@ public class AgentPool {
     }
 
     /**
-     * 保存会话状态
+     * 保存会话状态到数据库
      */
     public void save(String sessionId) {
         AgentHandle handle = agents.get(sessionId);
         if (handle != null) {
             try {
                 handle.agent().saveTo(session, sessionId);
-                log.debug("已保存会话 {} 的状态", sessionId);
+                log.debug("已保存会话 {} 的状态到数据库", sessionId);
             } catch (Exception e) {
                 log.warn("保存会话 {} 状态失败: {}", sessionId, e.getMessage());
             }
@@ -74,16 +70,15 @@ public class AgentPool {
         if (handle != null) {
             try {
                 session.delete(io.agentscope.core.state.SimpleSessionKey.of(sessionId));
-                log.info("已删除会话 {} 的 Agent 和持久化数据", sessionId);
+                log.info("已删除会话 {} 的 Agent 和数据库状态", sessionId);
             } catch (Exception e) {
-                log.warn("删除会话 {} 持久化数据失败: {}", sessionId, e.getMessage());
+                log.warn("删除会话 {} 数据库状态失败: {}", sessionId, e.getMessage());
             }
         }
     }
 
     /**
      * 尝试获取会话锁（防止并发调用同一 Agent）
-     * @return true 如果成功获取锁
      */
     public boolean tryAcquire(String sessionId) {
         AtomicBoolean flag = busyFlags.computeIfAbsent(sessionId, id -> new AtomicBoolean(false));

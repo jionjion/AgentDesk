@@ -1,10 +1,11 @@
 package top.jionjion.agentdesk.session;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import top.jionjion.agentdesk.agent.AgentPool;
 import top.jionjion.agentdesk.dto.SessionResponse;
+import top.jionjion.agentdesk.repository.SessionRepository;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,11 +15,11 @@ import java.util.UUID;
 @Service
 public class SessionService {
 
-    private final SessionMetadataStore metadataStore;
+    private final SessionRepository sessionRepository;
     private final AgentPool agentPool;
 
-    public SessionService(SessionMetadataStore metadataStore, AgentPool agentPool) {
-        this.metadataStore = metadataStore;
+    public SessionService(SessionRepository sessionRepository, AgentPool agentPool) {
+        this.sessionRepository = sessionRepository;
         this.agentPool = agentPool;
     }
 
@@ -30,7 +31,7 @@ public class SessionService {
         long now = System.currentTimeMillis();
 
         SessionMetadata metadata = new SessionMetadata(id, title != null ? title : "新对话", now, now);
-        metadataStore.save(metadata);
+        sessionRepository.save(metadata);
 
         return toResponse(metadata);
     }
@@ -39,8 +40,7 @@ public class SessionService {
      * 列出所有会话 (按最近使用排序)
      */
     public List<SessionResponse> listAll() {
-        return metadataStore.findAll().stream()
-                .sorted(Comparator.comparingLong(SessionMetadata::getLastUsedAt).reversed())
+        return sessionRepository.findAll(Sort.by(Sort.Direction.DESC, "lastUsedAt")).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -49,14 +49,14 @@ public class SessionService {
      * 获取会话详情
      */
     public SessionResponse get(String id) {
-        return metadataStore.findById(id).map(this::toResponse).orElse(null);
+        return sessionRepository.findById(id).map(this::toResponse).orElse(null);
     }
 
     /**
      * 删除会话
      */
     public void delete(String id) {
-        metadataStore.deleteById(id);
+        sessionRepository.deleteById(id);
         agentPool.remove(id);
     }
 
@@ -64,9 +64,9 @@ public class SessionService {
      * 更新会话标题
      */
     public SessionResponse updateTitle(String id, String title) {
-        return metadataStore.findById(id).map(m -> {
+        return sessionRepository.findById(id).map(m -> {
             m.setTitle(title);
-            metadataStore.save(m);
+            sessionRepository.save(m);
             return toResponse(m);
         }).orElse(null);
     }
@@ -75,9 +75,9 @@ public class SessionService {
      * 更新最后使用时间
      */
     public void touch(String id) {
-        metadataStore.findById(id).ifPresent(m -> {
+        sessionRepository.findById(id).ifPresent(m -> {
             m.setLastUsedAt(System.currentTimeMillis());
-            metadataStore.save(m);
+            sessionRepository.save(m);
         });
     }
 

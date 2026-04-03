@@ -50,6 +50,19 @@
             <version>${agentscope.version}</version>
         </dependency>
 
+        <!-- Spring Data JPA (includes JDBC) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- PostgreSQL 驱动 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- .env 文件支持 -->
         <dependency>
             <groupId>me.paulschwarz</groupId>

@@ -34,9 +34,18 @@ public class SseStreamingHook implements Hook {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private volatile SseEmitter emitter;
+    private volatile String lastReply;
 
     public void setEmitter(SseEmitter emitter) {
         this.emitter = emitter;
+        this.lastReply = null;
+    }
+
+    /**
+     * 获取最近一次 Agent 回复的完整文本
+     */
+    public String getLastReply() {
+        return lastReply;
     }
 
     @Override
@@ -100,6 +109,7 @@ public class SseStreamingHook implements Hook {
                     String content = finalMsg != null ? finalMsg.getTextContent() : "";
                     String reason = finalMsg != null && finalMsg.getGenerateReason() != null
                             ? finalMsg.getGenerateReason().name() : "MODEL_STOP";
+                    lastReply = content;
                     sendEvent("agent_complete", ChatEventDto.agentComplete(content, reason));
                 }
 
