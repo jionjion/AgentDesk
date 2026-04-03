@@ -1,3 +1,9 @@
 spring:
   application:
     name: agent-desk
+
+agentscope:
+  dashscope:
+    api-key: ${DASHSCOPE_API_KEY}
+  agent:
+    name: assistant
