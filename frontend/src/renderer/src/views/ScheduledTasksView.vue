@@ -3,22 +3,22 @@
     <!-- 顶部工具栏 -->
     <div class="flex items-center justify-end px-6 py-4 border-b border-gray-100">
       <div class="flex items-center gap-2">
-        <el-button text circle size="default">
-          <el-icon><Refresh /></el-icon>
-        </el-button>
-        <el-button size="default">
-          <el-icon class="mr-1"><Connection /></el-icon>
+        <Button variant="ghost" size="icon">
+          <RefreshCw :size="16" />
+        </Button>
+        <Button variant="outline">
+          <Link :size="16" class="mr-1" />
           通过 QoderWork 创建
-        </el-button>
-        <el-button type="primary" size="default">
-          <el-icon class="mr-1"><Plus /></el-icon>
+        </Button>
+        <Button>
+          <Plus :size="16" class="mr-1" />
           新建定时任务
-        </el-button>
+        </Button>
       </div>
     </div>
 
     <!-- 内容区 -->
-    <el-scrollbar>
+    <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
         <h1 class="text-2xl font-bold text-gray-900 mb-2">定时任务</h1>
         <p class="text-sm text-gray-500 mb-6">
@@ -27,40 +27,38 @@
 
         <!-- 标签页 + 排序 -->
         <div class="flex items-center justify-between mb-4">
-          <el-tabs model-value="my-tasks">
-            <el-tab-pane label="我的定时任务" name="my-tasks" />
-            <el-tab-pane label="执行记录" name="history" />
-          </el-tabs>
-          <el-dropdown trigger="click">
-            <el-button text size="small" class="text-gray-500">
-              <el-icon class="mr-1"><Sort /></el-icon>
-              按创建时间倒序
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item>按创建时间倒序</el-dropdown-item>
-                <el-dropdown-item>按创建时间正序</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          <Tabs default-value="my-tasks">
+            <TabsList>
+              <TabsTrigger value="my-tasks">我的定时任务</TabsTrigger>
+              <TabsTrigger value="history">执行记录</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="ghost" size="sm" class="text-gray-500">
+                <ArrowUpDown :size="14" class="mr-1" />
+                按创建时间倒序
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>按创建时间倒序</DropdownMenuItem>
+              <DropdownMenuItem>按创建时间正序</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <!-- 提示条 -->
-        <el-alert
-          type="info"
-          :closable="false"
-          class="mb-6"
-        >
-          <template #default>
+        <Alert class="mb-6">
+          <AlertDescription>
             <div class="flex items-center justify-between w-full">
               <span class="text-sm">定时任务仅在电脑保持唤醒时运行</span>
               <div class="flex items-center gap-2">
                 <span class="text-sm text-gray-500">保持系统唤醒</span>
-                <el-switch size="small" />
+                <Switch />
               </div>
             </div>
-          </template>
-        </el-alert>
+          </AlertDescription>
+        </Alert>
 
         <!-- 任务卡片网格 -->
         <div class="grid grid-cols-2 gap-4">
@@ -70,26 +68,32 @@
             class="border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow"
           >
             <div class="flex items-center justify-between mb-3">
-              <el-switch size="small" :model-value="task.enabled" />
-              <el-button text circle size="small">
-                <el-icon><MoreFilled /></el-icon>
-              </el-button>
+              <Switch :checked="task.enabled" />
+              <Button variant="ghost" size="icon" class="h-8 w-8">
+                <MoreHorizontal :size="16" />
+              </Button>
             </div>
             <h3 class="text-sm font-semibold text-gray-800 mb-2">{{ task.title }}</h3>
             <p class="text-xs text-gray-400 line-clamp-2 mb-3">{{ task.description }}</p>
             <div class="flex items-center gap-1 text-xs text-gray-500">
-              <el-icon :size="14"><Clock /></el-icon>
+              <Clock :size="14" />
               <span>{{ task.schedule }}</span>
             </div>
           </div>
         </div>
       </div>
-    </el-scrollbar>
+    </ScrollArea>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Refresh, Connection, Plus, Sort, MoreFilled, Clock } from '@element-plus/icons-vue'
+import { RefreshCw, Link, Plus, ArrowUpDown, MoreHorizontal, Clock } from 'lucide-vue-next'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Switch } from '@/components/ui/switch'
 
 const mockScheduledTasks = [
   {

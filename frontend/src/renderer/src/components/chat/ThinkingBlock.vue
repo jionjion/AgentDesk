@@ -4,9 +4,7 @@
       class="flex items-center gap-1.5 cursor-pointer text-gray-400 hover:text-gray-600 text-xs"
       @click="collapsed = !collapsed"
     >
-      <el-icon :size="10">
-        <ArrowRight :class="collapsed ? '' : 'rotate-90'" />
-      </el-icon>
+      <ChevronRight :size="10" :class="collapsed ? '' : 'rotate-90 transition-transform'" />
       <span>思考中...</span>
     </div>
     <div v-if="!collapsed" class="mt-1 pl-4 border-l-2 border-gray-200">
@@ -17,7 +15,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ArrowRight } from '@element-plus/icons-vue'
+import { ChevronRight } from 'lucide-vue-next'
 import type { ThinkingMessage } from '@/types/chat'
 
 const props = defineProps<{

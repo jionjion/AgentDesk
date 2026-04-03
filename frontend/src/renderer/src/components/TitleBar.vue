@@ -5,23 +5,24 @@
   >
     <!-- 左侧操作区 -->
     <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">
-      <el-button text size="small" @click="emit('toggleMenu')">
-        <el-icon :size="18"><Menu /></el-icon>
-      </el-button>
-      <el-button text size="small" @click="appStore.toggleSidebar()">
-        <el-icon :size="16"><DArrowLeft v-if="!appStore.sidebarCollapsed" /><DArrowRight v-else /></el-icon>
-      </el-button>
+      <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggleMenu')">
+        <Menu :size="18" />
+      </Button>
+      <Button variant="ghost" size="icon" class="h-8 w-8" @click="appStore.toggleSidebar()">
+        <ChevronsLeft v-if="!appStore.sidebarCollapsed" :size="16" />
+        <ChevronsRight v-else :size="16" />
+      </Button>
     </div>
 
     <!-- 右侧操作区 -->
     <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">
-      <el-button text size="small" class="text-gray-500">
-        <el-icon :size="14" class="mr-1"><ChatDotSquare /></el-icon>
+      <Button variant="ghost" size="sm" class="text-gray-500">
+        <MessageSquare :size="14" class="mr-1" />
         <span class="text-xs">问题反馈</span>
-      </el-button>
-      <el-button text size="small" circle>
-        <el-icon :size="16"><QuestionFilled /></el-icon>
-      </el-button>
+      </Button>
+      <Button variant="ghost" size="icon" class="h-8 w-8">
+        <CircleHelp :size="16" />
+      </Button>
 
       <!-- 窗口控制按钮 -->
       <div class="flex items-center ml-2">
@@ -29,19 +30,19 @@
           class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-gray-500"
           @click="handleMinimize"
         >
-          <el-icon :size="14"><Minus /></el-icon>
+          <Minus :size="14" />
         </button>
         <button
           class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-gray-500"
           @click="handleMaximize"
         >
-          <el-icon :size="14"><FullScreen /></el-icon>
+          <Maximize2 :size="14" />
         </button>
         <button
           class="w-8 h-8 flex items-center justify-center hover:bg-red-50 hover:text-red-500 rounded text-gray-500"
           @click="handleClose"
         >
-          <el-icon :size="14"><Close /></el-icon>
+          <X :size="14" />
         </button>
       </div>
     </div>
@@ -52,14 +53,15 @@
 import { useAppStore } from '@/stores/app'
 import {
   Menu,
-  DArrowLeft,
-  DArrowRight,
-  ChatDotSquare,
-  QuestionFilled,
+  ChevronsLeft,
+  ChevronsRight,
+  MessageSquare,
+  CircleHelp,
   Minus,
-  FullScreen,
-  Close
-} from '@element-plus/icons-vue'
+  Maximize2,
+  X
+} from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
 
 const appStore = useAppStore()
 const emit = defineEmits<{ toggleMenu: [] }>()

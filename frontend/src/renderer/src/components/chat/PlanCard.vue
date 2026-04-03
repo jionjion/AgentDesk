@@ -2,10 +2,10 @@
   <div class="my-2 mx-11 border border-amber-200 rounded-lg overflow-hidden bg-amber-50">
     <!-- 头部 -->
     <div class="flex items-center gap-2 px-3 py-2 border-b border-amber-200">
-      <el-icon :size="14" class="text-amber-600"><List /></el-icon>
+      <List :size="14" class="text-amber-600" />
       <span class="text-xs font-medium text-amber-700">{{ displayName }}</span>
-      <el-icon v-if="message.result" :size="14" class="ml-auto text-green-500"><CircleCheckFilled /></el-icon>
-      <el-icon v-else :size="12" class="ml-auto animate-spin text-amber-500"><Loading /></el-icon>
+      <CheckCircle2 v-if="message.result" :size="14" class="ml-auto text-green-500" />
+      <Loader2 v-else :size="12" class="ml-auto animate-spin text-amber-500" />
     </div>
     <!-- 结果 -->
     <div v-if="message.result" class="px-3 py-2">
@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { List, CircleCheckFilled, Loading } from '@element-plus/icons-vue'
+import { List, CheckCircle2, Loader2 } from 'lucide-vue-next'
 import type { PlanMessage } from '@/types/chat'
 
 const props = defineProps<{

@@ -6,7 +6,7 @@
         class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md w-full"
         @click="handleNewSession"
       >
-        <el-icon :size="16" class="text-green-600"><Plus /></el-icon>
+        <Plus :size="16" class="text-green-600" />
         <span>新任务</span>
       </button>
     </div>
@@ -20,11 +20,11 @@
         class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md"
         :class="[isActive(item.path) ? 'bg-gray-200/80 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-100']"
       >
-        <el-icon :size="16"><component :is="item.icon" /></el-icon>
+        <component :is="item.icon" :size="16" />
         <span>{{ item.label }}</span>
-        <el-tag v-if="item.badge" size="small" type="info" effect="plain" class="ml-auto scale-75">
+        <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0">
           {{ item.badge }}
-        </el-tag>
+        </Badge>
       </router-link>
     </nav>
 
@@ -48,7 +48,7 @@
       <div class="px-3 mb-1">
         <span class="text-xs text-gray-400">{{ appStore.activeTab === 'tasks' ? '任务' : '频道' }}</span>
       </div>
-      <el-scrollbar>
+      <ScrollArea class="h-full">
         <div class="px-2 space-y-0.5">
           <div
             v-for="session in chatStore.sessions"
@@ -61,19 +61,17 @@
             @contextmenu.prevent="handleContextMenu($event, session.id)"
           >
             <span class="flex-1 truncate">{{ session.title }}</span>
-            <el-icon
+            <X
               :size="14"
               class="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
               @click.stop="handleDeleteSession(session.id)"
-            >
-              <Close />
-            </el-icon>
+            />
           </div>
           <div v-if="chatStore.sessions.length === 0" class="px-2 py-4 text-center">
             <span class="text-xs text-gray-400">暂无会话</span>
           </div>
         </div>
-      </el-scrollbar>
+      </ScrollArea>
     </div>
 
     <!-- 用户信息 -->
@@ -85,9 +83,9 @@
         <div class="text-sm font-medium text-gray-800 truncate">{{ appStore.currentUser.name }}</div>
         <div class="text-xs text-blue-500">{{ appStore.currentUser.plan }}</div>
       </div>
-      <el-button text size="small" circle>
-        <el-icon :size="16" class="text-gray-400"><Setting /></el-icon>
-      </el-button>
+      <Button variant="ghost" size="icon" class="h-8 w-8">
+        <Settings :size="16" class="text-gray-400" />
+      </Button>
     </div>
   </aside>
 </template>
@@ -97,7 +95,10 @@ import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, ChatRound, Setting, Close } from '@element-plus/icons-vue'
+import { Plus, Ticket, Timer, MessageCircle, Settings, X } from 'lucide-vue-next'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 const route = useRoute()
 const router = useRouter()
@@ -107,7 +108,7 @@ const chatStore = useChatStore()
 const navItems = [
   { path: '/skills', label: '技能', icon: Ticket, badge: '' },
   { path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: '' },
-  { path: '/im-channel', label: 'IM 频道', icon: ChatRound, badge: 'Beta' }
+  { path: '/im-channel', label: 'IM 频道', icon: MessageCircle, badge: 'Beta' }
 ]
 
 const tabs = [

@@ -1,7 +1,7 @@
 <template>
   <div class="h-full flex flex-col">
     <!-- 内容区 -->
-    <el-scrollbar>
+    <ScrollArea class="flex-1">
       <div class="px-6 py-10 max-w-3xl mx-auto">
         <!-- 插图区域 -->
         <div class="flex justify-center mb-8">
@@ -46,14 +46,7 @@
               <div>
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-medium text-gray-800">{{ channel.name }}</span>
-                  <el-tag
-                    v-if="channel.connected"
-                    size="small"
-                    type="success"
-                    effect="light"
-                  >
-                    已连接
-                  </el-tag>
+                  <Badge v-if="channel.connected" variant="success">已连接</Badge>
                 </div>
                 <p class="text-xs text-gray-400 mt-0.5">{{ channel.description }}</p>
               </div>
@@ -61,22 +54,26 @@
             <div class="flex items-center gap-3">
               <template v-if="channel.connected">
                 <span class="text-sm text-blue-500 cursor-pointer hover:underline">配对管理</span>
-                <el-button text circle size="small">
-                  <el-icon><MoreFilled /></el-icon>
-                </el-button>
-                <el-switch :model-value="true" />
+                <Button variant="ghost" size="icon" class="h-8 w-8">
+                  <MoreHorizontal :size="16" />
+                </Button>
+                <Switch :checked="true" />
               </template>
-              <el-button v-else size="default">配置</el-button>
+              <Button v-else variant="outline">配置</Button>
             </div>
           </div>
         </div>
       </div>
-    </el-scrollbar>
+    </ScrollArea>
   </div>
 </template>
 
 <script setup lang="ts">
-import { MoreFilled } from '@element-plus/icons-vue'
+import { MoreHorizontal } from 'lucide-vue-next'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 
 const channels = [
   {

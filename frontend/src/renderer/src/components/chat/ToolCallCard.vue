@@ -2,12 +2,12 @@
   <div class="my-2 mx-11 border border-gray-200 rounded-lg overflow-hidden">
     <!-- 头部 -->
     <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-      <el-icon :size="14" class="text-gray-500"><SetUp /></el-icon>
+      <Settings2 :size="14" class="text-gray-500" />
       <span class="text-xs font-medium text-gray-700">{{ message.toolName }}</span>
       <span v-if="message.status === 'calling'" class="ml-auto">
-        <el-icon :size="12" class="animate-spin text-blue-500"><Loading /></el-icon>
+        <Loader2 :size="12" class="animate-spin text-blue-500" />
       </span>
-      <el-icon v-else :size="14" class="ml-auto text-green-500"><CircleCheckFilled /></el-icon>
+      <CheckCircle2 v-else :size="14" class="ml-auto text-green-500" />
     </div>
     <!-- 参数 -->
     <div v-if="hasArguments" class="px-3 py-2 text-xs">
@@ -15,7 +15,7 @@
         class="flex items-center gap-1 cursor-pointer text-gray-500 hover:text-gray-700"
         @click="showArgs = !showArgs"
       >
-        <el-icon :size="10"><ArrowRight :class="showArgs ? 'rotate-90' : ''" /></el-icon>
+        <ChevronRight :size="10" :class="showArgs ? 'rotate-90 transition-transform' : 'transition-transform'" />
         <span>参数</span>
       </div>
       <pre v-if="showArgs" class="mt-1 p-2 bg-gray-50 rounded text-xs text-gray-600 overflow-x-auto">{{ formattedArgs }}</pre>
@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { SetUp, Loading, CircleCheckFilled, ArrowRight } from '@element-plus/icons-vue'
+import { Settings2, Loader2, CheckCircle2, ChevronRight } from 'lucide-vue-next'
 import type { ToolCallMessage } from '@/types/chat'
 
 const props = defineProps<{

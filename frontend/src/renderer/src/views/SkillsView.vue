@@ -3,27 +3,25 @@
     <!-- 顶部工具栏 -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
       <div class="flex items-center gap-3">
-        <el-input
-          placeholder="搜索技能"
-          prefix-icon="Search"
-          size="default"
-          class="w-60"
-        />
+        <div class="relative w-60">
+          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" :size="16" />
+          <Input placeholder="搜索技能" class="pl-8" />
+        </div>
       </div>
       <div class="flex items-center gap-2">
-        <el-button size="default">
-          <el-icon class="mr-1"><Connection /></el-icon>
+        <Button variant="outline">
+          <Link :size="16" class="mr-1" />
           通过 QoderWork 创建
-        </el-button>
-        <el-button type="primary" size="default">
-          <el-icon class="mr-1"><Download /></el-icon>
+        </Button>
+        <Button>
+          <Download :size="16" class="mr-1" />
           安装技能
-        </el-button>
+        </Button>
       </div>
     </div>
 
     <!-- 内容区 -->
-    <el-scrollbar>
+    <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
         <h1 class="text-2xl font-bold text-gray-900 mb-2">技能</h1>
         <p class="text-sm text-gray-500 mb-6">安装与管理技能，在对话中扩展 QoderWork 的能力。</p>
@@ -35,15 +33,15 @@
         </div>
 
         <!-- 标签页 -->
-        <el-tabs model-value="marketplace" class="mb-4">
-          <el-tab-pane label="技能广场" name="marketplace" />
-          <el-tab-pane label="内置" name="builtin" />
-          <el-tab-pane name="installed">
-            <template #label>
-              用户安装 <el-badge :value="1" :max="99" class="ml-1" />
-            </template>
-          </el-tab-pane>
-        </el-tabs>
+        <Tabs default-value="marketplace" class="mb-4">
+          <TabsList>
+            <TabsTrigger value="marketplace">技能广场</TabsTrigger>
+            <TabsTrigger value="builtin">内置</TabsTrigger>
+            <TabsTrigger value="installed">
+              用户安装 <Badge variant="secondary" class="ml-1.5">1</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <div class="mb-4">
           <span class="text-sm font-medium text-gray-800">官方精选</span>
@@ -72,12 +70,17 @@
           </div>
         </div>
       </div>
-    </el-scrollbar>
+    </ScrollArea>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Connection, Download } from '@element-plus/icons-vue'
+import { Search, Link, Download } from 'lucide-vue-next'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const mockSkills = [
   { name: '深度研究', icon: '🔍', bgColor: '#EEF2FF', description: '综合多来源搜索引擎和深度浏览器助手' },

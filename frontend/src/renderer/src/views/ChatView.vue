@@ -18,7 +18,7 @@
           @click="sendQuickMessage(card.prompt)"
         >
           <div class="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center mb-3">
-            <el-icon :size="22" class="text-gray-600"><component :is="card.icon" /></el-icon>
+            <component :is="card.icon" :size="22" class="text-gray-600" />
           </div>
           <h3 class="text-sm font-medium text-gray-800 mb-1">{{ card.title }}</h3>
           <p class="text-xs text-gray-400">{{ card.description }}</p>
@@ -42,54 +42,51 @@
     <!-- 底部输入区 -->
     <div class="px-8 pb-6">
       <div class="max-w-2xl mx-auto border border-gray-200 rounded-xl p-4">
-        <el-input
+        <Textarea
           v-model="inputText"
-          type="textarea"
           :rows="2"
           :placeholder="chatStore.isStreaming ? '等待回复中...' : '描述任务，/ 调用技能与工具，标准模式经济高效'"
           :disabled="chatStore.isStreaming"
-          resize="none"
-          class="border-none!"
+          class="resize-none border-none shadow-none focus-visible:ring-0"
           @keydown.enter.exact.prevent="handleSend"
         />
         <div class="flex items-center justify-between mt-3">
           <div class="flex items-center gap-2">
-            <el-button text size="small">
-              <el-icon class="mr-1"><FolderOpened /></el-icon>
+            <Button variant="ghost" size="sm">
+              <FolderOpen :size="14" class="mr-1" />
               <span class="text-xs text-gray-500">选择工作目录</span>
-            </el-button>
-            <el-button text size="small" circle>
-              <el-icon :size="16"><Brush /></el-icon>
-            </el-button>
-            <el-button text size="small" circle>
-              <el-icon :size="16"><Paperclip /></el-icon>
-            </el-button>
+            </Button>
+            <Button variant="ghost" size="icon" class="h-8 w-8">
+              <Paintbrush :size="16" />
+            </Button>
+            <Button variant="ghost" size="icon" class="h-8 w-8">
+              <Paperclip :size="16" />
+            </Button>
           </div>
           <div class="flex items-center gap-2">
-            <el-tag size="small" effect="plain" class="cursor-pointer">
+            <Badge variant="outline" class="cursor-pointer">
               &#x26A1; 标准
-              <el-icon :size="10" class="ml-1"><ArrowDown /></el-icon>
-            </el-tag>
+              <ChevronDown :size="10" class="ml-1" />
+            </Badge>
             <!-- 发送 / 停止按钮 -->
-            <el-button
+            <Button
               v-if="!chatStore.isStreaming"
-              type="primary"
-              circle
-              size="small"
+              size="icon"
+              class="h-8 w-8 rounded-full"
               :disabled="!inputText.trim()"
               @click="handleSend"
             >
-              <el-icon><Top /></el-icon>
-            </el-button>
-            <el-button
+              <ArrowUp :size="16" />
+            </Button>
+            <Button
               v-else
-              type="danger"
-              circle
-              size="small"
+              variant="destructive"
+              size="icon"
+              class="h-8 w-8 rounded-full"
               @click="chatStore.interrupt()"
             >
-              <el-icon><VideoPause /></el-icon>
-            </el-button>
+              <Square :size="14" />
+            </Button>
           </div>
         </div>
       </div>
@@ -101,17 +98,20 @@
 import { ref, watch, nextTick, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  FolderOpened,
-  Brush,
+  FolderOpen,
+  Paintbrush,
   Paperclip,
-  ArrowDown,
-  Top,
-  VideoPause,
-  Document,
+  ChevronDown,
+  ArrowUp,
+  Square,
+  FileText,
   Camera,
-  DataLine
-} from '@element-plus/icons-vue'
+  BarChart3
+} from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chat'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ToolCallCard from '@/components/chat/ToolCallCard.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
@@ -125,9 +125,9 @@ const messageListRef = ref<HTMLElement>()
 const scrollAnchorRef = ref<HTMLElement>()
 
 const featureCards = [
-  { title: '文件整理', description: '智能整理和管理本地文件', icon: Document, prompt: '帮我整理当前目录下的文件' },
+  { title: '文件整理', description: '智能整理和管理本地文件', icon: FileText, prompt: '帮我整理当前目录下的文件' },
   { title: '内容创作', description: '创作演示文稿、文档和多媒体内容', icon: Camera, prompt: '帮我写一篇技术文档' },
-  { title: '文档处理', description: '处理和分析文档数据', icon: DataLine, prompt: '帮我分析这份数据' }
+  { title: '文档处理', description: '处理和分析文档数据', icon: BarChart3, prompt: '帮我分析这份数据' }
 ]
 
 function handleSend() {
