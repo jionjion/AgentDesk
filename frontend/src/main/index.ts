@@ -5,8 +5,8 @@ import { registerIpcHandlers } from './ipc'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 1120,
-    height: 750,
+    width: 1280,
+    height: 860,
     minWidth: 900,
     minHeight: 600,
     show: false,

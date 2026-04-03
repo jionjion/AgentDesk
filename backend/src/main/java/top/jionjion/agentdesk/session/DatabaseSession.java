@@ -8,15 +8,16 @@ import io.agentscope.core.state.SimpleSessionKey;
 import io.agentscope.core.state.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import top.jionjion.agentdesk.repository.AgentStateRepository;
 
 import java.util.*;
 
 /**
- * 基于 PostgreSQL 的 AgentScope Session 实现
+ * 基于 PostgreSQL + JPA 的 AgentScope Session 实现
  * <p>
- * agent_state 表中以 session_id + key 为唯一标识, state_data 存储 JSON 序列化的状态
+ * agent_state 表中以 session_id + state_key 为唯一标识, state_data 存储 JSON 序列化的状态
  */
 @Component
 public class DatabaseSession implements Session {
@@ -24,10 +25,10 @@ public class DatabaseSession implements Session {
     private static final Logger log = LoggerFactory.getLogger(DatabaseSession.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final JdbcTemplate jdbc;
+    private final AgentStateRepository repository;
 
-    public DatabaseSession(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public DatabaseSession(AgentStateRepository repository) {
+        this.repository = repository;
     }
 
     /** 保存单个状态到数据库, 存在则更新 */
@@ -36,13 +37,7 @@ public class DatabaseSession implements Session {
         String sessionId = extractSessionId(sessionKey);
         try {
             String json = MAPPER.writeValueAsString(value);
-            jdbc.update("""
-                    INSERT INTO agent_state (session_id, state_key, state_data, updated_at)
-                    VALUES (?, ?, ?::jsonb, ?)
-                    ON CONFLICT (session_id, state_key) DO UPDATE
-                        SET state_data = EXCLUDED.state_data, updated_at = EXCLUDED.updated_at
-                    """,
-                    sessionId, key, json, System.currentTimeMillis());
+            saveState(sessionId, key, json);
         } catch (JsonProcessingException e) {
             log.error("序列化状态失败 session={}, key={}: {}", sessionId, key, e.getMessage());
         }
@@ -54,13 +49,7 @@ public class DatabaseSession implements Session {
         String sessionId = extractSessionId(sessionKey);
         try {
             String json = MAPPER.writeValueAsString(values);
-            jdbc.update("""
-                    INSERT INTO agent_state (session_id, state_key, state_data, updated_at)
-                    VALUES (?, ?, ?::jsonb, ?)
-                    ON CONFLICT (session_id, state_key) DO UPDATE
-                        SET state_data = EXCLUDED.state_data, updated_at = EXCLUDED.updated_at
-                    """,
-                    sessionId, key, json, System.currentTimeMillis());
+            saveState(sessionId, key, json);
         } catch (JsonProcessingException e) {
             log.error("序列化状态列表失败 session={}, key={}: {}", sessionId, key, e.getMessage());
         }
@@ -70,15 +59,12 @@ public class DatabaseSession implements Session {
     @Override
     public <T extends State> Optional<T> get(SessionKey sessionKey, String key, Class<T> type) {
         String sessionId = extractSessionId(sessionKey);
-        List<String> results = jdbc.query(
-                "SELECT state_data::text FROM agent_state WHERE session_id = ? AND state_key = ?",
-                (rs, rowNum) -> rs.getString(1),
-                sessionId, key);
-        if (results.isEmpty()) {
+        Optional<AgentState> state = repository.findBySessionIdAndStateKey(sessionId, key);
+        if (state.isEmpty()) {
             return Optional.empty();
         }
         try {
-            return Optional.of(MAPPER.readValue(results.getFirst(), type));
+            return Optional.of(MAPPER.readValue(state.get().getStateData(), type));
         } catch (JsonProcessingException e) {
             log.warn("反序列化状态失败 session={}, key={}: {}", sessionId, key, e.getMessage());
             return Optional.empty();
@@ -89,15 +75,12 @@ public class DatabaseSession implements Session {
     @Override
     public <T extends State> List<T> getList(SessionKey sessionKey, String key, Class<T> itemType) {
         String sessionId = extractSessionId(sessionKey);
-        List<String> results = jdbc.query(
-                "SELECT state_data::text FROM agent_state WHERE session_id = ? AND state_key = ?",
-                (rs, rowNum) -> rs.getString(1),
-                sessionId, key);
-        if (results.isEmpty()) {
+        Optional<AgentState> state = repository.findBySessionIdAndStateKey(sessionId, key);
+        if (state.isEmpty()) {
             return List.of();
         }
         try {
-            return MAPPER.readValue(results.getFirst(),
+            return MAPPER.readValue(state.get().getStateData(),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, itemType));
         } catch (JsonProcessingException e) {
             log.warn("反序列化状态列表失败 session={}, key={}: {}", sessionId, key, e.getMessage());
@@ -109,25 +92,21 @@ public class DatabaseSession implements Session {
     @Override
     public boolean exists(SessionKey sessionKey) {
         String sessionId = extractSessionId(sessionKey);
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM agent_state WHERE session_id = ?",
-                Integer.class, sessionId);
-        return count != null && count > 0;
+        return repository.existsBySessionId(sessionId);
     }
 
     /** 删除会话的所有状态记录 */
     @Override
+    @Transactional
     public void delete(SessionKey sessionKey) {
         String sessionId = extractSessionId(sessionKey);
-        jdbc.update("DELETE FROM agent_state WHERE session_id = ?", sessionId);
+        repository.deleteBySessionId(sessionId);
     }
 
     /** 列出所有存在状态记录的会话Key */
     @Override
     public Set<SessionKey> listSessionKeys() {
-        List<String> ids = jdbc.query(
-                "SELECT DISTINCT session_id FROM agent_state",
-                (rs, rowNum) -> rs.getString(1));
+        List<String> ids = repository.findDistinctSessionIds();
         Set<SessionKey> keys = new HashSet<>();
         for (String id : ids) {
             keys.add(SimpleSessionKey.of(id));
@@ -135,10 +114,24 @@ public class DatabaseSession implements Session {
         return keys;
     }
 
-    /** 关闭Session, JdbcTemplate由Spring管理无需手动关闭 */
+    /** 关闭Session, JPA由Spring管理无需手动关闭 */
     @Override
     public void close() {
-        // JdbcTemplate 由 Spring 管理连接池, 无需手动关闭
+        // JPA 由 Spring 管理, 无需手动关闭
+    }
+
+    /** 保存或更新状态 */
+    private void saveState(String sessionId, String key, String json) {
+        AgentState entity = repository.findBySessionIdAndStateKey(sessionId, key)
+                .orElseGet(() -> {
+                    AgentState s = new AgentState();
+                    s.setSessionId(sessionId);
+                    s.setStateKey(key);
+                    return s;
+                });
+        entity.setStateData(json);
+        entity.setUpdatedAt(System.currentTimeMillis());
+        repository.save(entity);
     }
 
     /** 从SessionKey中提取会话ID字符串 */

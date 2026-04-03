@@ -2,6 +2,7 @@ package top.jionjion.agentdesk.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.session.AgentState;
 import top.jionjion.agentdesk.session.AgentStateId;
 
@@ -17,6 +18,7 @@ public interface AgentStateRepository extends JpaRepository<AgentState, AgentSta
 
     boolean existsBySessionId(String sessionId);
 
+    @Transactional
     void deleteBySessionId(String sessionId);
 
     @Query("SELECT DISTINCT a.sessionId FROM AgentState a")
