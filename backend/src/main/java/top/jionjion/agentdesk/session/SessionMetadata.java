@@ -20,14 +20,26 @@ import lombok.Setter;
 @Table(name = "sessions", schema = "agent_desk")
 public class SessionMetadata {
 
+    /**
+     * 会话ID, 主键
+     */
     @Id
     private String id;
 
+    /**
+     * 会话标题
+     */
     private String title;
 
+    /**
+     * 创建时间, 毫秒时间戳
+     */
     @Column(name = "created_at", nullable = false)
     private long createdAt;
 
+    /**
+     * 最后使用时间, 毫秒时间戳
+     */
     @Column(name = "last_used_at", nullable = false)
     private long lastUsedAt;
 }

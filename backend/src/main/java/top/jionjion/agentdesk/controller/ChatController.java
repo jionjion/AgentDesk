@@ -19,6 +19,9 @@ import top.jionjion.agentdesk.session.SessionService;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+/**
+ * 对话控制器, 通过SSE流式推送对话事件
+ */
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
@@ -36,6 +39,13 @@ public class ChatController {
         this.sessionService = sessionService;
     }
 
+    /**
+     * 流式对话接口, 通过SSE推送Agent的回复事件
+     *
+     * @param sessionId 会话ID
+     * @param message   用户消息
+     * @return SSE事件流
+     */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
                                  @RequestParam String message) {
@@ -105,6 +115,9 @@ public class ChatController {
         return emitter;
     }
 
+    /**
+     * 中断当前会话的Agent执行
+     */
     @PostMapping("/{sessionId}/interrupt")
     public Map<String, String> interrupt(@PathVariable String sessionId) {
         if (!SESSION_ID_PATTERN.matcher(sessionId).matches()) {
@@ -115,6 +128,7 @@ public class ChatController {
         return Map.of("status", "interrupted");
     }
 
+    /** 向客户端发送错误事件 */
     private void sendErrorEvent(SseEmitter emitter, String message) {
         try {
             ObjectMapper mapper = new ObjectMapper();

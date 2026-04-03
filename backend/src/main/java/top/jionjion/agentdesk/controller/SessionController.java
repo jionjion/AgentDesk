@@ -22,16 +22,19 @@ public class SessionController {
         this.sessionService = sessionService;
     }
 
+    /** 创建新会话 */
     @PostMapping
     public SessionResponse create(@RequestBody SessionCreateRequest request) {
         return sessionService.create(request.title());
     }
 
+    /** 列出所有会话 */
     @GetMapping
     public List<SessionResponse> listAll() {
         return sessionService.listAll();
     }
 
+    /** 获取会话详情 */
     @GetMapping("/{id}")
     public SessionResponse get(@PathVariable String id) {
         SessionResponse response = sessionService.get(id);
@@ -41,12 +44,14 @@ public class SessionController {
         return response;
     }
 
+    /** 删除会话 */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         sessionService.delete(id);
     }
 
+    /** 更新会话标题 */
     @PutMapping("/{id}")
     public SessionResponse updateTitle(@PathVariable String id, @RequestBody SessionCreateRequest request) {
         SessionResponse response = sessionService.updateTitle(id, request.title());
