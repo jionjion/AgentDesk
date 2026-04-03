@@ -9,13 +9,21 @@ import java.util.Map;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ChatEventDto(
+        /* 事件类型, 如 text_chunk, thinking_chunk, tool_call_start 等 */
         String type,
+        /* 文本内容 */
         String content,
+        /* 工具名称 */
         String toolName,
+        /* 工具调用ID */
         String toolId,
+        /* 工具调用参数 */
         Map<String, Object> arguments,
+        /* 工具调用结果 */
         String result,
+        /* 完成原因 */
         String reason,
+        /* 错误信息 */
         String error
 ) {
     public static ChatEventDto textChunk(String content) {
