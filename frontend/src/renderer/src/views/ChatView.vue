@@ -3,7 +3,7 @@
     <!-- 消息区域 / 欢迎页 -->
     <div v-if="chatStore.currentMessages.length === 0" class="flex-1 flex flex-col items-center justify-center px-8">
       <!-- Logo + 标语 -->
-      <div class="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center mb-6">
+      <div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
         <span class="text-3xl">&#x1F916;</span>
       </div>
       <h1 class="text-2xl font-bold text-gray-900 mb-2">不止聊天，搞定一切</h1>
@@ -15,7 +15,7 @@
           v-for="card in featureCards"
           :key="card.title"
           class="w-52 p-5 border rounded-xl hover:shadow-sm transition-all cursor-pointer"
-          :class="selectedCard?.title === card.title ? 'border-green-400 bg-green-50/50' : 'border-gray-200'"
+          :class="selectedCard?.title === card.title ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200'"
           @click="toggleCard(card)"
         >
           <div class="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center mb-3">
@@ -60,7 +60,7 @@
             <div
               v-for="(example, idx) in selectedCard.examples"
               :key="idx"
-              class="flex items-start gap-2 text-xs text-gray-600 hover:text-green-600 cursor-pointer transition-colors"
+              class="flex items-start gap-2 text-xs text-gray-600 hover:text-blue-600 cursor-pointer transition-colors"
               @click.stop="fillExample(example)"
             >
               <span class="mt-0.5 w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
@@ -86,6 +86,8 @@
               <span class="text-xs text-gray-500">选择工作目录</span>
             </Button>
             <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
+              <Paintbrush :size="16" />
+            </Button>
             <Button variant="ghost" size="icon" class="h-8 w-8">
               <Paperclip :size="16" />
             </Button>

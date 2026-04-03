@@ -120,9 +120,9 @@ function isActive(path: string): boolean {
   return route.path === path
 }
 
-async function handleNewSession() {
-  const id = await chatStore.createNewSession()
-  router.push(`/chat/${id}`)
+function handleNewSession() {
+  chatStore.currentSessionId = null
+  router.push('/chat')
 }
 
 function handleSwitchSession(id: string) {
