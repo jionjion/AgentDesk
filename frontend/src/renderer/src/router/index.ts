@@ -8,6 +8,12 @@ const router = createRouter({
       redirect: '/chat'
     },
     {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { title: '登录', layout: 'none' }
+    },
+    {
       path: '/chat/:sessionId?',
       name: 'chat',
       component: () => import('@/views/ChatView.vue'),
@@ -30,6 +36,12 @@ const router = createRouter({
       name: 'im-channel',
       component: () => import('@/views/ImChannelView.vue'),
       meta: { title: 'IM 频道' }
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/SettingsView.vue'),
+      meta: { title: '设置', layout: 'none' }
     }
   ]
 })

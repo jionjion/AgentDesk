@@ -83,9 +83,51 @@
         <div class="text-sm font-medium text-gray-800 truncate">{{ appStore.currentUser.name }}</div>
         <div class="text-xs text-blue-500">{{ appStore.currentUser.plan }}</div>
       </div>
-      <Button variant="ghost" size="icon" class="h-8 w-8">
-        <Settings :size="16" class="text-gray-400" />
-      </Button>
+      <Popover>
+        <PopoverTrigger as-child>
+          <Button variant="ghost" size="icon" class="h-8 w-8">
+            <SettingsIcon :size="16" class="text-gray-400" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="end" class="w-48 p-1">
+          <button
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            @click="handleOpenSettings"
+          >
+            <SettingsIcon :size="16" class="text-gray-500" />
+            <span>设置</span>
+          </button>
+          <button
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            @click="handleOpenHelp"
+          >
+            <BookOpen :size="16" class="text-gray-500" />
+            <span>帮助文档</span>
+          </button>
+          <button
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            @click="handleOpenChangelog"
+          >
+            <FileText :size="16" class="text-gray-500" />
+            <span>更新日志</span>
+          </button>
+          <button
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            @click="handleOpenAbout"
+          >
+            <Info :size="16" class="text-gray-500" />
+            <span>关于我们</span>
+          </button>
+          <div class="my-1 border-t border-gray-200" />
+          <button
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 rounded-md hover:bg-red-50 transition-colors"
+            @click="handleLogout"
+          >
+            <LogOut :size="16" class="text-red-500" />
+            <span>退出登录</span>
+          </button>
+        </PopoverContent>
+      </Popover>
     </div>
   </aside>
 </template>
@@ -95,10 +137,11 @@ import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, MessageCircle, Settings, X } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,6 +184,26 @@ async function handleDeleteSession(id: string) {
 
 function handleContextMenu(_event: MouseEvent, _sessionId: string) {
   // 未来可扩展右键菜单 (重命名等)
+}
+
+function handleOpenSettings() {
+  router.push('/settings')
+}
+
+function handleOpenHelp() {
+  window.open('https://github.com/jionjion', '_blank')
+}
+
+function handleOpenChangelog() {
+  window.open('https://github.com/', '_blank')
+}
+
+function handleOpenAbout() {
+  window.open('https://github.com/', '_blank')
+}
+
+function handleLogout() {
+  router.push('/login')
 }
 
 onMounted(() => {
