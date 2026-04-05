@@ -62,3 +62,25 @@ COMMENT ON COLUMN agent_desk.agent_state.session_id IS '会话ID';
 COMMENT ON COLUMN agent_desk.agent_state.state_key IS '状态键名 (如 memory, toolkit 等)';
 COMMENT ON COLUMN agent_desk.agent_state.state_data IS 'AgentScope 序列化的状态数据(JSON)';
 COMMENT ON COLUMN agent_desk.agent_state.updated_at IS '最后更新时间戳(毫秒)';
+
+-- 5. 文件表
+CREATE TABLE IF NOT EXISTS agent_desk.files (
+    id              BIGSERIAL    PRIMARY KEY,
+    original_name   VARCHAR(512) NOT NULL,
+    oss_key         VARCHAR(1024) NOT NULL,
+    content_type    VARCHAR(128),
+    size            BIGINT       NOT NULL DEFAULT 0,
+    session_id      VARCHAR(32)  REFERENCES agent_desk.sessions(id) ON DELETE SET NULL,
+    created_at      BIGINT       NOT NULL
+);
+
+COMMENT ON TABLE  agent_desk.files IS '文件上传记录';
+COMMENT ON COLUMN agent_desk.files.original_name IS '原始文件名';
+COMMENT ON COLUMN agent_desk.files.oss_key IS 'OSS 对象键';
+COMMENT ON COLUMN agent_desk.files.content_type IS 'MIME 类型';
+COMMENT ON COLUMN agent_desk.files.size IS '文件大小(字节)';
+COMMENT ON COLUMN agent_desk.files.session_id IS '关联会话ID(可为空, 空表示通用上传)';
+COMMENT ON COLUMN agent_desk.files.created_at IS '创建时间戳(毫秒)';
+
+CREATE INDEX IF NOT EXISTS idx_files_session ON agent_desk.files (session_id);
+CREATE INDEX IF NOT EXISTS idx_files_oss_key ON agent_desk.files (oss_key);
