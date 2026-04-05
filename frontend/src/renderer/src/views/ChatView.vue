@@ -10,11 +10,11 @@
       <p class="text-sm text-gray-500 mb-10">本地运行、自主规划、安全可控的 AI 工作搭子</p>
 
       <!-- 功能卡片 -->
-      <div class="flex gap-4 mb-16">
+      <div class="flex gap-4 mb-16 w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl">
         <div
           v-for="card in featureCards"
           :key="card.title"
-          class="w-52 p-5 border rounded-xl hover:shadow-sm transition-all cursor-pointer"
+          class="flex-1 p-5 border rounded-xl hover:shadow-sm transition-all cursor-pointer"
           :class="selectedCard?.title === card.title ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200'"
           @click="toggleCard(card)"
         >
@@ -29,7 +29,7 @@
 
     <!-- 消息列表 -->
     <div v-else ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4">
-      <div class="max-w-3xl mx-auto">
+      <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
         <template v-for="msg in chatStore.currentMessages" :key="msg.id">
           <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg" />
           <ToolCallCard v-else-if="msg.role === 'tool_call'" :message="msg" />
@@ -42,7 +42,7 @@
 
     <!-- 底部输入区 -->
     <div class="px-8 pb-6">
-      <div class="max-w-2xl mx-auto relative">
+      <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto relative">
         <!-- 技能使用说明（浮动弹出） -->
         <div
           v-if="selectedCard"
