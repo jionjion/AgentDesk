@@ -8,7 +8,7 @@
         </Button>
         <Button variant="outline">
           <Link :size="16" class="mr-1" />
-          通过 QoderWork 创建
+          通过搭子创建
         </Button>
         <Button>
           <Plus :size="16" class="mr-1" />

@@ -7,10 +7,10 @@
         <Bot :size="28" class="text-white" />
       </div>
 
-      <h1 class="text-3xl font-bold text-gray-900 mb-2">欢迎使用 QoderWork</h1>
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">欢迎使用搭子</h1>
       <p class="text-sm text-green-600 mb-4">面向所有人的 AI 桌面助手</p>
       <p class="text-sm text-gray-500 leading-relaxed mb-8 max-w-md">
-        将 Qoder 的 Agent 能力从代码领域扩展到日常工作场景，描述需求，自动执行，直接交付结果。
+        Agent-Desk 将 Agent 能力从代码领域扩展到日常工作场景，描述需求，自动执行，直接交付结果。
       </p>
 
       <div class="flex items-center gap-3">

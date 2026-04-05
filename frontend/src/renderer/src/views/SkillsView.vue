@@ -11,7 +11,7 @@
       <div class="flex items-center gap-2">
         <Button variant="outline">
           <Link :size="16" class="mr-1" />
-          通过 QoderWork 创建
+          通过搭子创建
         </Button>
         <Button>
           <Download :size="16" class="mr-1" />
@@ -24,7 +24,7 @@
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
         <h1 class="text-2xl font-bold text-gray-900 mb-2">技能</h1>
-        <p class="text-sm text-gray-500 mb-6">安装与管理技能，在对话中扩展 QoderWork 的能力。</p>
+        <p class="text-sm text-gray-500 mb-6">安装与管理技能，在对话中扩展搭子的能力。</p>
 
         <!-- 横幅 -->
         <div class="bg-amber-50 rounded-xl p-6 mb-6">
@@ -86,7 +86,7 @@ const mockSkills = [
   { name: '深度研究', icon: '🔍', bgColor: '#EEF2FF', description: '综合多来源搜索引擎和深度浏览器助手' },
   { name: '技术图表生成', icon: '📊', bgColor: '#F0FDF4', description: '帮你编写名立意图、流程图和时序图' },
   { name: 'UI 设计师', icon: '🎨', bgColor: '#FFF7ED', description: 'Web UI 设计和原型专家' },
-  { name: 'QoderWork 演示文稿', icon: '📑', bgColor: '#FDF2F8', description: '生成 QoderWork 风格演示文稿' },
+  { name: '搭子演示文稿', icon: '📑', bgColor: '#FDF2F8', description: '生成搭子风格演示文稿' },
   { name: 'Notion 信息助手', icon: '📝', bgColor: '#ECFDF5', description: '解析整合文本数据生成 Notion 风格内容' },
   { name: '定制周历生成器', icon: '📅', bgColor: '#EFF6FF', description: '帮助生成定制化的周历' }
 ]

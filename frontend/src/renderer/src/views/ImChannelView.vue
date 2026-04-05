@@ -22,7 +22,7 @@
         <div class="text-center mb-8">
           <h1 class="text-2xl font-bold text-gray-900 mb-3">IM 频道</h1>
           <p class="text-sm text-gray-500">
-            配置 IM 频道，让 QoderWork 接收来自钉钉、飞书等平台的消息。
+            配置 IM 频道，让搭子接收来自钉钉、飞书等平台的消息。
           </p>
           <p class="text-sm text-gray-500">
             频道配置信息仅存储在本地，不会上传到云端。
