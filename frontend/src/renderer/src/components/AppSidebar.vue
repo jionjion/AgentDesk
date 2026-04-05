@@ -76,8 +76,8 @@
 
     <!-- 用户信息 -->
     <div class="px-3 py-3 border-t border-gray-200 flex items-center gap-2">
-      <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm">
-        &#x1F436;
+      <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+        <User :size="16" class="text-gray-600" />
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-gray-800 truncate">{{ appStore.currentUser.name }}</div>
@@ -137,7 +137,7 @@ import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

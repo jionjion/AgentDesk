@@ -57,10 +57,10 @@
           >
             <div class="flex items-start gap-3 mb-2">
               <div
-                class="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+                class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                 :style="{ backgroundColor: skill.bgColor }"
               >
-                {{ skill.icon }}
+                <component :is="skill.icon" :size="20" class="text-gray-600" />
               </div>
               <div class="min-w-0">
                 <h3 class="text-sm font-medium text-gray-800 truncate">{{ skill.name }}</h3>
@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { Search, Link, Download } from 'lucide-vue-next'
+import { Search, Link, Download, SearchCode, BarChart3, Palette, Presentation, FileEdit, CalendarDays } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -83,11 +83,11 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const mockSkills = [
-  { name: '深度研究', icon: '🔍', bgColor: '#EEF2FF', description: '综合多来源搜索引擎和深度浏览器助手' },
-  { name: '技术图表生成', icon: '📊', bgColor: '#F0FDF4', description: '帮你编写名立意图、流程图和时序图' },
-  { name: 'UI 设计师', icon: '🎨', bgColor: '#FFF7ED', description: 'Web UI 设计和原型专家' },
-  { name: '搭子演示文稿', icon: '📑', bgColor: '#FDF2F8', description: '生成搭子风格演示文稿' },
-  { name: 'Notion 信息助手', icon: '📝', bgColor: '#ECFDF5', description: '解析整合文本数据生成 Notion 风格内容' },
-  { name: '定制周历生成器', icon: '📅', bgColor: '#EFF6FF', description: '帮助生成定制化的周历' }
+  { name: '深度研究', icon: SearchCode, bgColor: '#F3F4F6', description: '综合多来源搜索引擎和深度浏览器助手' },
+  { name: '技术图表生成', icon: BarChart3, bgColor: '#F3F4F6', description: '帮你编写名立意图、流程图和时序图' },
+  { name: 'UI 设计师', icon: Palette, bgColor: '#F3F4F6', description: 'Web UI 设计和原型专家' },
+  { name: '搭子演示文稿', icon: Presentation, bgColor: '#F3F4F6', description: '生成搭子风格演示文稿' },
+  { name: 'Notion 信息助手', icon: FileEdit, bgColor: '#F3F4F6', description: '解析整合文本数据生成 Notion 风格内容' },
+  { name: '定制周历生成器', icon: CalendarDays, bgColor: '#F3F4F6', description: '帮助生成定制化的周历' }
 ]
 </script>

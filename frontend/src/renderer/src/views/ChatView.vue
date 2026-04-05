@@ -4,7 +4,7 @@
     <div v-if="chatStore.currentMessages.length === 0" class="flex-1 flex flex-col items-center justify-center px-8">
       <!-- Logo + 标语 -->
       <div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
-        <span class="text-3xl">&#x1F916;</span>
+        <Bot :size="32" class="text-gray-600" />
       </div>
       <h1 class="text-2xl font-bold text-gray-900 mb-2">不止聊天，搞定一切</h1>
       <p class="text-sm text-gray-500 mb-10">本地运行、自主规划、安全可控的 AI 工作搭子</p>
@@ -131,7 +131,8 @@ import {
   Square,
   FileText,
   Camera,
-  BarChart3
+  BarChart3,
+  Bot
 } from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chat'
 import { Button } from '@/components/ui/button'

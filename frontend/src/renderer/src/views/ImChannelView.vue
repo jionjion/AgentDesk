@@ -9,8 +9,8 @@
             <div class="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-sm">
               Sure. Cleaning duplicates now.
             </div>
-            <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center text-3xl">
-              🤖
+            <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
+              <Bot :size="28" class="text-gray-600" />
             </div>
             <div class="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm">
               Organize my desktop files please
@@ -38,10 +38,9 @@
           >
             <div class="flex items-center gap-4">
               <div
-                class="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                :style="{ backgroundColor: channel.bgColor }"
+                class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100"
               >
-                {{ channel.icon }}
+                <component :is="channel.icon" :size="20" class="text-gray-600" />
               </div>
               <div>
                 <div class="flex items-center gap-2">
@@ -69,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { MoreHorizontal } from 'lucide-vue-next'
+import { MoreHorizontal, Bot, MessageSquare, Send, MessageCircle } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -78,22 +77,19 @@ import { Switch } from '@/components/ui/switch'
 const channels = [
   {
     name: '钉钉',
-    icon: '💬',
-    bgColor: '#EFF6FF',
+    icon: MessageSquare,
     description: '通过钉钉机器人接收并回复用户消息',
     connected: false
   },
   {
     name: '飞书',
-    icon: '🐦',
-    bgColor: '#ECFDF5',
+    icon: Send,
     description: '通过飞书机器人接收并回复用户消息',
     connected: true
   },
   {
     name: '微信',
-    icon: '💚',
-    bgColor: '#F0FDF4',
+    icon: MessageCircle,
     description: '通过微信机器人接收并回复用户消息',
     connected: false
   }
