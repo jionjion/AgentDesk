@@ -28,6 +28,7 @@ public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private static final Pattern SESSION_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
@@ -131,8 +132,7 @@ public class ChatController {
     /** 向客户端发送错误事件 */
     private void sendErrorEvent(SseEmitter emitter, String message) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            String json = mapper.writeValueAsString(ChatEventDto.error(message != null ? message : "unknown error"));
+            String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.error(message != null ? message : "unknown error"));
             emitter.send(SseEmitter.event().name("error").data(json));
         } catch (Exception e) {
             log.debug("Failed to send error event: {}", e.getMessage());

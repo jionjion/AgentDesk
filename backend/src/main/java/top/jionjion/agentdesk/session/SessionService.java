@@ -2,8 +2,10 @@ package top.jionjion.agentdesk.session;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.agent.AgentPool;
 import top.jionjion.agentdesk.dto.SessionResponse;
+import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.repository.SessionRepository;
 
 import java.util.List;
@@ -16,10 +18,12 @@ import java.util.UUID;
 public class SessionService {
 
     private final SessionRepository sessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final AgentPool agentPool;
 
-    public SessionService(SessionRepository sessionRepository, AgentPool agentPool) {
+    public SessionService(SessionRepository sessionRepository, ChatMessageRepository chatMessageRepository, AgentPool agentPool) {
         this.sessionRepository = sessionRepository;
+        this.chatMessageRepository = chatMessageRepository;
         this.agentPool = agentPool;
     }
 
@@ -55,7 +59,9 @@ public class SessionService {
     /**
      * 删除会话
      */
+    @Transactional
     public void delete(String id) {
+        chatMessageRepository.deleteBySessionId(id);
         sessionRepository.deleteById(id);
         agentPool.remove(id);
     }
