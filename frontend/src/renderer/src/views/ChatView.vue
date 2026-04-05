@@ -1,7 +1,14 @@
 <template>
   <div class="h-full flex flex-col">
+    <!-- 骨架屏 - 切换会话加载中 -->
+    <div v-if="chatStore.isLoadingSession" class="flex-1 overflow-hidden">
+      <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
+        <MessageSkeleton />
+      </div>
+    </div>
+
     <!-- 消息区域 / 欢迎页 -->
-    <div v-if="chatStore.currentMessages.length === 0" class="flex-1 flex flex-col items-center justify-center px-8">
+    <div v-else-if="chatStore.currentMessages.length === 0" class="flex-1 flex flex-col items-center justify-center px-8">
       <!-- Logo + 标语 -->
       <div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
         <Bot :size="32" class="text-gray-600" />
@@ -141,6 +148,7 @@ import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ToolCallCard from '@/components/chat/ToolCallCard.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
 import PlanCard from '@/components/chat/PlanCard.vue'
+import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 
 const chatStore = useChatStore()
 const route = useRoute()

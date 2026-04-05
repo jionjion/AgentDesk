@@ -60,10 +60,19 @@
           </AlertDescription>
         </Alert>
 
-        <!-- 任务卡片网格 -->
-        <div class="grid grid-cols-2 gap-4">
+        <!-- 任务卡片网格 / 空状态 -->
+        <EmptyState
+          v-if="tasks.length === 0"
+          :icon="CalendarClock"
+          title="还没有定时任务"
+          description="创建定时任务，让搭子按时为你工作"
+          action-label="新建定时任务"
+          :action-icon="Plus"
+          @action="() => {}"
+        />
+        <div v-else class="grid grid-cols-2 gap-4">
           <div
-            v-for="task in mockScheduledTasks"
+            v-for="task in tasks"
             :key="task.title"
             class="border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow"
           >
@@ -87,13 +96,15 @@
 </template>
 
 <script setup lang="ts">
-import { RefreshCw, Link, Plus, ArrowUpDown, MoreHorizontal, Clock } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { RefreshCw, Link, Plus, ArrowUpDown, MoreHorizontal, Clock, CalendarClock } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Switch } from '@/components/ui/switch'
+import EmptyState from '@/components/ui/empty-state/EmptyState.vue'
 
 const mockScheduledTasks = [
   {
@@ -121,4 +132,6 @@ const mockScheduledTasks = [
     enabled: false
   }
 ]
+
+const tasks = ref(mockScheduledTasks)
 </script>

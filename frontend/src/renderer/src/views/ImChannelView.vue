@@ -29,8 +29,17 @@
           </p>
         </div>
 
-        <!-- 频道列表 -->
-        <div class="space-y-4">
+        <!-- 频道列表 / 空状态 -->
+        <EmptyState
+          v-if="channels.length === 0"
+          :icon="MessageSquare"
+          title="还没有连接频道"
+          description="连接钉钉、飞书或微信，随时随地与搭子对话"
+          action-label="添加频道"
+          :action-icon="Plus"
+          @action="() => {}"
+        />
+        <div v-else class="space-y-4">
           <div
             v-for="channel in channels"
             :key="channel.name"
@@ -68,13 +77,15 @@
 </template>
 
 <script setup lang="ts">
-import { MoreHorizontal, Bot, MessageSquare, Send, MessageCircle } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { MoreHorizontal, Bot, MessageSquare, Send, MessageCircle, Plus } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import EmptyState from '@/components/ui/empty-state/EmptyState.vue'
 
-const channels = [
+const mockChannels = [
   {
     name: '钉钉',
     icon: MessageSquare,
@@ -94,4 +105,6 @@ const channels = [
     connected: false
   }
 ]
+
+const channels = ref(mockChannels)
 </script>

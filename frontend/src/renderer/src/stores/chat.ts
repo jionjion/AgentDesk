@@ -16,6 +16,7 @@ export const useChatStore = defineStore('chat', () => {
   const currentSessionId = ref<string | null>(null)
   const messagesBySession = ref<Record<string, ChatMessage[]>>({})
   const isStreaming = ref(false)
+  const isLoadingSession = ref(false)
   const eventSource = ref<EventSource | null>(null)
 
   // === Computed ===
@@ -52,10 +53,15 @@ export const useChatStore = defineStore('chat', () => {
   /** 切换会话 */
   function switchSession(id: string) {
     if (isStreaming.value) return
+    isLoadingSession.value = true
     currentSessionId.value = id
     if (!messagesBySession.value[id]) {
       messagesBySession.value[id] = []
     }
+    // 模拟加载延迟，后续对接历史消息 API 时替换为真实异步
+    setTimeout(() => {
+      isLoadingSession.value = false
+    }, 400)
   }
 
   /** 删除会话 */
@@ -295,6 +301,7 @@ export const useChatStore = defineStore('chat', () => {
     currentSessionId,
     messagesBySession,
     isStreaming,
+    isLoadingSession,
     // computed
     currentSession,
     currentMessages,

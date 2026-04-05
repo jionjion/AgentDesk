@@ -48,10 +48,19 @@
           <span class="text-xs text-gray-400 ml-4 cursor-pointer hover:text-gray-600">全部</span>
         </div>
 
-        <!-- 技能卡片网格 -->
-        <div class="grid grid-cols-3 gap-4">
+        <!-- 技能卡片网格 / 空状态 -->
+        <EmptyState
+          v-if="skills.length === 0"
+          :icon="Sparkles"
+          title="还没有技能"
+          description="探索技能广场，安装你需要的技能来扩展搭子的能力"
+          action-label="浏览技能广场"
+          :action-icon="Search"
+          @action="() => {}"
+        />
+        <div v-else class="grid grid-cols-3 gap-4">
           <div
-            v-for="skill in mockSkills"
+            v-for="skill in skills"
             :key="skill.name"
             class="border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow cursor-pointer"
           >
@@ -75,12 +84,14 @@
 </template>
 
 <script setup lang="ts">
-import { Search, Link, Download, SearchCode, BarChart3, Palette, Presentation, FileEdit, CalendarDays } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { Search, Link, Download, SearchCode, BarChart3, Palette, Presentation, FileEdit, CalendarDays, Sparkles } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import EmptyState from '@/components/ui/empty-state/EmptyState.vue'
 
 const mockSkills = [
   { name: '深度研究', icon: SearchCode, bgColor: '#F3F4F6', description: '综合多来源搜索引擎和深度浏览器助手' },
@@ -90,4 +101,6 @@ const mockSkills = [
   { name: 'Notion 信息助手', icon: FileEdit, bgColor: '#F3F4F6', description: '解析整合文本数据生成 Notion 风格内容' },
   { name: '定制周历生成器', icon: CalendarDays, bgColor: '#F3F4F6', description: '帮助生成定制化的周历' }
 ]
+
+const skills = ref(mockSkills)
 </script>
