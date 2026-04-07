@@ -50,23 +50,40 @@
       </div>
       <ScrollArea class="h-full">
         <div class="px-2 space-y-0.5">
-          <div
-            v-for="session in chatStore.sessions"
-            :key="session.id"
-            class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
-            :class="chatStore.currentSessionId === session.id
-              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium'
-              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
-            @click="handleSwitchSession(session.id)"
-            @contextmenu.prevent="handleContextMenu($event, session.id)"
-          >
-            <span class="flex-1 truncate">{{ session.title }}</span>
-            <X
-              :size="14"
-              class="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-              @click.stop="handleDeleteSession(session.id)"
-            />
-          </div>
+          <ContextMenu v-for="session in chatStore.sortedSessions" :key="session.id">
+            <ContextMenuTrigger as-child>
+              <div
+                class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
+                :class="chatStore.currentSessionId === session.id
+                  ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
+                @click="handleSwitchSession(session.id)"
+              >
+                <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500" />
+                <span class="flex-1 truncate">{{ session.title }}</span>
+                <X
+                  :size="14"
+                  class="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                  @click.stop="handleDeleteSession(session.id)"
+                />
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent class="w-40">
+              <ContextMenuItem class="cursor-pointer" @select="handleRenameSession(session.id, session.title)">
+                <Edit3 :size="14" />
+                <span>重命名</span>
+              </ContextMenuItem>
+              <ContextMenuItem class="cursor-pointer" @select="chatStore.togglePin(session.id)">
+                <component :is="chatStore.isPinned(session.id) ? PinOff : Pin" :size="14" />
+                <span>{{ chatStore.isPinned(session.id) ? '取消置顶' : '置顶' }}</span>
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(session.id)">
+                <Trash2 :size="14" />
+                <span>删除</span>
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
           <div v-if="chatStore.sessions.length === 0" class="px-2 py-4 text-center">
             <span class="text-xs text-gray-400">暂无会话</span>
           </div>
@@ -156,25 +173,45 @@
         </PopoverContent>
       </Popover>
     </div>
+
+    <!-- 删除确认对话框 -->
+    <AlertDialog v-model:open="deleteConfirmOpen">
+      <AlertDialogContent class="max-w-sm">
+        <AlertDialogTitle>确认删除</AlertDialogTitle>
+        <AlertDialogDescription>删除后无法恢复，确定要删除该会话吗？</AlertDialogDescription>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction @click="confirmDeleteSession">删除</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import type { ThemeMode } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2 } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu'
+import {
+  AlertDialog, AlertDialogContent, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
+} from '@/components/ui/alert-dialog'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const chatStore = useChatStore()
+
+const deleteConfirmOpen = ref(false)
+const pendingDeleteId = ref<string | null>(null)
 
 const navItems = [
   { path: '/skills', label: '技能', icon: Ticket, badge: '' },
@@ -208,6 +245,15 @@ function handleSwitchSession(id: string) {
 }
 
 async function handleDeleteSession(id: string) {
+  pendingDeleteId.value = id
+  deleteConfirmOpen.value = true
+}
+
+async function confirmDeleteSession() {
+  if (!pendingDeleteId.value) return
+  const id = pendingDeleteId.value
+  deleteConfirmOpen.value = false
+  pendingDeleteId.value = null
   await chatStore.removeSession(id)
   if (chatStore.currentSessionId) {
     router.push(`/chat/${chatStore.currentSessionId}`)
@@ -216,8 +262,11 @@ async function handleDeleteSession(id: string) {
   }
 }
 
-function handleContextMenu(_event: MouseEvent, _sessionId: string) {
-  // 未来可扩展右键菜单 (重命名等)
+function handleRenameSession(id: string, currentTitle: string) {
+  const newTitle = window.prompt('重命名会话', currentTitle)
+  if (newTitle && newTitle.trim() && newTitle !== currentTitle) {
+    chatStore.renameSession(id, newTitle.trim())
+  }
 }
 
 function handleOpenSettings() {

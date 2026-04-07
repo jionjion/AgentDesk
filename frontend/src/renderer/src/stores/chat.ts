@@ -19,6 +19,7 @@ export const useChatStore = defineStore('chat', () => {
   const isStreaming = ref(false)
   const isLoadingSession = ref(false)
   const eventSource = ref<EventSource | null>(null)
+  const pinnedSessionIds = ref<Set<string>>(new Set())
 
   interface PendingFile {
     id: number
@@ -37,6 +38,12 @@ export const useChatStore = defineStore('chat', () => {
   const currentMessages = computed(() =>
     currentSessionId.value ? (messagesBySession.value[currentSessionId.value] || []) : []
   )
+
+  const sortedSessions = computed(() => {
+    const pinned = sessions.value.filter(s => pinnedSessionIds.value.has(s.id))
+    const unpinned = sessions.value.filter(s => !pinnedSessionIds.value.has(s.id))
+    return [...pinned, ...unpinned]
+  })
 
   // === Actions ===
 
@@ -383,6 +390,58 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /** 切换会话置顶 */
+  function togglePin(id: string) {
+    if (pinnedSessionIds.value.has(id)) {
+      pinnedSessionIds.value.delete(id)
+    } else {
+      pinnedSessionIds.value.add(id)
+    }
+  }
+
+  /** 判断会话是否置顶 */
+  function isPinned(id: string) {
+    return pinnedSessionIds.value.has(id)
+  }
+
+  /** 删除单条消息 */
+  function deleteMessage(messageId: string) {
+    if (!currentSessionId.value) return
+    const msgs = messagesBySession.value[currentSessionId.value]
+    if (!msgs) return
+    const idx = msgs.findIndex(m => m.id === messageId)
+    if (idx >= 0) {
+      msgs.splice(idx, 1)
+    }
+  }
+
+  /** 重新生成助手回复 (重发上一条用户消息) */
+  async function regenerateMessage(messageId: string) {
+    if (!currentSessionId.value || isStreaming.value) return
+    const msgs = messagesBySession.value[currentSessionId.value]
+    if (!msgs) return
+
+    // 找到该助手消息的位置
+    const assistantIdx = msgs.findIndex(m => m.id === messageId)
+    if (assistantIdx < 0) return
+
+    // 向前找到最近的用户消息
+    let userContent = ''
+    for (let i = assistantIdx - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') {
+        userContent = (msgs[i] as { content: string }).content
+        break
+      }
+    }
+    if (!userContent) return
+
+    // 删除该助手消息及其后续的 thinking/tool_call/plan 消息
+    msgs.splice(assistantIdx)
+
+    // 重新发送
+    await sendMessage(userContent)
+  }
+
   return {
     // state
     sessions,
@@ -391,9 +450,11 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     isLoadingSession,
     pendingAttachments,
+    pinnedSessionIds,
     // computed
     currentSession,
     currentMessages,
+    sortedSessions,
     // actions
     loadSessions,
     createNewSession,
@@ -404,6 +465,10 @@ export const useChatStore = defineStore('chat', () => {
     interrupt,
     addAttachment,
     removeAttachment,
-    clearAttachments
+    clearAttachments,
+    togglePin,
+    isPinned,
+    deleteMessage,
+    regenerateMessage
   }
 })

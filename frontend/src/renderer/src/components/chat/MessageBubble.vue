@@ -1,49 +1,86 @@
 <template>
-  <div ref="bubbleRef" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
-    <!-- 头像 -->
-    <div
-      class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
-      :class="isUser ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400' : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'"
-    >
-      {{ isUser ? '你' : 'AI' }}
-    </div>
-    <!-- 消息内容 -->
-    <div class="max-w-[75%] min-w-0">
-      <div
-        class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
-        :class="isUser
-          ? 'bg-blue-500 text-white rounded-br-md'
-          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
-      >
-        <div v-if="isUser">
-          {{ message.content }}
-          <div v-if="(message as UserMessage).attachments?.length"
-               class="flex flex-wrap gap-1.5 mt-2">
-            <div v-for="att in (message as UserMessage).attachments" :key="att.id"
-                 class="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs">
-              <FileText :size="12" />
-              <span class="truncate max-w-[120px]">{{ att.name }}</span>
+  <ContextMenu>
+    <ContextMenuTrigger as-child>
+      <div ref="bubbleRef" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
+        <!-- 头像 -->
+        <div
+          class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
+          :class="isUser ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400' : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'"
+        >
+          {{ isUser ? '你' : 'AI' }}
+        </div>
+        <!-- 消息内容 -->
+        <div class="max-w-[75%] min-w-0">
+          <div
+            class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
+            :class="isUser
+              ? 'bg-blue-500 text-white rounded-br-md'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
+          >
+            <div v-if="isUser">
+              {{ message.content }}
+              <div v-if="(message as UserMessage).attachments?.length"
+                   class="flex flex-wrap gap-1.5 mt-2">
+                <div v-for="att in (message as UserMessage).attachments" :key="att.id"
+                     class="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs">
+                  <FileText :size="12" />
+                  <span class="truncate max-w-[120px]">{{ att.name }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else>
+              <div class="markdown-body" v-html="renderedContent" />
+              <span
+                v-if="(message as AssistantMessage).isStreaming"
+                class="inline-block w-1.5 h-4 bg-green-500 ml-0.5 animate-pulse align-middle"
+              />
             </div>
           </div>
         </div>
-        <div v-else>
-          <div class="markdown-body" v-html="renderedContent" />
-          <span
-            v-if="(message as AssistantMessage).isStreaming"
-            class="inline-block w-1.5 h-4 bg-green-500 ml-0.5 animate-pulse align-middle"
-          />
-        </div>
       </div>
-    </div>
-  </div>
+    </ContextMenuTrigger>
+    <ContextMenuContent class="w-36">
+      <ContextMenuItem class="cursor-pointer" @select="handleCopyContent">
+        <Copy :size="14" />
+        <span>复制</span>
+      </ContextMenuItem>
+      <ContextMenuItem v-if="!isUser" class="cursor-pointer" @select="handleRegenerate">
+        <RefreshCw :size="14" />
+        <span>重新生成</span>
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDelete">
+        <Trash2 :size="14" />
+        <span>删除</span>
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
+
+  <!-- 删除确认对话框 -->
+  <AlertDialog v-model:open="deleteConfirmOpen">
+    <AlertDialogContent class="max-w-sm">
+      <AlertDialogTitle>确认删除</AlertDialogTitle>
+      <AlertDialogDescription>确定要删除该消息吗？</AlertDialogDescription>
+      <AlertDialogFooter>
+        <AlertDialogCancel>取消</AlertDialogCancel>
+        <AlertDialogAction @click="confirmDelete">删除</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { Marked } from 'marked'
 import hljs from 'highlight.js'
-import { FileText } from 'lucide-vue-next'
+import { FileText, Copy, RefreshCw, Trash2 } from 'lucide-vue-next'
 import type { ChatMessage, AssistantMessage, UserMessage } from '@/types/chat'
+import { useChatStore } from '@/stores/chat'
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu'
+import {
+  AlertDialog, AlertDialogContent, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
+} from '@/components/ui/alert-dialog'
 
 const marked = new Marked()
 
@@ -67,7 +104,31 @@ const props = defineProps<{
   message: ChatMessage
 }>()
 
+const chatStore = useChatStore()
+
 const isUser = computed(() => props.message.role === 'user')
+
+function handleCopyContent() {
+  const content = props.message.role === 'user'
+    ? (props.message as UserMessage).content
+    : (props.message as AssistantMessage).content
+  navigator.clipboard.writeText(content || '')
+}
+
+function handleRegenerate() {
+  chatStore.regenerateMessage(props.message.id)
+}
+
+const deleteConfirmOpen = ref(false)
+
+function handleDelete() {
+  deleteConfirmOpen.value = true
+}
+
+function confirmDelete() {
+  deleteConfirmOpen.value = false
+  chatStore.deleteMessage(props.message.id)
+}
 
 const renderedContent = computed(() => {
   const content = (props.message as AssistantMessage).content || ''
