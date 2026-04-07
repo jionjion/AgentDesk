@@ -16,10 +16,13 @@ import { RouterView } from 'vue-router'
 import TitleBar from '@/components/TitleBar.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 onMounted(() => {
   appStore.initTheme()
+  authStore.fetchUser()
 })
 </script>

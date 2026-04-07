@@ -244,7 +244,8 @@ function fillExample(example: string) {
   inputText.value = example
 }
 
-function handleSend() {
+function handleSend(e?: KeyboardEvent) {
+  if (e?.isComposing) return
   const hasAttachments = chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)
   if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
   chatStore.sendMessage(inputText.value)

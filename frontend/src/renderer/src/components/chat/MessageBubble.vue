@@ -15,13 +15,15 @@
           ? 'bg-blue-500 text-white rounded-br-md'
           : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
       >
-        <div v-if="isUser">{{ message.content }}</div>
-        <div v-if="isUser && (message as UserMessage).attachments?.length"
-             class="flex flex-wrap gap-1.5 mt-2">
-          <div v-for="att in (message as UserMessage).attachments" :key="att.id"
-               class="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs">
-            <FileText :size="12" />
-            <span class="truncate max-w-[120px]">{{ att.name }}</span>
+        <div v-if="isUser">
+          {{ message.content }}
+          <div v-if="(message as UserMessage).attachments?.length"
+               class="flex flex-wrap gap-1.5 mt-2">
+            <div v-for="att in (message as UserMessage).attachments" :key="att.id"
+                 class="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs">
+              <FileText :size="12" />
+              <span class="truncate max-w-[120px]">{{ att.name }}</span>
+            </div>
           </div>
         </div>
         <div v-else>
