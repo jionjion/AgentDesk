@@ -7,7 +7,8 @@ import io.agentscope.core.tool.Toolkit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.env.Environment;
+import top.jionjion.agentdesk.repository.FileRecordRepository;
+import top.jionjion.agentdesk.service.OssService;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -18,20 +19,20 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class AgentTest {
 
     @Autowired
-    private Environment environment;
+    private DashScopeChatModel model;
+
+    @Autowired
+    private FileRecordRepository fileRecordRepository;
+
+    @Autowired
+    private OssService ossService;
 
 
     @Test
     void testAgentChat() {
-        // 构建模型
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(environment.getProperty("DASHSCOPE_API_KEY"))
-                .modelName("qwen-plus")
-                .build();
-
         // 注册工具
         Toolkit toolkit = new Toolkit();
-        toolkit.registerTool(new SimpleTools());
+        toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
 
         // 创建 Agent
         ReActAgent agent = ReActAgent.builder()
@@ -52,13 +53,8 @@ class AgentTest {
 
     @Test
     void testAgentWithTool() {
-        DashScopeChatModel model = DashScopeChatModel.builder()
-                .apiKey(environment.getProperty("DASHSCOPE_API_KEY"))
-                .modelName("qwen-plus")
-                .build();
-
         Toolkit toolkit = new Toolkit();
-        toolkit.registerTool(new SimpleTools());
+        toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
 
         ReActAgent agent = ReActAgent.builder()
                 .name("test-assistant")
