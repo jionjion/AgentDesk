@@ -16,6 +16,7 @@ import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.session.SessionService;
 
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -38,6 +39,20 @@ public class ChatController {
         this.agentPool = agentPool;
         this.chatMessageRepository = chatMessageRepository;
         this.sessionService = sessionService;
+    }
+
+    /**
+     * 获取指定会话的聊天记录
+     *
+     * @param sessionId 会话ID
+     * @return 按时间升序排列的消息列表
+     */
+    @GetMapping("/messages")
+    public List<ChatMessage> getMessages(@RequestParam String sessionId) {
+        if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
+        }
+        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
     }
 
     /**
