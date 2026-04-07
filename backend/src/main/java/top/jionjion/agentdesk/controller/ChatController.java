@@ -12,10 +12,14 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import top.jionjion.agentdesk.agent.AgentHandle;
 import top.jionjion.agentdesk.agent.AgentPool;
 import top.jionjion.agentdesk.dto.ChatEventDto;
+import top.jionjion.agentdesk.dto.FileResponse;
 import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
+import top.jionjion.agentdesk.service.FileService;
 import top.jionjion.agentdesk.session.SessionService;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -34,11 +38,14 @@ public class ChatController {
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
     private final SessionService sessionService;
+    private final FileService fileService;
 
-    public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository, SessionService sessionService) {
+    public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository,
+                          SessionService sessionService, FileService fileService) {
         this.agentPool = agentPool;
         this.chatMessageRepository = chatMessageRepository;
         this.sessionService = sessionService;
+        this.fileService = fileService;
     }
 
     /**
@@ -60,7 +67,8 @@ public class ChatController {
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
-                                 @RequestParam String message) {
+                                 @RequestParam String message,
+                                 @RequestParam(required = false) String fileIds) {
         if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
         }
@@ -79,8 +87,21 @@ public class ChatController {
         SseEmitter emitter = new SseEmitter(300_000L);
         handle.hook().setEmitter(emitter);
 
-        // 持久化用户消息
-        chatMessageRepository.save(new ChatMessage(sessionId, "user", message));
+        // 解析 fileIds 并查询文件元数据
+        List<Long> parsedFileIds = parseFileIds(fileIds);
+        List<FileResponse> files = parsedFileIds.isEmpty()
+                ? Collections.emptyList()
+                : fileService.getByIds(parsedFileIds);
+
+        // 拼接带文件信息的 prompt
+        String enrichedMessage = buildMessageWithFiles(message, files);
+
+        // 持久化用户消息 (含 fileIds)
+        ChatMessage chatMsg = new ChatMessage(sessionId, "user", message);
+        if (!parsedFileIds.isEmpty()) {
+            chatMsg.setFileIds(parsedFileIds);
+        }
+        chatMessageRepository.save(chatMsg);
 
         emitter.onTimeout(() -> {
             log.warn("Session {} SSE timeout", sessionId);
@@ -97,7 +118,7 @@ public class ChatController {
         });
 
         Msg userMsg = Msg.builder()
-                .textContent(message)
+                .textContent(enrichedMessage)
                 .build();
 
         handle.agent().stream(userMsg)
@@ -151,5 +172,41 @@ public class ChatController {
         } catch (Exception e) {
             log.debug("Failed to send error event: {}", e.getMessage());
         }
+    }
+
+    /** 解析逗号分隔的 fileIds 字符串 */
+    private List<Long> parseFileIds(String fileIds) {
+        if (fileIds == null || fileIds.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(fileIds.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Long::valueOf)
+                .toList();
+    }
+
+    /** 将文件元信息拼入用户消息 */
+    private String buildMessageWithFiles(String message, List<FileResponse> files) {
+        if (files.isEmpty()) return message;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("[用户上传了以下文件]\n");
+        for (FileResponse f : files) {
+            sb.append(String.format("- %s (大小: %s, 类型: %s, fileId: %d)\n",
+                    f.originalName(),
+                    formatSize(f.size()),
+                    f.contentType(),
+                    f.id()));
+        }
+        sb.append("\n[用户消息]\n");
+        sb.append(message);
+        return sb.toString();
+    }
+
+    private String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + "B";
+        if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
+        return String.format("%.1fMB", bytes / (1024.0 * 1024));
     }
 }

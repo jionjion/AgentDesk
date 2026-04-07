@@ -5,7 +5,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import top.jionjion.agentdesk.converter.JsonMapConverter;
+import top.jionjion.agentdesk.converter.LongListConverter;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -65,6 +67,13 @@ public class ChatMessage {
      * 工具调用结果
      */
     private String result;
+
+    /**
+     * 附件文件ID列表, 仅 user 消息使用
+     */
+    @Convert(converter = LongListConverter.class)
+    @Column(name = "file_ids", columnDefinition = "jsonb")
+    private List<Long> fileIds;
 
     /**
      * 创建时间, 毫秒时间戳

@@ -108,3 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON agent_desk.sessions (user_id);
 
 ALTER TABLE agent_desk.files ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES agent_desk.users(id);
 CREATE INDEX IF NOT EXISTS idx_files_user ON agent_desk.files (user_id);
+
+-- 8. chat_messages 增加 file_ids 字段 (存储用户消息附带的文件ID列表)
+ALTER TABLE agent_desk.chat_messages ADD COLUMN IF NOT EXISTS file_ids JSONB DEFAULT NULL;
+COMMENT ON COLUMN agent_desk.chat_messages.file_ids IS '附件文件ID列表, JSON数组格式, 仅user角色消息使用';

@@ -15,7 +15,9 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * JWT 认证过滤器: 从 Header 提取并验证 Token, 设置 SecurityContext
+ * JWT 认证过滤器: 从 Header 或 URL 参数提取并验证 Token, 设置 SecurityContext.
+ * <p>
+ * SSE (EventSource) 无法设置自定义 Header, 因此也支持 ?token=xxx 方式传递.
  */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -27,25 +29,38 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
+        String token = resolveToken(request);
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            if (jwtService.isTokenValid(token)) {
-                Long userId = jwtService.getUserId(token);
-                String username = jwtService.getUsername(token);
-                UserPrincipal principal = new UserPrincipal(userId, username);
+        if (token != null && jwtService.isTokenValid(token)) {
+            Long userId = jwtService.getUserId(token);
+            String username = jwtService.getUsername(token);
+            UserPrincipal principal = new UserPrincipal(userId, username);
 
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        principal, null, List.of()
-                );
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            }
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                    principal, null, List.of()
+            );
+            SecurityContextHolder.getContext().setAuthentication(auth);
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 优先从 Authorization Header 提取, 其次从 URL 参数 token 提取
+     */
+    private String resolveToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return request.getParameter("token");
     }
 }
