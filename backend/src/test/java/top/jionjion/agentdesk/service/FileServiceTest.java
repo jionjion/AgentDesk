@@ -35,7 +35,7 @@ class FileServiceTest {
         );
 
         // 1. 上传
-        FileResponse uploaded = fileService.upload(file, null, 1L);
+        FileResponse uploaded = fileService.upload(file, null);
         assertNotNull(uploaded.id());
         assertNotNull(uploaded.downloadUrl());
         assertEquals("15853.jpg", uploaded.originalName());
@@ -47,14 +47,14 @@ class FileServiceTest {
         System.out.println("下载链接: " + uploaded.downloadUrl());
 
         // 2. 查询
-        FileResponse queried = fileService.getFile(uploaded.id(), 1L);
+        FileResponse queried = fileService.getFile(uploaded.id());
         assertEquals(uploaded.id(), queried.id());
         assertNotNull(queried.downloadUrl());
 
         System.out.println("查询成功, 文件大小: " + queried.size() + " bytes");
 
         // 3. 删除
-        fileService.delete(uploaded.id(), 1L);
+        fileService.delete(uploaded.id());
         System.out.println("删除成功");
     }
 }

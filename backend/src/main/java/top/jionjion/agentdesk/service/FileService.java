@@ -7,6 +7,7 @@ import org.springframework.web.server.ResponseStatusException;
 import top.jionjion.agentdesk.dto.FileResponse;
 import top.jionjion.agentdesk.entity.FileRecord;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
+import top.jionjion.agentdesk.security.UserContext;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -31,7 +32,8 @@ public class FileService {
     /**
      * 上传文件, sessionId 可为空(通用上传)
      */
-    public FileResponse upload(MultipartFile file, String sessionId, Long userId) {
+    public FileResponse upload(MultipartFile file, String sessionId) {
+        Long userId = UserContext.getUserId();
         String originalName = file.getOriginalFilename();
         String prefix = sessionId != null ? "chat/" + sessionId
                 : "general/" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
@@ -54,7 +56,8 @@ public class FileService {
     /**
      * 获取文件信息 + 预签名下载 URL
      */
-    public FileResponse getFile(Long id, Long userId) {
+    public FileResponse getFile(Long id) {
+        Long userId = UserContext.getUserId();
         FileRecord record = fileRecordRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文件不存在"));
         return toResponse(record);
@@ -63,7 +66,8 @@ public class FileService {
     /**
      * 删除文件(OSS + 数据库)
      */
-    public void delete(Long id, Long userId) {
+    public void delete(Long id) {
+        Long userId = UserContext.getUserId();
         FileRecord record = fileRecordRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文件不存在"));
         ossService.delete(record.getOssKey());
@@ -73,7 +77,8 @@ public class FileService {
     /**
      * 列出会话下所有文件
      */
-    public List<FileResponse> listBySession(String sessionId, Long userId) {
+    public List<FileResponse> listBySession(String sessionId) {
+        Long userId = UserContext.getUserId();
         return fileRecordRepository.findBySessionIdAndUserIdOrderByCreatedAtAsc(sessionId, userId)
                 .stream().map(this::toResponse).toList();
     }

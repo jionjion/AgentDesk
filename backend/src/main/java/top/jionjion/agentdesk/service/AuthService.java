@@ -9,6 +9,7 @@ import top.jionjion.agentdesk.dto.LoginRequest;
 import top.jionjion.agentdesk.dto.RegisterRequest;
 import top.jionjion.agentdesk.entity.User;
 import top.jionjion.agentdesk.repository.UserRepository;
+import top.jionjion.agentdesk.security.UserContext;
 
 /**
  * 认证业务逻辑
@@ -63,7 +64,8 @@ public class AuthService {
     /**
      * 获取当前用户信息
      */
-    public AuthResponse getCurrentUser(Long userId) {
+    public AuthResponse getCurrentUser() {
+        Long userId = UserContext.getUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
         return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), user.getAvatar(), null);

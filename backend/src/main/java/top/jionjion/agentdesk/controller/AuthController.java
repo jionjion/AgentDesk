@@ -30,7 +30,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public AuthResponse me(@RequestAttribute("userId") Long userId) {
-        return authService.getCurrentUser(userId);
+    public AuthResponse me() {
+        return authService.getCurrentUser();
     }
 }

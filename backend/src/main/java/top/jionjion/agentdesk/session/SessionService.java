@@ -7,6 +7,7 @@ import top.jionjion.agentdesk.agent.AgentPool;
 import top.jionjion.agentdesk.dto.SessionResponse;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.repository.SessionRepository;
+import top.jionjion.agentdesk.security.UserContext;
 
 import java.util.List;
 import java.util.UUID;
@@ -30,7 +31,8 @@ public class SessionService {
     /**
      * 创建新会话
      */
-    public SessionResponse create(String title, Long userId) {
+    public SessionResponse create(String title) {
+        Long userId = UserContext.getUserId();
         String id = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         long now = System.currentTimeMillis();
 
@@ -48,7 +50,8 @@ public class SessionService {
     /**
      * 列出当前用户的所有会话 (按最近使用排序)
      */
-    public List<SessionResponse> listByUser(Long userId) {
+    public List<SessionResponse> listByUser() {
+        Long userId = UserContext.getUserId();
         return sessionRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "lastUsedAt")).stream()
                 .map(this::toResponse)
                 .toList();
@@ -57,7 +60,8 @@ public class SessionService {
     /**
      * 获取当前用户的会话详情
      */
-    public SessionResponse get(String id, Long userId) {
+    public SessionResponse get(String id) {
+        Long userId = UserContext.getUserId();
         return sessionRepository.findByIdAndUserId(id, userId).map(this::toResponse).orElse(null);
     }
 
@@ -65,7 +69,8 @@ public class SessionService {
      * 删除当前用户的会话
      */
     @Transactional
-    public void delete(String id, Long userId) {
+    public void delete(String id) {
+        Long userId = UserContext.getUserId();
         sessionRepository.findByIdAndUserId(id, userId).ifPresent(m -> {
             chatMessageRepository.deleteBySessionId(id);
             sessionRepository.deleteById(id);
@@ -76,7 +81,8 @@ public class SessionService {
     /**
      * 更新当前用户的会话标题
      */
-    public SessionResponse updateTitle(String id, String title, Long userId) {
+    public SessionResponse updateTitle(String id, String title) {
+        Long userId = UserContext.getUserId();
         return sessionRepository.findByIdAndUserId(id, userId).map(m -> {
             m.setTitle(title);
             sessionRepository.save(m);
@@ -87,7 +93,8 @@ public class SessionService {
     /**
      * 校验会话归属当前用户
      */
-    public boolean belongsToUser(String sessionId, Long userId) {
+    public boolean belongsToUser(String sessionId) {
+        Long userId = UserContext.getUserId();
         return sessionRepository.findByIdAndUserId(sessionId, userId).isPresent();
     }
 

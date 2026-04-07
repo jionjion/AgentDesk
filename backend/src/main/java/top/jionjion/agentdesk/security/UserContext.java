@@ -28,14 +28,14 @@ public final class UserContext {
      * 获取当前用户 ID
      */
     public static Long getUserId() {
-        return getPrincipal().id();
+        return getPrincipal().getId();
     }
 
     /**
      * 获取当前用户名
      */
     public static String getUsername() {
-        return getPrincipal().username();
+        return getPrincipal().getUsername();
     }
 
     /**
@@ -50,6 +50,6 @@ public final class UserContext {
      * 获取当前用户 ID, 未认证时返回 null (适用于可选认证场景)
      */
     public static Long getUserIdOrNull() {
-        return isAuthenticated() ? getPrincipal().id() : null;
+        return isAuthenticated() ? getPrincipal().getId() : null;
     }
 }

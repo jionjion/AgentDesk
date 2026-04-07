@@ -26,18 +26,16 @@ public class FileController {
      */
     @PostMapping("/upload")
     public FileResponse upload(@RequestParam("file") MultipartFile file,
-                               @RequestParam(value = "sessionId", required = false) String sessionId,
-                               @RequestAttribute("userId") Long userId) {
-        return fileService.upload(file, sessionId, userId);
+                               @RequestParam(value = "sessionId", required = false) String sessionId) {
+        return fileService.upload(file, sessionId);
     }
 
     /**
      * 获取文件信息 + 预签名下载 URL
      */
     @GetMapping("/{id}")
-    public FileResponse getFile(@PathVariable Long id,
-                                @RequestAttribute("userId") Long userId) {
-        return fileService.getFile(id, userId);
+    public FileResponse getFile(@PathVariable Long id) {
+        return fileService.getFile(id);
     }
 
     /**
@@ -45,17 +43,15 @@ public class FileController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id,
-                       @RequestAttribute("userId") Long userId) {
-        fileService.delete(id, userId);
+    public void delete(@PathVariable Long id) {
+        fileService.delete(id);
     }
 
     /**
      * 列出会话下所有文件
      */
     @GetMapping("/session/{sessionId}")
-    public List<FileResponse> listBySession(@PathVariable String sessionId,
-                                            @RequestAttribute("userId") Long userId) {
-        return fileService.listBySession(sessionId, userId);
+    public List<FileResponse> listBySession(@PathVariable String sessionId) {
+        return fileService.listBySession(sessionId);
     }
 }

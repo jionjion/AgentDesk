@@ -8,6 +8,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import top.jionjion.agentdesk.security.UserPrincipal;
 import top.jionjion.agentdesk.service.JwtService;
 
 import java.io.IOException;
@@ -36,15 +37,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (jwtService.isTokenValid(token)) {
                 Long userId = jwtService.getUserId(token);
                 String username = jwtService.getUsername(token);
+                UserPrincipal principal = new UserPrincipal(userId, username);
 
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        userId, null, List.of()
+                        principal, null, List.of()
                 );
                 SecurityContextHolder.getContext().setAuthentication(auth);
-
-                // 同时设置为 request attribute, 方便 Controller 取用
-                request.setAttribute("userId", userId);
-                request.setAttribute("username", username);
             }
         }
 
