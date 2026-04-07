@@ -13,15 +13,58 @@
         Agent-Desk 将 Agent 能力从代码领域扩展到日常工作场景，描述需求，自动执行，直接交付结果。
       </p>
 
-      <div class="flex items-center gap-3">
+      <!-- 表单 -->
+      <form class="w-full max-w-sm space-y-4" @submit.prevent="handleSubmit">
+        <div>
+          <input
+            v-model="form.username"
+            type="text"
+            placeholder="用户名"
+            required
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <input
+            v-model="form.password"
+            type="password"
+            placeholder="密码"
+            required
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+        <div v-if="isRegister">
+          <input
+            v-model="form.nickname"
+            type="text"
+            placeholder="昵称"
+            required
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+
+        <!-- 错误提示 -->
+        <p v-if="errorMsg" class="text-red-500 text-sm">{{ errorMsg }}</p>
+
         <button
-          class="px-8 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-          @click="handleLogin"
+          type="submit"
+          :disabled="loading"
+          class="w-full py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          登录/注册
+          {{ loading ? '请稍候...' : (isRegister ? '注册' : '登录') }}
         </button>
-        <div class="text-sm text-gray-400">中文</div>
-      </div>
+      </form>
+
+      <p class="mt-4 text-sm text-gray-500">
+        <span v-if="!isRegister">
+          还没有账号?
+          <button class="text-green-600 hover:underline" @click="toggleMode">去注册</button>
+        </span>
+        <span v-else>
+          已有账号?
+          <button class="text-green-600 hover:underline" @click="toggleMode">去登录</button>
+        </span>
+      </p>
     </div>
 
     <!-- 右侧装饰区 -->
@@ -39,12 +82,43 @@
 </template>
 
 <script setup lang="ts">
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Bot } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
-function handleLogin() {
-  router.push('/chat')
+const isRegister = ref(false)
+const loading = ref(false)
+const errorMsg = ref('')
+
+const form = reactive({
+  username: '',
+  password: '',
+  nickname: ''
+})
+
+function toggleMode() {
+  isRegister.value = !isRegister.value
+  errorMsg.value = ''
+}
+
+async function handleSubmit() {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    if (isRegister.value) {
+      await authStore.doRegister(form)
+    } else {
+      await authStore.doLogin({ username: form.username, password: form.password })
+    }
+    router.push('/chat')
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.error || '操作失败，请重试'
+  } finally {
+    loading.value = false
+  }
 }
 </script>

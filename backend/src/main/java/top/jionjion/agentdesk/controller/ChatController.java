@@ -45,12 +45,11 @@ public class ChatController {
      * 获取指定会话的聊天记录
      */
     @GetMapping("/messages")
-    public List<ChatMessage> getMessages(@RequestParam String sessionId,
-                                         @RequestAttribute("userId") Long userId) {
+    public List<ChatMessage> getMessages(@RequestParam String sessionId) {
         if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
         }
-        if (!sessionService.belongsToUser(sessionId, userId)) {
+        if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
         return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
@@ -61,15 +60,14 @@ public class ChatController {
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
-                                 @RequestParam String message,
-                                 @RequestAttribute("userId") Long userId) {
+                                 @RequestParam String message) {
         if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
         }
         if (message == null || message.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is empty");
         }
-        if (!sessionService.belongsToUser(sessionId, userId)) {
+        if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
 

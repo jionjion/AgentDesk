@@ -16,7 +16,8 @@ export function getMessages(sessionId: string) {
  * 创建 SSE 流式聊天连接
  */
 export function createChatStream(sessionId: string, message: string): EventSource {
-  const url = `${BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}`
+  const token = localStorage.getItem('auth_token') || ''
+  const url = `${BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}&token=${encodeURIComponent(token)}`
   return new EventSource(url)
 }
 

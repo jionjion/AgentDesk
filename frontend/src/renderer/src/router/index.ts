@@ -46,4 +46,27 @@ const router = createRouter({
   ]
 })
 
+// 白名单 (无需登录即可访问)
+const whiteList = ['/login']
+
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('auth_token')
+
+  if (token) {
+    // 已登录 → 访问 login 页面则跳转到 chat
+    if (to.path === '/login') {
+      next('/chat')
+    } else {
+      next()
+    }
+  } else {
+    // 未登录 → 白名单放行，其他跳转 login
+    if (whiteList.includes(to.path)) {
+      next()
+    } else {
+      next('/login')
+    }
+  }
+})
+
 export default router

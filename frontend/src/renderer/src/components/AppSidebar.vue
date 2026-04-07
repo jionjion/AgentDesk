@@ -1,9 +1,9 @@
 <template>
-  <aside class="w-60 border-r border-gray-200 bg-gray-50/50 flex flex-col h-full">
+  <aside class="w-60 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 flex flex-col h-full">
     <!-- 新任务按钮 -->
     <div class="px-3 pt-3 pb-1">
       <button
-        class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md w-full"
+        class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md w-full"
         @click="handleNewSession"
       >
         <Plus :size="16" class="text-green-600" />
@@ -18,7 +18,7 @@
         :key="item.path"
         :to="item.path"
         class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md"
-        :class="[isActive(item.path) ? 'bg-gray-200/80 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-100']"
+        :class="[isActive(item.path) ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800']"
       >
         <component :is="item.icon" :size="16" />
         <span>{{ item.label }}</span>
@@ -30,12 +30,12 @@
 
     <!-- 标签切换 -->
     <div class="px-3 mt-3">
-      <div class="flex bg-gray-100 rounded-md p-0.5">
+      <div class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
         <button
           v-for="tab in tabs"
           :key="tab.value"
           class="flex-1 text-xs py-1.5 rounded text-center transition-colors"
-          :class="[appStore.activeTab === tab.value ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700']"
+          :class="[appStore.activeTab === tab.value ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300']"
           @click="appStore.activeTab = tab.value"
         >
           {{ tab.label }}
@@ -46,7 +46,7 @@
     <!-- 任务/频道列表 -->
     <div class="flex-1 overflow-hidden mt-2">
       <div class="px-3 mb-1">
-        <span class="text-xs text-gray-400">{{ appStore.activeTab === 'tasks' ? '任务' : '频道' }}</span>
+        <span class="text-xs text-gray-400 dark:text-gray-500">{{ appStore.activeTab === 'tasks' ? '任务' : '频道' }}</span>
       </div>
       <ScrollArea class="h-full">
         <div class="px-2 space-y-0.5">
@@ -55,8 +55,8 @@
             :key="session.id"
             class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
             :class="chatStore.currentSessionId === session.id
-              ? 'bg-green-50 text-green-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-100'"
+              ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
             @click="handleSwitchSession(session.id)"
             @contextmenu.prevent="handleContextMenu($event, session.id)"
           >
@@ -75,12 +75,12 @@
     </div>
 
     <!-- 用户信息 -->
-    <div class="px-3 py-3 border-t border-gray-200 flex items-center gap-2">
-      <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-        <User :size="16" class="text-gray-600" />
+    <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2">
+      <div class="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+        <User :size="16" class="text-gray-600 dark:text-gray-300" />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-sm font-medium text-gray-800 truncate">{{ appStore.currentUser.name }}</div>
+        <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ appStore.currentUser.name }}</div>
         <div class="text-xs text-blue-500">{{ appStore.currentUser.plan }}</div>
       </div>
       <Popover>
@@ -89,38 +89,65 @@
             <SettingsIcon :size="16" class="text-gray-400" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent side="top" align="end" class="w-48 p-1">
+        <PopoverContent side="top" align="end" class="w-48 p-1 dark:bg-gray-800 dark:border-gray-700">
           <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             @click="handleOpenSettings"
           >
-            <SettingsIcon :size="16" class="text-gray-500" />
+            <SettingsIcon :size="16" class="text-gray-500 dark:text-gray-400" />
             <span>设置</span>
           </button>
+          <!-- 主题子菜单 -->
+          <Popover>
+            <PopoverTrigger as-child>
+              <button
+                class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Palette :size="16" class="text-gray-500 dark:text-gray-400" />
+                <span>主题</span>
+                <ChevronRight :size="14" class="ml-auto text-gray-400" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" class="w-36 p-1 dark:bg-gray-800 dark:border-gray-700">
+              <button
+                v-for="item in themeOptions"
+                :key="item.value"
+                class="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md transition-colors"
+                :class="appStore.theme === item.value
+                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'"
+                @click="appStore.setTheme(item.value)"
+              >
+                <component :is="item.icon" :size="16" />
+                <span>{{ item.label }}</span>
+                <Check v-if="appStore.theme === item.value" :size="14" class="ml-auto" />
+              </button>
+            </PopoverContent>
+          </Popover>
           <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             @click="handleOpenHelp"
           >
-            <BookOpen :size="16" class="text-gray-500" />
+            <BookOpen :size="16" class="text-gray-500 dark:text-gray-400" />
             <span>帮助文档</span>
           </button>
           <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             @click="handleOpenChangelog"
           >
-            <FileText :size="16" class="text-gray-500" />
+            <FileText :size="16" class="text-gray-500 dark:text-gray-400" />
             <span>更新日志</span>
           </button>
           <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             @click="handleOpenAbout"
           >
-            <Info :size="16" class="text-gray-500" />
+            <Info :size="16" class="text-gray-500 dark:text-gray-400" />
             <span>关于我们</span>
           </button>
-          <div class="my-1 border-t border-gray-200" />
+          <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
           <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 rounded-md hover:bg-red-50 transition-colors"
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
             @click="handleLogout"
           >
             <LogOut :size="16" class="text-red-500" />
@@ -136,8 +163,9 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import type { ThemeMode } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -157,6 +185,12 @@ const navItems = [
 const tabs = [
   { label: '任务', value: 'tasks' as const },
   { label: '频道', value: 'channels' as const }
+]
+
+const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [
+  { label: '亮色', value: 'light', icon: Sun },
+  { label: '暗色', value: 'dark', icon: Moon },
+  { label: '自动', value: 'auto', icon: Monitor }
 ]
 
 function isActive(path: string): boolean {

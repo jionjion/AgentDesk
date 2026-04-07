@@ -9,12 +9,13 @@
  * 基于 github-markdown-css，调整间距和字号以适配对话场景
  */
 .markdown-body {
-  /* 重置 github-markdown-css 的默认背景和字号 */
   background: transparent !important;
   font-size: inherit;
   line-height: 1.6;
   color: inherit;
   font-family: inherit;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* 段落间距收紧 */
@@ -42,12 +43,56 @@
   padding-bottom: 0;
 }
 
-/* 代码块适配 */
+/* 代码块容器 */
+.code-block-wrapper {
+  position: relative;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  background: #f0f0f0;
+  font-size: 0.75em;
+}
+.code-block-header .code-lang {
+  color: #666;
+  font-family: inherit;
+}
+.code-block-header .code-copy-btn {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75em;
+  color: #555;
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.code-block-header .code-copy-btn:hover {
+  background: #d0d0d0;
+  color: #333;
+}
+
+/* 代码块内的 pre */
+.markdown-body .code-block-wrapper pre {
+  margin-top: 0;
+  margin-bottom: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+  overflow-x: auto;
+}
 .markdown-body pre {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
   border-radius: 0.5rem;
   font-size: 0.85em;
+  overflow-x: auto;
 }
 .markdown-body pre code {
   font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -98,4 +143,128 @@
 .markdown-body img {
   max-width: 100%;
   border-radius: 0.375rem;
+}
+
+/* ========================================
+   深色模式适配
+   ======================================== */
+
+/* 代码块头部 */
+.dark .code-block-header {
+  background: #2a2a2a;
+}
+.dark .code-block-header .code-lang {
+  color: #999;
+}
+.dark .code-block-header .code-copy-btn {
+  color: #aaa;
+  border-color: #555;
+}
+.dark .code-block-header .code-copy-btn:hover {
+  background: #444;
+  color: #ddd;
+}
+
+/* 代码块背景 */
+.dark .markdown-body pre {
+  background: #1e1e1e !important;
+}
+
+/* highlight.js 深色覆盖 (GitHub Dark 配色) */
+.dark .hljs {
+  background: #1e1e1e !important;
+  color: #e6edf3 !important;
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag {
+  color: #ff7b72 !important;
+}
+.dark .hljs-string,
+.dark .hljs-attr {
+  color: #a5d6ff !important;
+}
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #8b949e !important;
+}
+.dark .hljs-number,
+.dark .hljs-literal {
+  color: #79c0ff !important;
+}
+.dark .hljs-title,
+.dark .hljs-title\.function_,
+.dark .hljs-section {
+  color: #d2a8ff !important;
+}
+.dark .hljs-built_in {
+  color: #ffa657 !important;
+}
+.dark .hljs-type,
+.dark .hljs-params {
+  color: #ffa657 !important;
+}
+.dark .hljs-name,
+.dark .hljs-tag {
+  color: #7ee787 !important;
+}
+.dark .hljs-variable,
+.dark .hljs-template-variable {
+  color: #ffa657 !important;
+}
+.dark .hljs-regexp {
+  color: #a5d6ff !important;
+}
+.dark .hljs-symbol {
+  color: #79c0ff !important;
+}
+.dark .hljs-meta {
+  color: #8b949e !important;
+}
+.dark .hljs-deletion {
+  color: #ffa198 !important;
+  background: #490202 !important;
+}
+.dark .hljs-addition {
+  color: #7ee787 !important;
+  background: #04260f !important;
+}
+
+/* 行内代码 */
+.dark .markdown-body :not(pre) > code {
+  background: #383838 !important;
+  color: #e0e0e0;
+}
+
+/* 表格 */
+.dark .markdown-body table th,
+.dark .markdown-body table td {
+  border-color: #444;
+}
+.dark .markdown-body table tr {
+  background: transparent;
+  border-color: #444;
+}
+.dark .markdown-body table tr:nth-child(2n) {
+  background: #1e1e1e;
+}
+
+/* 引用块 */
+.dark .markdown-body blockquote {
+  border-left-color: #555;
+  color: #aaa;
+}
+
+/* 分隔线 */
+.dark .markdown-body hr {
+  background-color: #444;
+}
+
+/* 标题 */
+.dark .markdown-body h1,
+.dark .markdown-body h2,
+.dark .markdown-body h3,
+.dark .markdown-body h4,
+.dark .markdown-body h5,
+.dark .markdown-body h6 {
+  color: #e0e0e0;
 }
