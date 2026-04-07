@@ -42,4 +42,10 @@ public class SessionMetadata {
      */
     @Column(name = "last_used_at", nullable = false)
     private long lastUsedAt;
+
+    /**
+     * 所属用户ID
+     */
+    @Column(name = "user_id")
+    private Long userId;
 }

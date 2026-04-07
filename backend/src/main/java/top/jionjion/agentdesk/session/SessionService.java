@@ -30,51 +30,65 @@ public class SessionService {
     /**
      * 创建新会话
      */
-    public SessionResponse create(String title) {
+    public SessionResponse create(String title, Long userId) {
         String id = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         long now = System.currentTimeMillis();
 
-        SessionMetadata metadata = new SessionMetadata(id, title != null ? title : "新对话", now, now);
+        SessionMetadata metadata = new SessionMetadata();
+        metadata.setId(id);
+        metadata.setTitle(title != null ? title : "新对话");
+        metadata.setCreatedAt(now);
+        metadata.setLastUsedAt(now);
+        metadata.setUserId(userId);
         sessionRepository.save(metadata);
 
         return toResponse(metadata);
     }
 
     /**
-     * 列出所有会话 (按最近使用排序)
+     * 列出当前用户的所有会话 (按最近使用排序)
      */
-    public List<SessionResponse> listAll() {
-        return sessionRepository.findAll(Sort.by(Sort.Direction.DESC, "lastUsedAt")).stream()
+    public List<SessionResponse> listByUser(Long userId) {
+        return sessionRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "lastUsedAt")).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     /**
-     * 获取会话详情
+     * 获取当前用户的会话详情
      */
-    public SessionResponse get(String id) {
-        return sessionRepository.findById(id).map(this::toResponse).orElse(null);
+    public SessionResponse get(String id, Long userId) {
+        return sessionRepository.findByIdAndUserId(id, userId).map(this::toResponse).orElse(null);
     }
 
     /**
-     * 删除会话
+     * 删除当前用户的会话
      */
     @Transactional
-    public void delete(String id) {
-        chatMessageRepository.deleteBySessionId(id);
-        sessionRepository.deleteById(id);
-        agentPool.remove(id);
+    public void delete(String id, Long userId) {
+        sessionRepository.findByIdAndUserId(id, userId).ifPresent(m -> {
+            chatMessageRepository.deleteBySessionId(id);
+            sessionRepository.deleteById(id);
+            agentPool.remove(id);
+        });
     }
 
     /**
-     * 更新会话标题
+     * 更新当前用户的会话标题
      */
-    public SessionResponse updateTitle(String id, String title) {
-        return sessionRepository.findById(id).map(m -> {
+    public SessionResponse updateTitle(String id, String title, Long userId) {
+        return sessionRepository.findByIdAndUserId(id, userId).map(m -> {
             m.setTitle(title);
             sessionRepository.save(m);
             return toResponse(m);
         }).orElse(null);
+    }
+
+    /**
+     * 校验会话归属当前用户
+     */
+    public boolean belongsToUser(String sessionId, Long userId) {
+        return sessionRepository.findByIdAndUserId(sessionId, userId).isPresent();
     }
 
     /**

@@ -34,6 +34,9 @@ public class FileRecord {
     @Column(name = "session_id")
     private String sessionId;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     @Column(name = "created_at", nullable = false)
     private long createdAt;
 

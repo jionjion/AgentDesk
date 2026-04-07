@@ -24,20 +24,22 @@ public class SessionController {
 
     /** 创建新会话 */
     @PostMapping
-    public SessionResponse create(@RequestBody SessionCreateRequest request) {
-        return sessionService.create(request.title());
+    public SessionResponse create(@RequestBody SessionCreateRequest request,
+                                  @RequestAttribute("userId") Long userId) {
+        return sessionService.create(request.title(), userId);
     }
 
-    /** 列出所有会话 */
+    /** 列出当前用户的所有会话 */
     @GetMapping
-    public List<SessionResponse> listAll() {
-        return sessionService.listAll();
+    public List<SessionResponse> listAll(@RequestAttribute("userId") Long userId) {
+        return sessionService.listByUser(userId);
     }
 
     /** 获取会话详情 */
     @GetMapping("/{id}")
-    public SessionResponse get(@PathVariable String id) {
-        SessionResponse response = sessionService.get(id);
+    public SessionResponse get(@PathVariable String id,
+                               @RequestAttribute("userId") Long userId) {
+        SessionResponse response = sessionService.get(id, userId);
         if (response == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在");
         }
@@ -47,14 +49,17 @@ public class SessionController {
     /** 删除会话 */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable String id) {
-        sessionService.delete(id);
+    public void delete(@PathVariable String id,
+                       @RequestAttribute("userId") Long userId) {
+        sessionService.delete(id, userId);
     }
 
     /** 更新会话标题 */
     @PutMapping("/{id}")
-    public SessionResponse updateTitle(@PathVariable String id, @RequestBody SessionCreateRequest request) {
-        SessionResponse response = sessionService.updateTitle(id, request.title());
+    public SessionResponse updateTitle(@PathVariable String id,
+                                       @RequestBody SessionCreateRequest request,
+                                       @RequestAttribute("userId") Long userId) {
+        SessionResponse response = sessionService.updateTitle(id, request.title(), userId);
         if (response == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在");
         }
