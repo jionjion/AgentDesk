@@ -58,6 +58,19 @@ export interface PlanMessage {
 /** 聊天消息联合类型 */
 export type ChatMessage = UserMessage | AssistantMessage | ToolCallMessage | ThinkingMessage | PlanMessage
 
+/** 后端返回的聊天消息 */
+export interface BackendChatMessage {
+  id: number
+  sessionId: string
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  toolName?: string
+  toolId?: string
+  arguments?: Record<string, unknown>
+  result?: string
+  createdAt: number
+}
+
 /** SSE 事件数据 */
 export interface SSEEventData {
   type: string

@@ -1,6 +1,16 @@
 import request from './request'
+import type { BackendChatMessage } from '@/types/chat'
 
 const BASE_URL = 'http://localhost:8080'
+
+/**
+ * 获取会话的历史消息
+ */
+export function getMessages(sessionId: string) {
+  return request.get<BackendChatMessage[]>('/api/chat/messages', {
+    params: { sessionId }
+  })
+}
 
 /**
  * 创建 SSE 流式聊天连接

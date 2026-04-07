@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ChatSession, ChatMessage, AssistantMessage, SSEEventData } from '@/types/chat'
+import type { ChatSession, ChatMessage, AssistantMessage, BackendChatMessage, SSEEventData } from '@/types/chat'
 import { createSession, getSessions, deleteSession, updateSessionTitle } from '@/api/session'
-import { createChatStream, interruptChat } from '@/api/chat'
+import { createChatStream, interruptChat, getMessages } from '@/api/chat'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan']
 
@@ -50,18 +50,50 @@ export const useChatStore = defineStore('chat', () => {
     return session.id
   }
 
+  /** 将后端消息映射为前端消息类型 */
+  function mapBackendMessage(msg: BackendChatMessage): ChatMessage {
+    if (msg.role === 'user') {
+      return { id: String(msg.id), role: 'user', content: msg.content, timestamp: msg.createdAt }
+    }
+    if (msg.role === 'tool') {
+      return {
+        id: String(msg.id),
+        role: 'tool_call',
+        toolName: msg.toolName || '',
+        toolId: msg.toolId || '',
+        arguments: msg.arguments || {},
+        result: msg.result,
+        status: 'done'
+      }
+    }
+    // assistant
+    return {
+      id: String(msg.id),
+      role: 'assistant',
+      content: msg.content,
+      timestamp: msg.createdAt,
+      isStreaming: false
+    }
+  }
+
   /** 切换会话 */
-  function switchSession(id: string) {
+  async function switchSession(id: string) {
     if (isStreaming.value) return
     isLoadingSession.value = true
     currentSessionId.value = id
-    if (!messagesBySession.value[id]) {
-      messagesBySession.value[id] = []
-    }
-    // 模拟加载延迟，后续对接历史消息 API 时替换为真实异步
-    setTimeout(() => {
+    try {
+      // 已有缓存则直接使用
+      if (messagesBySession.value[id]) return
+      const res = await getMessages(id)
+      messagesBySession.value[id] = res.data.map(mapBackendMessage)
+    } catch (e) {
+      console.error('加载历史消息失败', e)
+      if (!messagesBySession.value[id]) {
+        messagesBySession.value[id] = []
+      }
+    } finally {
       isLoadingSession.value = false
-    }, 400)
+    }
   }
 
   /** 删除会话 */
