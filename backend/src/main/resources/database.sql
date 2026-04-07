@@ -63,7 +63,24 @@ COMMENT ON COLUMN agent_desk.agent_state.state_key IS '状态键名 (如 memory,
 COMMENT ON COLUMN agent_desk.agent_state.state_data IS 'AgentScope 序列化的状态数据(JSON)';
 COMMENT ON COLUMN agent_desk.agent_state.updated_at IS '最后更新时间戳(毫秒)';
 
--- 5. 文件表
+-- 5. 用户表
+CREATE TABLE IF NOT EXISTS agent_desk.users (
+    id          BIGSERIAL    PRIMARY KEY,
+    username    VARCHAR(64)  NOT NULL UNIQUE,
+    password    VARCHAR(256) NOT NULL,
+    nickname    VARCHAR(128),
+    avatar      VARCHAR(512),
+    created_at  BIGINT       NOT NULL,
+    updated_at  BIGINT       NOT NULL
+);
+
+COMMENT ON TABLE  agent_desk.users IS '用户表';
+COMMENT ON COLUMN agent_desk.users.username IS '登录用户名, 唯一';
+COMMENT ON COLUMN agent_desk.users.password IS '密码, BCrypt 加密';
+COMMENT ON COLUMN agent_desk.users.nickname IS '显示昵称';
+COMMENT ON COLUMN agent_desk.users.avatar IS '头像 URL';
+
+-- 6. 文件表
 CREATE TABLE IF NOT EXISTS agent_desk.files (
     id              BIGSERIAL    PRIMARY KEY,
     original_name   VARCHAR(512) NOT NULL,
@@ -84,3 +101,10 @@ COMMENT ON COLUMN agent_desk.files.created_at IS '创建时间戳(毫秒)';
 
 CREATE INDEX IF NOT EXISTS idx_files_session ON agent_desk.files (session_id);
 CREATE INDEX IF NOT EXISTS idx_files_oss_key ON agent_desk.files (oss_key);
+
+-- 7. 现有表增加 user_id 关联
+ALTER TABLE agent_desk.sessions ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES agent_desk.users(id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON agent_desk.sessions (user_id);
+
+ALTER TABLE agent_desk.files ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES agent_desk.users(id);
+CREATE INDEX IF NOT EXISTS idx_files_user ON agent_desk.files (user_id);

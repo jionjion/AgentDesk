@@ -43,33 +43,34 @@ public class ChatController {
 
     /**
      * 获取指定会话的聊天记录
-     *
-     * @param sessionId 会话ID
-     * @return 按时间升序排列的消息列表
      */
     @GetMapping("/messages")
-    public List<ChatMessage> getMessages(@RequestParam String sessionId) {
+    public List<ChatMessage> getMessages(@RequestParam String sessionId,
+                                         @RequestAttribute("userId") Long userId) {
         if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
+        }
+        if (!sessionService.belongsToUser(sessionId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
         return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
     }
 
     /**
      * 流式对话接口, 通过SSE推送Agent的回复事件
-     *
-     * @param sessionId 会话ID
-     * @param message   用户消息
-     * @return SSE事件流
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
-                                 @RequestParam String message) {
+                                 @RequestParam String message,
+                                 @RequestAttribute("userId") Long userId) {
         if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
         }
         if (message == null || message.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is empty");
+        }
+        if (!sessionService.belongsToUser(sessionId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
 
         if (!agentPool.tryAcquire(sessionId)) {
