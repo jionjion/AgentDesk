@@ -10,12 +10,21 @@ export interface ChatSession {
   lastUsedAt: number
 }
 
+/** 附件信息 */
+export interface Attachment {
+  id: number
+  name: string
+  size: number
+  contentType: string
+}
+
 /** 用户消息 */
 export interface UserMessage {
   id: string
   role: 'user'
   content: string
   timestamp: number
+  attachments?: Attachment[]
 }
 
 /** 助手消息 */
@@ -68,6 +77,7 @@ export interface BackendChatMessage {
   toolId?: string
   arguments?: Record<string, unknown>
   result?: string
+  fileIds?: number[]
   createdAt: number
 }
 

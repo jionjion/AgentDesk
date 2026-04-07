@@ -78,6 +78,26 @@
 
         <!-- 输入框 -->
         <div class="border border-gray-200 rounded-xl p-4">
+        <!-- 隐藏的文件选择器 -->
+        <input ref="fileInputRef" type="file" multiple
+               accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh"
+               class="hidden"
+               @change="handleFileSelect" />
+        <!-- 附件预览区 -->
+        <div v-if="chatStore.pendingAttachments.length > 0"
+             class="flex flex-wrap gap-2 mb-2 px-1">
+          <div v-for="file in chatStore.pendingAttachments" :key="file.name"
+               class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm">
+            <FileText :size="14" />
+            <span class="truncate max-w-[150px]">{{ file.name }}</span>
+            <span class="text-gray-400 text-xs">{{ formatSize(file.size) }}</span>
+            <Loader2 v-if="file.uploading" :size="14" class="animate-spin" />
+            <button v-else @click="chatStore.removeAttachment(file.id)"
+                    class="text-gray-400 hover:text-red-500">
+              <X :size="14" />
+            </button>
+          </div>
+        </div>
         <Textarea
           v-model="inputText"
           :rows="2"
@@ -95,7 +115,7 @@
             <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
               <Paintbrush :size="16" />
             </Button>
-            <Button variant="ghost" size="icon" class="h-8 w-8">
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="fileInputRef?.click()">
               <Paperclip :size="16" />
             </Button>
           </div>
@@ -105,7 +125,7 @@
               v-if="!chatStore.isStreaming"
               size="icon"
               class="h-8 w-8 rounded-full"
-              :disabled="!inputText.trim()"
+              :disabled="!inputText.trim() && !chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)"
               @click="handleSend"
             >
               <ArrowUp :size="16" />
@@ -139,7 +159,9 @@ import {
   FileText,
   Camera,
   BarChart3,
-  Bot
+  Bot,
+  Loader2,
+  X
 } from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chat'
 import { Button } from '@/components/ui/button'
@@ -156,6 +178,25 @@ const route = useRoute()
 const inputText = ref('')
 const messageListRef = ref<HTMLElement>()
 const scrollAnchorRef = ref<HTMLElement>()
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function handleFileSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files) return
+  for (const file of Array.from(input.files)) {
+    if (file.size > 10 * 1024 * 1024) {
+      continue
+    }
+    chatStore.addAttachment(file)
+  }
+  input.value = ''
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
 
 const featureCards = [
   {
@@ -204,7 +245,8 @@ function fillExample(example: string) {
 }
 
 function handleSend() {
-  if (!inputText.value.trim() || chatStore.isStreaming) return
+  const hasAttachments = chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)
+  if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
   chatStore.sendMessage(inputText.value)
   inputText.value = ''
 }

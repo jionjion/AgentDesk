@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ChatSession, ChatMessage, AssistantMessage, BackendChatMessage, SSEEventData } from '@/types/chat'
+import type { ChatSession, ChatMessage, AssistantMessage, BackendChatMessage, SSEEventData, Attachment } from '@/types/chat'
 import { createSession, getSessions, deleteSession, updateSessionTitle } from '@/api/session'
 import { createChatStream, interruptChat, getMessages } from '@/api/chat'
+import { uploadFile } from '@/api/file'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan']
 
@@ -18,6 +19,15 @@ export const useChatStore = defineStore('chat', () => {
   const isStreaming = ref(false)
   const isLoadingSession = ref(false)
   const eventSource = ref<EventSource | null>(null)
+
+  interface PendingFile {
+    id: number
+    name: string
+    size: number
+    contentType: string
+    uploading: boolean
+  }
+  const pendingAttachments = ref<PendingFile[]>([])
 
   // === Computed ===
   const currentSession = computed(() =>
@@ -121,14 +131,59 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /** 添加附件 (选择文件后调用) */
+  async function addAttachment(file: File) {
+    if (pendingAttachments.value.length >= 5) return
+
+    const pending: PendingFile = {
+      id: 0,
+      name: file.name,
+      size: file.size,
+      contentType: file.type,
+      uploading: true
+    }
+    pendingAttachments.value.push(pending)
+
+    try {
+      const res = await uploadFile(file, currentSessionId.value || undefined)
+      pending.id = res.data.id
+      pending.uploading = false
+    } catch (e) {
+      pendingAttachments.value = pendingAttachments.value.filter(p => p !== pending)
+      console.error('文件上传失败', e)
+    }
+  }
+
+  /** 移除附件 */
+  function removeAttachment(fileId: number) {
+    pendingAttachments.value = pendingAttachments.value.filter(p => p.id !== fileId)
+  }
+
+  /** 清空附件 */
+  function clearAttachments() {
+    pendingAttachments.value = []
+  }
+
   /** 发送消息 (核心) */
   async function sendMessage(content: string) {
-    if (!content.trim() || isStreaming.value) return
+    const hasAttachments = pendingAttachments.value.some(p => !p.uploading && p.id > 0)
+    if ((!content.trim() && !hasAttachments) || isStreaming.value) return
+
+    // 收集附件
+    const fileIds = pendingAttachments.value
+      .filter(p => !p.uploading && p.id > 0)
+      .map(p => p.id)
+    const attachments: Attachment[] = pendingAttachments.value
+      .filter(p => !p.uploading && p.id > 0)
+      .map(p => ({ id: p.id, name: p.name, size: p.size, contentType: p.contentType }))
+    clearAttachments()
+
+    const messageContent = content.trim() || '请查看我上传的文件'
 
     // 1. 自动创建会话
     let sessionId = currentSessionId.value
     if (!sessionId) {
-      sessionId = await createNewSession(content.substring(0, 20))
+      sessionId = await createNewSession(messageContent.substring(0, 20))
     }
 
     // 2. 推入用户消息
@@ -136,8 +191,9 @@ export const useChatStore = defineStore('chat', () => {
     messages.push({
       id: generateId(),
       role: 'user',
-      content: content.trim(),
-      timestamp: Date.now()
+      content: messageContent,
+      timestamp: Date.now(),
+      attachments: attachments.length > 0 ? attachments : undefined
     })
 
     // 3. 推入助手占位消息
@@ -153,7 +209,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 4. 创建 SSE 连接
     isStreaming.value = true
-    const es = createChatStream(sessionId, content.trim())
+    const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined)
     eventSource.value = es
 
     // 辅助函数: 获取当前助手消息
@@ -334,6 +390,7 @@ export const useChatStore = defineStore('chat', () => {
     messagesBySession,
     isStreaming,
     isLoadingSession,
+    pendingAttachments,
     // computed
     currentSession,
     currentMessages,
@@ -344,6 +401,9 @@ export const useChatStore = defineStore('chat', () => {
     removeSession,
     renameSession,
     sendMessage,
-    interrupt
+    interrupt,
+    addAttachment,
+    removeAttachment,
+    clearAttachments
   }
 })

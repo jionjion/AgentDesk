@@ -15,9 +15,12 @@ export function getMessages(sessionId: string) {
 /**
  * 创建 SSE 流式聊天连接
  */
-export function createChatStream(sessionId: string, message: string): EventSource {
+export function createChatStream(sessionId: string, message: string, fileIds?: number[]): EventSource {
   const token = localStorage.getItem('auth_token') || ''
-  const url = `${BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}&token=${encodeURIComponent(token)}`
+  let url = `${BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}&token=${encodeURIComponent(token)}`
+  if (fileIds && fileIds.length > 0) {
+    url += `&fileIds=${fileIds.join(',')}`
+  }
   return new EventSource(url)
 }
 
