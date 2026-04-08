@@ -22,31 +22,16 @@
       >
         <component :is="item.icon" :size="16" />
         <span>{{ item.label }}</span>
-        <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0">
+        <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
           {{ item.badge }}
         </Badge>
       </router-link>
     </nav>
 
-    <!-- 标签切换 -->
-    <div class="px-3 mt-3">
-      <div class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-0.5">
-        <button
-          v-for="tab in tabs"
-          :key="tab.value"
-          class="flex-1 text-xs py-1.5 rounded text-center transition-colors"
-          :class="[appStore.activeTab === tab.value ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm font-medium' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300']"
-          @click="appStore.activeTab = tab.value"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-    </div>
-
-    <!-- 任务/频道列表 -->
+    <!-- 任务列表 -->
     <div class="flex-1 overflow-hidden mt-2">
       <div class="px-3 mb-1">
-        <span class="text-xs text-gray-400 dark:text-gray-500">{{ appStore.activeTab === 'tasks' ? '任务' : '频道' }}</span>
+        <span class="text-xs text-gray-400 dark:text-gray-500">任务</span>
       </div>
       <ScrollArea class="h-full">
         <div class="px-2 space-y-0.5">
@@ -198,7 +183,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import type { ThemeMode } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2, Download } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2, Download } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -218,14 +203,8 @@ const deleteConfirmOpen = ref(false)
 const pendingDeleteId = ref<string | null>(null)
 
 const navItems = [
-  { path: '/skills', label: '技能', icon: Ticket, badge: '' },
-  { path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: '' },
-  { path: '/im-channel', label: 'IM 频道', icon: MessageCircle, badge: 'Beta' }
-]
-
-const tabs = [
-  { label: '任务', value: 'tasks' as const },
-  { label: '频道', value: 'channels' as const }
+  { path: '/skills', label: '技能', icon: Ticket, badge: 'Beta' },
+  { path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: 'Beta' }
 ]
 
 const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [

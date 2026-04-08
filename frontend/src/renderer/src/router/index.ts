@@ -32,12 +32,6 @@ const router = createRouter({
       meta: { title: '定时任务' }
     },
     {
-      path: '/im-channel',
-      name: 'im-channel',
-      component: () => import('@/views/ImChannelView.vue'),
-      meta: { title: 'IM 频道' }
-    },
-    {
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),

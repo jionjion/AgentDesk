@@ -6,7 +6,6 @@ export type ThemeMode = 'light' | 'dark' | 'auto'
 
 export const useAppStore = defineStore('app', () => {
   const sidebarCollapsed = ref(false)
-  const activeTab = ref<'tasks' | 'channels'>('tasks')
   const currentUser = computed(() => {
     const authStore = useAuthStore()
     return authStore.user
@@ -48,7 +47,6 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     sidebarCollapsed,
-    activeTab,
     currentUser,
     theme,
     toggleSidebar,
