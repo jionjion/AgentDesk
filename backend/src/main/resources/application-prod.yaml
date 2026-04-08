@@ -1,0 +1,25 @@
+spring:
+  # jpa 配置
+  jpa:
+    show-sql: false
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?currentSchema=agent_desk&stringtype=unspecified
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+# dashscope api key
+agentscope:
+  dashscope:
+    api-key: ${DASHSCOPE_API_KEY}
+
+agentdesk:
+  jwt:
+    secret: ${JWT_SECRET}
+  oss:
+    endpoint: ${OSS_ENDPOINT}
+    bucket: ${OSS_BUCKET}
+    access-key-id: ${OSS_ACCESS_KEY_ID}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET}
