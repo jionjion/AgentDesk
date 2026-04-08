@@ -1,13 +1,13 @@
 <template>
-  <div class="h-screen w-screen flex flex-col overflow-hidden bg-white">
+  <div class="h-screen w-screen flex flex-col overflow-hidden bg-white dark:bg-gray-900">
     <TitleBar />
     <div class="flex flex-1 overflow-hidden">
     <!-- 左侧导航 -->
-    <aside class="w-56 border-r border-gray-200 flex flex-col h-full">
+    <aside class="w-56 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
       <!-- 返回按钮 -->
       <div class="px-4 pt-4 pb-2">
         <button
-          class="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           @click="router.back()"
         >
           <ArrowLeft :size="16" />
@@ -19,15 +19,15 @@
       <nav class="flex-1 px-3 py-2 space-y-4 overflow-y-auto">
         <!-- 通用 -->
         <div>
-          <div class="px-2 mb-1 text-xs text-gray-400 font-medium">通用</div>
+          <div class="px-2 mb-1 text-xs text-gray-400 dark:text-gray-500 font-medium">通用</div>
           <div class="space-y-0.5">
             <button
               v-for="item in generalItems"
               :key="item.key"
               class="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors"
               :class="activeSection === item.key
-                ? 'bg-gray-100 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'"
               @click="activeSection = item.key"
             >
               <component :is="item.icon" :size="16" />
@@ -38,15 +38,15 @@
 
         <!-- 数据与隐私 -->
         <div>
-          <div class="px-2 mb-1 text-xs text-gray-400 font-medium">数据与隐私</div>
+          <div class="px-2 mb-1 text-xs text-gray-400 dark:text-gray-500 font-medium">数据与隐私</div>
           <div class="space-y-0.5">
             <button
               v-for="item in privacyItems"
               :key="item.key"
               class="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors"
               :class="activeSection === item.key
-                ? 'bg-gray-100 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'"
               @click="activeSection = item.key"
             >
               <component :is="item.icon" :size="16" />
@@ -57,15 +57,15 @@
 
         <!-- 扩展与集成 -->
         <div>
-          <div class="px-2 mb-1 text-xs text-gray-400 font-medium">扩展与集成</div>
+          <div class="px-2 mb-1 text-xs text-gray-400 dark:text-gray-500 font-medium">扩展与集成</div>
           <div class="space-y-0.5">
             <button
               v-for="item in extensionItems"
               :key="item.key"
               class="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors"
               :class="activeSection === item.key
-                ? 'bg-gray-100 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'"
               @click="activeSection = item.key"
             >
               <component :is="item.icon" :size="16" />
@@ -76,15 +76,15 @@
 
         <!-- 高级设置 -->
         <div>
-          <div class="px-2 mb-1 text-xs text-gray-400 font-medium">高级设置</div>
+          <div class="px-2 mb-1 text-xs text-gray-400 dark:text-gray-500 font-medium">高级设置</div>
           <div class="space-y-0.5">
             <button
               v-for="item in advancedItems"
               :key="item.key"
               class="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors"
               :class="activeSection === item.key
-                ? 'bg-gray-100 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'"
               @click="activeSection = item.key"
             >
               <component :is="item.icon" :size="16" />
@@ -95,15 +95,15 @@
 
         <!-- 开发者 -->
         <div>
-          <div class="px-2 mb-1 text-xs text-gray-400 font-medium">开发者</div>
+          <div class="px-2 mb-1 text-xs text-gray-400 dark:text-gray-500 font-medium">开发者</div>
           <div class="space-y-0.5">
             <button
               v-for="item in developerItems"
               :key="item.key"
               class="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md transition-colors"
               :class="activeSection === item.key
-                ? 'bg-gray-100 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'"
               @click="activeSection = item.key"
             >
               <component :is="item.icon" :size="16" />
@@ -114,9 +114,9 @@
       </nav>
 
       <!-- 底部升级方案 -->
-      <div class="px-3 py-3 border-t border-gray-200">
+      <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-700">
         <button
-          class="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-green-600 rounded-md hover:bg-green-50 transition-colors"
+          class="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-green-600 dark:text-green-400 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
           @click="activeSection = 'upgrade'"
         >
           <Sparkles :size="16" />
@@ -128,12 +128,12 @@
     <!-- 右侧内容区 -->
     <main class="flex-1 overflow-y-auto">
       <div class="max-w-2xl mx-auto px-8 py-8">
-        <h1 class="text-2xl font-bold text-gray-900 mb-1">{{ activeSectionLabel }}</h1>
-        <p class="text-sm text-gray-500 mb-6">{{ activeSectionDescription }}</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">{{ activeSectionLabel }}</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ activeSectionDescription }}</p>
 
         <!-- 占位内容 -->
-        <div class="rounded-lg border border-dashed border-gray-300 p-12 text-center">
-          <div class="text-gray-400 text-sm">设置内容开发中...</div>
+        <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
+          <div class="text-gray-400 dark:text-gray-500 text-sm">设置内容开发中...</div>
         </div>
       </div>
     </main>

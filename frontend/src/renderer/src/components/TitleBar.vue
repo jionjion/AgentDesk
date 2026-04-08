@@ -1,6 +1,6 @@
 <template>
   <div
-    class="title-bar flex items-center justify-between h-10 px-3 border-b border-gray-200 bg-white select-none"
+    class="title-bar flex items-center justify-between h-10 px-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none"
     style="-webkit-app-region: drag"
   >
     <!-- 左侧操作区 -->
@@ -22,7 +22,7 @@
             <CircleHelp :size="16" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-auto p-3 text-xs text-gray-600">
+        <PopoverContent class="w-auto p-3 text-xs text-gray-600 dark:text-gray-400">
           <div class="space-y-1">
             <div>版本: v{{ appVersion }}</div>
             <div>构建日期: {{ buildDate }}</div>
@@ -33,19 +33,19 @@
       <!-- 窗口控制按钮 -->
       <div class="flex items-center ml-2">
         <button
-          class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-gray-500"
+          class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-gray-500 dark:text-gray-400"
           @click="handleMinimize"
         >
           <Minus :size="14" />
         </button>
         <button
-          class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-gray-500"
+          class="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded text-gray-500 dark:text-gray-400"
           @click="handleMaximize"
         >
           <Maximize2 :size="14" />
         </button>
         <button
-          class="w-8 h-8 flex items-center justify-center hover:bg-red-50 hover:text-red-500 rounded text-gray-500"
+          class="w-8 h-8 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400 rounded text-gray-500 dark:text-gray-400"
           @click="handleClose"
         >
           <X :size="14" />

@@ -6,13 +6,13 @@
         <!-- 插图区域 -->
         <div class="flex justify-center mb-8">
           <div class="flex items-end gap-4">
-            <div class="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-sm">
+            <div class="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-4 py-2 rounded-xl text-sm">
               Sure. Cleaning duplicates now.
             </div>
-            <div class="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
-              <Bot :size="28" class="text-gray-600" />
+            <div class="w-16 h-16 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+              <Bot :size="28" class="text-gray-600 dark:text-gray-400" />
             </div>
-            <div class="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm">
+            <div class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-xl text-sm">
               Organize my desktop files please
             </div>
           </div>
@@ -20,11 +20,11 @@
 
         <!-- 标题 -->
         <div class="text-center mb-8">
-          <h1 class="text-2xl font-bold text-gray-900 mb-3">IM 频道</h1>
-          <p class="text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">IM 频道</h1>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
             配置 IM 频道，让搭子接收来自钉钉、飞书等平台的消息。
           </p>
-          <p class="text-sm text-gray-500">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
             频道配置信息仅存储在本地，不会上传到云端。
           </p>
         </div>
@@ -43,20 +43,20 @@
           <div
             v-for="channel in channels"
             :key="channel.name"
-            class="flex items-center justify-between p-5 border border-gray-200 rounded-xl hover:shadow-sm transition-shadow"
+            class="flex items-center justify-between p-5 border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-sm transition-shadow"
           >
             <div class="flex items-center gap-4">
               <div
-                class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100"
+                class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"
               >
-                <component :is="channel.icon" :size="20" class="text-gray-600" />
+                <component :is="channel.icon" :size="20" class="text-gray-600 dark:text-gray-400" />
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-gray-800">{{ channel.name }}</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ channel.name }}</span>
                   <Badge v-if="channel.connected" variant="success">已连接</Badge>
                 </div>
-                <p class="text-xs text-gray-400 mt-0.5">{{ channel.description }}</p>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ channel.description }}</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
