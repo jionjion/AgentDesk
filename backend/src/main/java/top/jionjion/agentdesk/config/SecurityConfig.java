@@ -16,6 +16,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import top.jionjion.agentdesk.dto.ErrorResponse;
+import top.jionjion.agentdesk.security.JwtAuthFilter;
 
 import java.util.List;
 
