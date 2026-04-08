@@ -13,7 +13,7 @@
       <div class="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-6">
         <Bot :size="32" class="text-gray-600 dark:text-gray-400" />
       </div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">不止聊天，搞定一切</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">说做就做，交付结果</h1>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-10">本地运行、自主规划、安全可控的 AI 工作搭子</p>
 
       <!-- 功能卡片 -->

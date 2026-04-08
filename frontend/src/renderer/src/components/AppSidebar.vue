@@ -77,6 +77,10 @@
                 <component :is="chatStore.isPinned(session.id) ? PinOff : Pin" :size="14" />
                 <span>{{ chatStore.isPinned(session.id) ? '取消置顶' : '置顶' }}</span>
               </ContextMenuItem>
+              <ContextMenuItem class="cursor-pointer" @select="chatStore.exportSession(session.id)">
+                <Download :size="14" />
+                <span>导出</span>
+              </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(session.id)">
                 <Trash2 :size="14" />
@@ -194,7 +198,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import type { ThemeMode } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2 } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, MessageCircle, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2, Download } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

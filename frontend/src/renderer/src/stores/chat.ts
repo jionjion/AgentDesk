@@ -4,6 +4,7 @@ import type { ChatSession, ChatMessage, AssistantMessage, BackendChatMessage, SS
 import { createSession, getSessions, deleteSession, updateSessionTitle } from '@/api/session'
 import { createChatStream, interruptChat, getMessages } from '@/api/chat'
 import { uploadFile } from '@/api/file'
+import { exportToMarkdown } from '@/utils/exportMarkdown'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan']
 
@@ -415,6 +416,36 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /** 导出会话为 Markdown 文件 */
+  async function exportSession(sessionId: string) {
+    try {
+      const session = sessions.value.find(s => s.id === sessionId)
+      if (!session) return
+
+      // 加载消息（不切换当前会话）
+      let messages = messagesBySession.value[sessionId]
+      if (!messages) {
+        const res = await getMessages(sessionId)
+        messages = res.data.map(mapBackendMessage)
+        messagesBySession.value[sessionId] = messages
+      }
+      if (messages.length === 0) return
+
+      const markdown = exportToMarkdown(session.title, messages)
+
+      const filePath = await window.electronAPI.dialog.saveFile({
+        defaultPath: `${session.title}.md`,
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      })
+      if (!filePath) return
+
+      const data = new TextEncoder().encode(markdown)
+      await window.electronAPI.fs.writeFile(filePath, data)
+    } catch (e) {
+      console.error('导出会话失败', e)
+    }
+  }
+
   /** 重新生成助手回复 (重发上一条用户消息) */
   async function regenerateMessage(messageId: string) {
     if (!currentSessionId.value || isStreaming.value) return
@@ -469,6 +500,7 @@ export const useChatStore = defineStore('chat', () => {
     togglePin,
     isPinned,
     deleteMessage,
-    regenerateMessage
+    regenerateMessage,
+    exportSession
   }
 })

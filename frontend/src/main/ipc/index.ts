@@ -10,8 +10,11 @@ export function registerIpcHandlers(): void {
     return result.canceled ? [] : result.filePaths
   })
 
-  ipcMain.handle('dialog:saveFile', async () => {
-    const result = await dialog.showSaveDialog({})
+  ipcMain.handle('dialog:saveFile', async (_event, options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: options?.defaultPath,
+      filters: options?.filters
+    })
     return result.canceled ? '' : result.filePath
   })
 

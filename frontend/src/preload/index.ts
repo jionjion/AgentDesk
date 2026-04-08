@@ -3,7 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 const electronAPI = {
   dialog: {
     openFile: (): Promise<string[]> => ipcRenderer.invoke('dialog:openFile'),
-    saveFile: (): Promise<string> => ipcRenderer.invoke('dialog:saveFile')
+    saveFile: (options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }): Promise<string> =>
+      ipcRenderer.invoke('dialog:saveFile', options)
   },
   fs: {
     readFile: (filePath: string): Promise<Uint8Array> =>
