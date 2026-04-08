@@ -15,6 +15,7 @@ import top.jionjion.agentdesk.dto.ChatEventDto;
 import top.jionjion.agentdesk.dto.FileResponse;
 import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
+import top.jionjion.agentdesk.annotation.RateLimit;
 import top.jionjion.agentdesk.service.FileService;
 import top.jionjion.agentdesk.session.SessionService;
 
@@ -65,6 +66,7 @@ public class ChatController {
     /**
      * 流式对话接口, 通过SSE推送Agent的回复事件
      */
+    @RateLimit(maxRequests = 10, windowSeconds = 60, message = "对话请求过于频繁, 请稍后再试")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
                                  @RequestParam String message,
