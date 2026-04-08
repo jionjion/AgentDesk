@@ -26,6 +26,16 @@ agentscope:
   agent:
     name: assistant
 
+# Actuator 配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 agentdesk:
   # 数据库存储, 不再使用本地文件
   storage: postgresql
