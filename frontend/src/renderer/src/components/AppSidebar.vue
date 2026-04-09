@@ -195,6 +195,24 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- 重命名对话框 -->
+    <Dialog v-model:open="renameDialogOpen">
+      <DialogContent class="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>重命名会话</DialogTitle>
+        </DialogHeader>
+        <Input
+          v-model="renameTitle"
+          placeholder="请输入新标题"
+          @keydown.enter="confirmRename"
+        />
+        <DialogFooter class="gap-2">
+          <Button variant="outline" @click="renameDialogOpen = false">取消</Button>
+          <Button @click="confirmRename">确认</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </aside>
 </template>
 
@@ -214,6 +232,8 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
 } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 
 const route = useRoute()
 const router = useRouter()
@@ -222,6 +242,9 @@ const chatStore = useChatStore()
 
 const deleteConfirmOpen = ref(false)
 const pendingDeleteId = ref<string | null>(null)
+const renameDialogOpen = ref(false)
+const renameSessionId = ref<string | null>(null)
+const renameTitle = ref('')
 const showFilter = ref(false)
 const filterKeyword = ref('')
 const filterInputRef = ref<HTMLInputElement>()
@@ -284,10 +307,19 @@ async function confirmDeleteSession() {
 }
 
 function handleRenameSession(id: string, currentTitle: string) {
-  const newTitle = window.prompt('重命名会话', currentTitle)
-  if (newTitle && newTitle.trim() && newTitle !== currentTitle) {
-    chatStore.renameSession(id, newTitle.trim())
+  renameSessionId.value = id
+  renameTitle.value = currentTitle
+  renameDialogOpen.value = true
+}
+
+function confirmRename() {
+  if (!renameSessionId.value) return
+  const newTitle = renameTitle.value.trim()
+  if (newTitle) {
+    chatStore.renameSession(renameSessionId.value, newTitle)
   }
+  renameDialogOpen.value = false
+  renameSessionId.value = null
 }
 
 function handleOpenSettings() {

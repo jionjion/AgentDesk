@@ -1,6 +1,6 @@
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="max-w-lg p-0 gap-0">
+    <DialogContent class="w-[90vw] max-w-3xl min-w-[320px] p-0 gap-0">
       <!-- 搜索输入框 -->
       <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <Search :size="18" class="text-gray-400 flex-shrink-0" />
@@ -22,7 +22,7 @@
       </div>
 
       <!-- 搜索结果 -->
-      <ScrollArea class="max-h-[400px]">
+      <ScrollArea class="h-[50vh] min-h-[200px]">
         <!-- 加载中 -->
         <div v-if="loading" class="flex items-center justify-center py-8">
           <Loader2 :size="20" class="animate-spin text-gray-400" />
