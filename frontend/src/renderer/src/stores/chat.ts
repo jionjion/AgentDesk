@@ -6,7 +6,15 @@ import { createChatStream, interruptChat, getMessages } from '@/api/chat'
 import { uploadFile } from '@/api/file'
 import { exportToMarkdown } from '@/utils/exportMarkdown'
 
-const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan']
+const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
+
+/** 判断工具名是否属于计划/子任务管理类 */
+function isPlanTool(toolName: string): boolean {
+  if (PLAN_TOOL_NAMES.includes(toolName)) return true
+  // 兜底：包含 plan 或 subtask 关键词的工具名也归入 plan 类
+  const lower = toolName.toLowerCase()
+  return lower.includes('plan') || lower.includes('subtask')
+}
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
@@ -265,8 +273,18 @@ export const useChatStore = defineStore('chat', () => {
       const msgs = messagesBySession.value[sessionId!]
       if (!msgs) return
 
-      const isPlanTool = PLAN_TOOL_NAMES.includes(data.toolName || '')
-      const newMsg: ChatMessage = isPlanTool
+      const planTool = isPlanTool(data.toolName || '')
+
+      // finish_subtask：往 assistant 内容中注入分隔标记
+      if (data.toolName === 'finish_subtask') {
+        const currentAssistant = getAssistantMsg()
+        if (currentAssistant) {
+          const idx = data.arguments?.subtask_idx ?? data.arguments?.subtask_index ?? ''
+          currentAssistant.content += `\n<!-- subtask_done:${idx} -->\n`
+        }
+      }
+
+      const newMsg: ChatMessage = planTool
         ? {
             id: generateId(),
             role: 'plan',
@@ -282,6 +300,14 @@ export const useChatStore = defineStore('chat', () => {
             arguments: data.arguments || {},
             status: 'calling'
           }
+
+      // 非 plan 工具调用：往 assistant 内容注入标记
+      if (!planTool) {
+        const currentAssistant = getAssistantMsg()
+        if (currentAssistant) {
+          currentAssistant.content += `\n<!-- tool_call:${newMsg.id} -->\n`
+        }
+      }
 
       // 在助手消息之前插入
       const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)

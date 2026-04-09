@@ -64,6 +64,19 @@ export interface PlanMessage {
   result?: string
 }
 
+/** 子任务 */
+export interface Subtask {
+  name: string
+  state: 'todo' | 'in_progress' | 'done' | 'abandoned'
+}
+
+/** 计划状态 */
+export interface PlanState {
+  title: string
+  subtasks: Subtask[]
+  isFinished: boolean
+}
+
 /** 聊天消息联合类型 */
 export type ChatMessage = UserMessage | AssistantMessage | ToolCallMessage | ThinkingMessage | PlanMessage
 

@@ -3,7 +3,7 @@
     <TitleBar />
     <div class="flex flex-1 overflow-hidden">
       <AppSidebar v-show="!appStore.sidebarCollapsed" />
-      <main class="flex-1 overflow-auto">
+      <main class="flex-1 overflow-hidden">
         <RouterView />
       </main>
     </div>

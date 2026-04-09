@@ -37,11 +37,11 @@
     <!-- 消息列表 -->
     <div v-else ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4">
       <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
-        <template v-for="msg in chatStore.currentMessages" :key="msg.id">
+        <template v-for="(msg, idx) in chatStore.currentMessages" :key="msg.id">
           <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg" />
-          <ToolCallCard v-else-if="msg.role === 'tool_call'" :message="msg" />
-          <PlanCard v-else-if="msg.role === 'plan'" :message="msg" />
-          <MessageBubble v-else :message="msg" />
+          <template v-else-if="msg.role === 'tool_call'" />
+          <template v-else-if="msg.role === 'plan'" />
+          <MessageBubble v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)" :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)" />
         </template>
         <div ref="scrollAnchorRef" />
       </div>
@@ -75,6 +75,9 @@
             </div>
           </div>
         </div>
+
+        <!-- 任务状态栏（输入框上方） -->
+        <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState" />
 
         <!-- 输入框 -->
         <div class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
@@ -148,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   FolderOpen,
@@ -168,14 +171,188 @@ import { useSettingsStore } from '@/stores/settings'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
-import ToolCallCard from '@/components/chat/ToolCallCard.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
-import PlanCard from '@/components/chat/PlanCard.vue'
+import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
+import { usePlanSubtasks } from '@/composables/usePlanSubtasks'
+import type { PlanMessage, ToolCallMessage } from '@/types/chat'
 
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const route = useRoute()
+const { planState } = usePlanSubtasks()
+
+const planMessages = computed(() =>
+  chatStore.currentMessages.filter((m): m is PlanMessage => m.role === 'plan')
+)
+
+/**
+ * 获取 index 处的助手消息对应的子任务名称
+ * 往前查找最近的 update_subtask_state / finish_subtask，从 arguments 提取子任务索引，
+ * 然后从 planState 中取出该子任务名称
+ */
+function getSubtaskName(index: number): string | undefined {
+  const msgs = chatStore.currentMessages
+  const msg = msgs[index]
+  if (msg.role !== 'assistant') return undefined
+
+  // 往前找最近的 plan 消息
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = msgs[i]
+    if (prev.role === 'user') break
+    if (prev.role === 'thinking') continue
+    if (prev.role === 'plan') {
+      const planMsg = prev as PlanMessage
+      const args = planMsg.arguments || {}
+
+      if (planMsg.toolName === 'update_subtask_state' || planMsg.toolName === 'finish_subtask') {
+        const idx = args.subtask_idx ?? args.subtask_index ?? args.index
+        if (typeof idx === 'number' && idx >= 0) {
+          const subtasks = planState.value.subtasks
+          if (idx < subtasks.length) return subtasks[idx].name
+          return `子任务 ${idx + 1}`
+        }
+      }
+      // 如果是其他 plan 消息（如 create_plan），看 planState 中是否有 in_progress 的子任务
+      const inProgress = planState.value.subtasks.find(s => s.state === 'in_progress')
+      if (inProgress) return inProgress.name
+      break
+    }
+    break
+  }
+  return undefined
+}
+
+/**
+ * 判断 index 处的助手消息对应的子任务是否已完成
+ */
+function isSubtaskDone(index: number): boolean {
+  const msgs = chatStore.currentMessages
+  // 往后看是否有 finish_subtask
+  for (let i = index + 1; i < msgs.length; i++) {
+    const next = msgs[i]
+    if (next.role === 'user') break
+    if (next.role === 'plan' && (next as PlanMessage).toolName === 'finish_subtask') return true
+  }
+  return false
+}
+
+/**
+ * 从 finish_subtask 的 plan 消息中获取子任务名称
+ */
+
+/**
+ * 获取 index 处的助手消息关联的 finish_subtask 卡片数据
+ * 往前查找 finish_subtask plan 消息，返回 { subtaskIdx: { name, outcome } } 的 map
+ */
+function getSubtaskCardsMap(index: number): Record<string, { name: string; outcome: string }> {
+  const msgs = chatStore.currentMessages
+  const msg = msgs[index]
+  if (msg.role !== 'assistant') return {}
+
+  const map: Record<string, { name: string; outcome: string }> = {}
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = msgs[i]
+    if (prev.role === 'user') break
+    if (prev.role === 'plan' && (prev as PlanMessage).toolName === 'finish_subtask') {
+      const planMsg = prev as PlanMessage
+      const args = planMsg.arguments || {}
+      const idx = args.subtask_idx ?? args.subtask_index ?? args.index
+      if (typeof idx !== 'number') continue
+      let name = `子任务 ${idx + 1}`
+      if (idx >= 0 && idx < planState.value.subtasks.length) {
+        name = planState.value.subtasks[idx].name
+      } else {
+        const match = planMsg.result?.match(/named '([^']+)'/)
+        if (match) name = match[1]
+      }
+      const outcome = (args.subtask_outcome as string) || planMsg.result || ''
+      map[String(idx)] = { name, outcome }
+    }
+  }
+  return map
+}
+
+/**
+ * 获取 index 处的助手消息关联的 tool_call 消息 map
+ * key 为 tool_call 消息 ID，value 为 ToolCallMessage
+ */
+function getToolCallsMap(index: number): Record<string, ToolCallMessage> {
+  const msgs = chatStore.currentMessages
+  const msg = msgs[index]
+  if (msg.role !== 'assistant') return {}
+
+  const map: Record<string, ToolCallMessage> = {}
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = msgs[i]
+    if (prev.role === 'user') break
+    if (prev.role === 'tool_call') {
+      map[prev.id] = prev as ToolCallMessage
+    }
+  }
+  return map
+}
+
+/**
+ * 判断 index 处的助手消息是否紧跟在 create_plan 完成之后
+ * 即：该助手消息之前最近的非 thinking 消息是一条已完成的 create_plan/revise_current_plan
+ * 且该助手消息之后到下一条用户消息之间没有更多的 plan 消息（说明 agent 在等待用户确认）
+ */
+function isAfterPlanCreated(index: number): boolean {
+  const msgs = chatStore.currentMessages
+  const msg = msgs[index]
+  if (msg.role !== 'assistant') return false
+
+  // 往前找最近的 plan 消息（跳过 thinking / tool_call）
+  let foundCreatePlan = false
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = msgs[i]
+    if (prev.role === 'thinking' || prev.role === 'tool_call') continue
+    if (prev.role === 'plan' && (prev.toolName === 'create_plan' || prev.toolName === 'revise_current_plan') && prev.result) {
+      foundCreatePlan = true
+    }
+    break
+  }
+  if (!foundCreatePlan) return false
+
+  // 往后看：这条助手消息之后不应有更多 plan/tool_call/user 消息（说明 agent 停了，在等确认）
+  for (let i = index + 1; i < msgs.length; i++) {
+    const next = msgs[i]
+    if (next.role === 'user') return false
+    if (next.role === 'plan' || next.role === 'tool_call') return false
+  }
+  return true
+}
+
+/**
+ * 判断 index 处的助手消息是否属于子任务执行过程中的输出
+ * 即：该助手消息前后都有 plan 消息（夹在 plan 操作之间），不是最后一轮对话
+ */
+function isSubtaskOutput(index: number): boolean {
+  const msgs = chatStore.currentMessages
+  const msg = msgs[index]
+  if (msg.role !== 'assistant') return false
+
+  // 前面有 plan 消息（不是 create_plan 等待确认的那条）
+  let hasPlanBefore = false
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = msgs[i]
+    if (prev.role === 'user') break
+    if (prev.role === 'plan') {
+      hasPlanBefore = true
+      break
+    }
+  }
+  if (!hasPlanBefore) return false
+
+  // 后面也有 plan 或 tool_call 消息（说明还在执行中，不是最终回复）
+  for (let i = index + 1; i < msgs.length; i++) {
+    const next = msgs[i]
+    if (next.role === 'user') return false
+    if (next.role === 'plan' || next.role === 'tool_call') return true
+  }
+  return false
+}
 
 const inputText = ref('')
 const messageListRef = ref<HTMLElement>()
