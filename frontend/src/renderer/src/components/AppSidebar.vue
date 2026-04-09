@@ -103,7 +103,7 @@
     <!-- 用户信息 -->
     <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2">
       <div class="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center overflow-hidden">
-        <img v-if="appStore.currentUser.avatar" :src="appStore.currentUser.avatar" alt="头像" class="h-full w-full object-cover" />
+        <img v-if="appStore.currentUser.avatar && !avatarError" :src="appStore.currentUser.avatar" alt="头像" class="h-full w-full object-cover" @error="avatarError = true" />
         <User v-else :size="16" class="text-gray-600 dark:text-gray-300" />
       </div>
       <div class="flex-1 min-w-0">
@@ -248,6 +248,7 @@ const renameTitle = ref('')
 const showFilter = ref(false)
 const filterKeyword = ref('')
 const filterInputRef = ref<HTMLInputElement>()
+const avatarError = ref(false)
 
 const filteredSessions = computed(() => {
   const kw = filterKeyword.value.trim().toLowerCase()
@@ -261,6 +262,10 @@ watch(showFilter, (val) => {
   } else {
     filterKeyword.value = ''
   }
+})
+
+watch(() => appStore.currentUser.avatar, () => {
+  avatarError.value = false
 })
 
 const navItems = [
