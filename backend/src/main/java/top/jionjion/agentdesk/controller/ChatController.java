@@ -13,11 +13,14 @@ import top.jionjion.agentdesk.agent.AgentHandle;
 import top.jionjion.agentdesk.agent.AgentPool;
 import top.jionjion.agentdesk.dto.ChatEventDto;
 import top.jionjion.agentdesk.dto.FileResponse;
+import top.jionjion.agentdesk.dto.SearchResultDto;
 import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.annotation.RateLimit;
 import top.jionjion.agentdesk.service.FileService;
+import top.jionjion.agentdesk.service.TitleGenerationService;
 import top.jionjion.agentdesk.session.SessionService;
+import top.jionjion.agentdesk.security.UserContext;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -40,13 +43,16 @@ public class ChatController {
     private final ChatMessageRepository chatMessageRepository;
     private final SessionService sessionService;
     private final FileService fileService;
+    private final TitleGenerationService titleGenerationService;
 
     public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository,
-                          SessionService sessionService, FileService fileService) {
+                          SessionService sessionService, FileService fileService,
+                          TitleGenerationService titleGenerationService) {
         this.agentPool = agentPool;
         this.chatMessageRepository = chatMessageRepository;
         this.sessionService = sessionService;
         this.fileService = fileService;
+        this.titleGenerationService = titleGenerationService;
     }
 
     /**
@@ -137,6 +143,20 @@ public class ChatController {
                     } catch (Exception e) {
                         log.warn("Error completing SSE: {}", e.getMessage());
                     }
+
+                    // 首次对话时异步生成标题 (emitter 已关闭, 不再通过 SSE 推送)
+                    if (sessionService.hasDefaultTitle(sessionId)) {
+                        java.util.concurrent.CompletableFuture.runAsync(() -> {
+                            try {
+                                String generatedTitle = titleGenerationService.generateTitle(message);
+                                if (generatedTitle != null && !generatedTitle.isEmpty()) {
+                                    sessionService.updateTitleInternal(sessionId, generatedTitle);
+                                }
+                            } catch (Exception e) {
+                                log.warn("自动生成标题失败: {}", e.getMessage());
+                            }
+                        });
+                    }
                 })
                 .doOnError(e -> {
                     log.error("Agent error: {}", e.getMessage(), e);
@@ -151,6 +171,30 @@ public class ChatController {
                 .subscribe();
 
         return emitter;
+    }
+
+    /**
+     * 全文搜索消息
+     */
+    @GetMapping("/search")
+    public List<SearchResultDto> searchMessages(@RequestParam String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return Collections.emptyList();
+        }
+        Long userId = UserContext.getUserId();
+        Map<String, String> titleMap = sessionService.getSessionTitleMap();
+        List<ChatMessage> messages = chatMessageRepository.searchByContent(userId, keyword.trim());
+
+        return messages.stream()
+                .map(m -> new SearchResultDto(
+                        m.getId(),
+                        m.getSessionId(),
+                        titleMap.getOrDefault(m.getSessionId(), "未知会话"),
+                        m.getRole(),
+                        m.getContent(),
+                        m.getCreatedAt()
+                ))
+                .toList();
     }
 
     /**

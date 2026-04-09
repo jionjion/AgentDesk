@@ -61,6 +61,11 @@ public record ChatEventDto(
         return new ChatEventDto("agent_complete", content, null, null, null, null, reason, null);
     }
 
+    /** 标题生成事件 */
+    public static ChatEventDto titleGenerated(String title) {
+        return new ChatEventDto("title_generated", title, null, null, null, null, null, null);
+    }
+
     /** 错误事件 */
     public static ChatEventDto error(String message) {
         return new ChatEventDto("error", null, null, null, null, null, null, message);
