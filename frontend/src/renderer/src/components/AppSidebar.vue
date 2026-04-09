@@ -30,12 +30,37 @@
 
     <!-- 任务列表 -->
     <div class="flex-1 overflow-hidden mt-2">
-      <div class="px-3 mb-1">
+      <div class="px-3 mb-1 flex items-center justify-between">
         <span class="text-xs text-gray-400 dark:text-gray-500">任务</span>
+        <button
+          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          @click="showFilter = !showFilter"
+        >
+          <Search :size="12" />
+        </button>
+      </div>
+      <div v-if="showFilter" class="px-3 mb-1">
+        <div class="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
+          <Search :size="12" class="text-gray-400 flex-shrink-0" />
+          <input
+            ref="filterInputRef"
+            v-model="filterKeyword"
+            type="text"
+            placeholder="过滤会话..."
+            class="flex-1 bg-transparent border-none outline-none text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400"
+          />
+          <button
+            v-if="filterKeyword"
+            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            @click="filterKeyword = ''"
+          >
+            <X :size="12" />
+          </button>
+        </div>
       </div>
       <ScrollArea class="h-full">
         <div class="px-2 space-y-0.5">
-          <ContextMenu v-for="session in chatStore.sortedSessions" :key="session.id">
+          <ContextMenu v-for="session in filteredSessions" :key="session.id">
             <ContextMenuTrigger as-child>
               <div
                 class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
@@ -46,11 +71,6 @@
               >
                 <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500" />
                 <span class="flex-1 truncate">{{ session.title }}</span>
-                <X
-                  :size="14"
-                  class="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-                  @click.stop="handleDeleteSession(session.id)"
-                />
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent class="w-40">
@@ -73,8 +93,8 @@
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
-          <div v-if="chatStore.sessions.length === 0" class="px-2 py-4 text-center">
-            <span class="text-xs text-gray-400">暂无会话</span>
+          <div v-if="filteredSessions.length === 0" class="px-2 py-4 text-center">
+            <span class="text-xs text-gray-400">{{ filterKeyword ? '无匹配会话' : '暂无会话' }}</span>
           </div>
         </div>
       </ScrollArea>
@@ -179,12 +199,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import type { ThemeMode } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { Plus, Ticket, Timer, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2, Download } from 'lucide-vue-next'
+import { Plus, Ticket, Timer, Settings as SettingsIcon, X, BookOpen, FileText, Info, LogOut, User, Sun, Moon, Monitor, Palette, ChevronRight, Check, Edit3, Pin, PinOff, Trash2, Download, Search } from 'lucide-vue-next'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -202,6 +222,23 @@ const chatStore = useChatStore()
 
 const deleteConfirmOpen = ref(false)
 const pendingDeleteId = ref<string | null>(null)
+const showFilter = ref(false)
+const filterKeyword = ref('')
+const filterInputRef = ref<HTMLInputElement>()
+
+const filteredSessions = computed(() => {
+  const kw = filterKeyword.value.trim().toLowerCase()
+  if (!kw) return chatStore.sortedSessions
+  return chatStore.sortedSessions.filter(s => s.title.toLowerCase().includes(kw))
+})
+
+watch(showFilter, (val) => {
+  if (val) {
+    nextTick(() => filterInputRef.value?.focus())
+  } else {
+    filterKeyword.value = ''
+  }
+})
 
 const navItems = [
   { path: '/skills', label: '技能', icon: Ticket, badge: 'Beta' },

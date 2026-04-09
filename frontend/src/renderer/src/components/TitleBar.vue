@@ -16,6 +16,9 @@
 
     <!-- 右侧操作区 -->
     <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">
+      <Button variant="ghost" size="icon" class="h-8 w-8" @click="searchOpen = true">
+        <Search :size="16" />
+      </Button>
       <Popover>
         <PopoverTrigger as-child>
           <Button variant="ghost" size="icon" class="h-8 w-8">
@@ -53,21 +56,25 @@
       </div>
     </div>
   </div>
+  <SearchDialog v-model:open="searchOpen" />
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useAppStore } from '@/stores/app'
 import {
   Menu,
   ChevronsLeft,
   ChevronsRight,
   CircleHelp,
+  Search,
   Minus,
   Maximize2,
   X
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import SearchDialog from '@/components/SearchDialog.vue'
 
 declare const __APP_VERSION__: string
 declare const __BUILD_DATE__: string
@@ -77,7 +84,7 @@ const buildDate = __BUILD_DATE__
 
 const appStore = useAppStore()
 const emit = defineEmits<{ toggleMenu: [] }>()
-
+const searchOpen = ref(false)
 function handleMinimize() {
   window.electronAPI?.window.minimize()
 }
