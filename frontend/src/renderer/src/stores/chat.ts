@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ChatSession, ChatMessage, AssistantMessage, BackendChatMessage, SSEEventData, Attachment } from '@/types/chat'
-import { createSession, getSessions, deleteSession, updateSessionTitle } from '@/api/session'
+import { createSession, getSessions, getSession, deleteSession, updateSessionTitle } from '@/api/session'
 import { createChatStream, interruptChat, getMessages } from '@/api/chat'
 import { uploadFile } from '@/api/file'
 import { exportToMarkdown } from '@/utils/exportMarkdown'
@@ -328,18 +328,17 @@ export const useChatStore = defineStore('chat', () => {
         msg.isStreaming = false
       }
       cleanup()
-    })
 
-    es.addEventListener('title_generated', (e: MessageEvent) => {
-      try {
-        const data: SSEEventData = JSON.parse(e.data)
-        if (data.content) {
+      // 延迟刷新会话标题 (后端异步生成标题)
+      setTimeout(async () => {
+        try {
+          const res = await getSession(sessionId!)
           const session = sessions.value.find(s => s.id === sessionId)
-          if (session) session.title = data.content
-        }
-      } catch {
-        // ignore parse errors
-      }
+          if (session && res.data.title && res.data.title !== '新对话') {
+            session.title = res.data.title
+          }
+        } catch { /* ignore */ }
+      }, 3000)
     })
 
     es.addEventListener('error', (e: MessageEvent) => {

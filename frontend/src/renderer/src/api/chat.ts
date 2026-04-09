@@ -1,5 +1,5 @@
 import request from './request'
-import type { BackendChatMessage } from '@/types/chat'
+import type { BackendChatMessage, SearchResult } from '@/types/chat'
 
 const BASE_URL = 'http://localhost:8080'
 
@@ -29,4 +29,13 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
  */
 export function interruptChat(sessionId: string) {
   return request.post(`/api/chat/${sessionId}/interrupt`)
+}
+
+/**
+ * 全文搜索消息
+ */
+export function searchMessages(keyword: string) {
+  return request.get<SearchResult[]>('/api/chat/search', {
+    params: { keyword }
+  })
 }

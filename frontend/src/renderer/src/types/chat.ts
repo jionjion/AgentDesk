@@ -92,3 +92,13 @@ export interface SSEEventData {
   reason?: string
   error?: string
 }
+
+/** 消息搜索结果 */
+export interface SearchResult {
+  id: number
+  sessionId: string
+  sessionTitle: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: number
+}
