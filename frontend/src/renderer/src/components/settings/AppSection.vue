@@ -15,6 +15,25 @@
       </Select>
     </div>
 
+    <!-- 关闭窗口行为 -->
+    <div class="space-y-2">
+      <Label>关闭窗口时</Label>
+      <RadioGroup v-model="closeAction" class="space-y-1">
+        <div class="flex items-center gap-2">
+          <RadioGroupItem value="ask" id="close-ask" />
+          <Label for="close-ask" class="font-normal cursor-pointer">每次询问</Label>
+        </div>
+        <div class="flex items-center gap-2">
+          <RadioGroupItem value="minimize" id="close-minimize" />
+          <Label for="close-minimize" class="font-normal cursor-pointer">最小化到系统托盘</Label>
+        </div>
+        <div class="flex items-center gap-2">
+          <RadioGroupItem value="quit" id="close-quit" />
+          <Label for="close-quit" class="font-normal cursor-pointer">直接退出</Label>
+        </div>
+      </RadioGroup>
+    </div>
+
     <!-- 发送键 -->
     <div class="space-y-2">
       <Label>发送快捷键</Label>
@@ -40,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import type { AppSettings } from '@/types/settings'
 import { Button } from '@/components/ui/button'
@@ -57,6 +76,7 @@ const form = reactive<AppSettings>({
   fontSize: 14
 })
 const saving = ref(false)
+const closeAction = ref<'ask' | 'minimize' | 'quit'>('ask')
 
 const themeOptions = [
   { label: '跟随系统', value: 'auto' },
@@ -67,6 +87,16 @@ const themeOptions = [
 watch(() => settingsStore.app, (val) => {
   Object.assign(form, val)
 }, { immediate: true })
+
+// 关闭行为独立于后端设置，通过 Electron IPC 读写本地配置
+watch(closeAction, async (val) => {
+  await window.electronAPI?.app.setCloseAction(val)
+})
+
+onMounted(async () => {
+  const action = await window.electronAPI?.app.getCloseAction()
+  if (action) closeAction.value = action
+})
 
 async function handleSave() {
   saving.value = true

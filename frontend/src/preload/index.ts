@@ -19,7 +19,19 @@ const electronAPI = {
       ipcRenderer.invoke('shell:openExternal', url)
   },
   app: {
-    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion')
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+    getCloseAction: (): Promise<'ask' | 'minimize' | 'quit'> =>
+      ipcRenderer.invoke('app:getCloseAction'),
+    setCloseAction: (action: 'ask' | 'minimize' | 'quit'): Promise<void> =>
+      ipcRenderer.invoke('app:setCloseAction', action),
+    confirmClose: (choice: 'quit' | 'minimize'): void =>
+      ipcRenderer.send('app:confirmClose', choice),
+    onShowCloseDialog: (callback: () => void): void => {
+      ipcRenderer.on('show-close-dialog', callback)
+    },
+    offShowCloseDialog: (): void => {
+      ipcRenderer.removeAllListeners('show-close-dialog')
+    }
   },
   window: {
     minimize: (): void => ipcRenderer.send('window:minimize'),
