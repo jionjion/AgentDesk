@@ -20,11 +20,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final OssService ossService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtService jwtService, OssService ossService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.ossService = ossService;
     }
 
     /**
@@ -43,7 +46,7 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtService.generateToken(user.getId(), user.getUsername());
-        return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), user.getAvatar(), token);
+        return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), resolveAvatarUrl(user.getAvatar()), token);
     }
 
     /**
@@ -58,7 +61,7 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(user.getId(), user.getUsername());
-        return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), user.getAvatar(), token);
+        return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), resolveAvatarUrl(user.getAvatar()), token);
     }
 
     /**
@@ -68,6 +71,16 @@ public class AuthService {
         Long userId = UserContext.getUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
-        return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), user.getAvatar(), null);
+        return new AuthResponse(user.getId(), user.getUsername(), user.getNickname(), resolveAvatarUrl(user.getAvatar()), null);
+    }
+
+    /**
+     * 将 OSS key 转为预签名 URL
+     */
+    private String resolveAvatarUrl(String avatar) {
+        if (avatar != null && avatar.startsWith("avatar/")) {
+            return ossService.generatePresignedUrl(avatar, 60);
+        }
+        return avatar;
     }
 }

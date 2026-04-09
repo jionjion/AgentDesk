@@ -10,7 +10,9 @@ import top.jionjion.agentdesk.repository.SessionRepository;
 import top.jionjion.agentdesk.security.UserContext;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 会话管理服务
@@ -99,6 +101,25 @@ public class SessionService {
     }
 
     /**
+     * 内部更新标题 (不依赖 UserContext, 用于 Reactor 线程回调)
+     */
+    public void updateTitleInternal(String id, String title) {
+        sessionRepository.findById(id).ifPresent(m -> {
+            m.setTitle(title);
+            sessionRepository.save(m);
+        });
+    }
+
+    /**
+     * 判断会话是否仍使用默认标题
+     */
+    public boolean hasDefaultTitle(String sessionId) {
+        return sessionRepository.findById(sessionId)
+                .map(m -> "新对话".equals(m.getTitle()))
+                .orElse(false);
+    }
+
+    /**
      * 更新最后使用时间
      */
     public void touch(String id) {
@@ -106,6 +127,15 @@ public class SessionService {
             m.setLastUsedAt(System.currentTimeMillis());
             sessionRepository.save(m);
         });
+    }
+
+    /**
+     * 获取当前用户的会话标题映射 (sessionId -> title)
+     */
+    public Map<String, String> getSessionTitleMap() {
+        Long userId = UserContext.getUserId();
+        return sessionRepository.findByUserId(userId, Sort.unsorted()).stream()
+                .collect(Collectors.toMap(SessionMetadata::getId, SessionMetadata::getTitle));
     }
 
     private SessionResponse toResponse(SessionMetadata metadata) {

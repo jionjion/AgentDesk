@@ -1,6 +1,7 @@
 package top.jionjion.agentdesk.controller;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import top.jionjion.agentdesk.dto.*;
 import top.jionjion.agentdesk.service.SettingsService;
 
@@ -27,6 +28,11 @@ public class SettingsController {
     @PutMapping("/profile")
     public ProfileDto updateProfile(@RequestBody UpdateProfileRequest request) {
         return settingsService.updateProfile(request);
+    }
+
+    @PostMapping("/avatar")
+    public ProfileDto uploadAvatar(@RequestParam("file") MultipartFile file) {
+        return settingsService.uploadAvatar(file);
     }
 
     @PutMapping("/password")

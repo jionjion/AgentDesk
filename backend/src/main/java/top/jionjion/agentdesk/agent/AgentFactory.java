@@ -3,10 +3,15 @@ package top.jionjion.agentdesk.agent;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.tool.Toolkit;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import top.jionjion.agentdesk.dto.ModelSettingsDto;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
+import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.OssService;
+import top.jionjion.agentdesk.service.SettingsService;
 
 /**
  * Agent 工厂: 为每个会话创建独立的 Agent 实例
@@ -14,7 +19,7 @@ import top.jionjion.agentdesk.service.OssService;
 @Component
 public class AgentFactory {
 
-    private static final String SYS_PROMPT = """
+    private static final String DEFAULT_SYS_PROMPT = """
             你是一个名为 Assistant 的智能助手。你可以帮助用户回答问题、获取当前时间、进行数学计算等。
             当遇到复杂任务时，你可以制定计划并逐步执行。
 
@@ -25,14 +30,22 @@ public class AgentFactory {
             请用中文回答。
             """;
 
-    private final DashScopeChatModel model;
+    private final DashScopeChatModel defaultModel;
     private final FileRecordRepository fileRecordRepository;
     private final OssService ossService;
+    private final SettingsService settingsService;
 
-    public AgentFactory(DashScopeChatModel model, FileRecordRepository fileRecordRepository, OssService ossService) {
-        this.model = model;
+    @Value("${agentscope.dashscope.api-key}")
+    private String apiKey;
+
+    public AgentFactory(DashScopeChatModel defaultModel,
+                        FileRecordRepository fileRecordRepository,
+                        OssService ossService,
+                        SettingsService settingsService) {
+        this.defaultModel = defaultModel;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
+        this.settingsService = settingsService;
     }
 
     /**
@@ -49,10 +62,30 @@ public class AgentFactory {
         // 每个 Agent 独立的 Memory
         InMemoryMemory memory = new InMemoryMemory();
 
+        // 读取用户模型配置
+        DashScopeChatModel model = defaultModel;
+        String sysPrompt = DEFAULT_SYS_PROMPT;
+        if (UserContext.isAuthenticated()) {
+            ModelSettingsDto ms = settingsService.getModelSettings(UserContext.getUserId());
+            GenerateOptions options = GenerateOptions.builder()
+                    .temperature(ms.temperature())
+                    .topP(ms.topP())
+                    .maxTokens(ms.maxTokens())
+                    .build();
+            model = DashScopeChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName(ms.modelName())
+                    .defaultOptions(options)
+                    .build();
+            if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
+                sysPrompt = ms.systemPrompt();
+            }
+        }
+
         // 构建 ReActAgent
         ReActAgent agent = ReActAgent.builder()
                 .name("assistant-" + sessionId)
-                .sysPrompt(SYS_PROMPT)
+                .sysPrompt(sysPrompt)
                 .model(model)
                 .toolkit(toolkit)
                 .memory(memory)

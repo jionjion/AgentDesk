@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import top.jionjion.agentdesk.dto.*;
 import top.jionjion.agentdesk.entity.User;
@@ -16,6 +17,10 @@ import top.jionjion.agentdesk.repository.UserRepository;
 import top.jionjion.agentdesk.repository.UserSettingsRepository;
 import top.jionjion.agentdesk.security.UserContext;
 
+import java.io.IOException;
+import java.util.Set;
+import java.util.UUID;
+
 /**
  * 设置业务逻辑
  */
@@ -23,17 +28,22 @@ import top.jionjion.agentdesk.security.UserContext;
 public class SettingsService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
+    private static final long MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
 
     private final UserRepository userRepository;
     private final UserSettingsRepository userSettingsRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OssService ossService;
 
     public SettingsService(UserRepository userRepository,
                            UserSettingsRepository userSettingsRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           OssService ossService) {
         this.userRepository = userRepository;
         this.userSettingsRepository = userSettingsRepository;
         this.passwordEncoder = passwordEncoder;
+        this.ossService = ossService;
     }
 
     /**
@@ -44,7 +54,7 @@ public class SettingsService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
 
-        ProfileDto profile = ProfileDto.from(user);
+        ProfileDto profile = buildProfileDto(user);
 
         UserSettings entity = userSettingsRepository.findByUserId(userId).orElse(null);
         ModelSettingsDto model = (entity != null) ? parseModel(entity.getSettings()) : ModelSettingsDto.defaults();
@@ -77,7 +87,53 @@ public class SettingsService {
         user.setUpdatedAt(System.currentTimeMillis());
         userRepository.save(user);
 
-        return ProfileDto.from(user);
+        return buildProfileDto(user);
+    }
+
+    /**
+     * 上传头像到 OSS
+     */
+    @Transactional
+    public ProfileDto uploadAvatar(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件不能为空");
+        }
+        if (!ALLOWED_AVATAR_TYPES.contains(file.getContentType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "仅支持 PNG/JPEG/GIF/WebP 格式");
+        }
+        if (file.getSize() > MAX_AVATAR_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "头像文件不能超过 2MB");
+        }
+
+        Long userId = UserContext.getUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+
+        // 生成 OSS key
+        String ext = extractExtension(file.getOriginalFilename());
+        String ossKey = "avatar/" + userId + "/" + System.currentTimeMillis()
+                + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
+
+        try {
+            ossService.upload(ossKey, file.getInputStream(), file.getSize(), file.getContentType());
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "头像上传失败");
+        }
+
+        // 删除旧头像
+        String oldAvatar = user.getAvatar();
+        if (oldAvatar != null && oldAvatar.startsWith("avatar/")) {
+            try {
+                ossService.delete(oldAvatar);
+            } catch (Exception ignored) {
+            }
+        }
+
+        user.setAvatar(ossKey);
+        user.setUpdatedAt(System.currentTimeMillis());
+        userRepository.save(user);
+
+        return buildProfileDto(user);
     }
 
     /**
@@ -153,6 +209,23 @@ public class SettingsService {
     }
 
     // ==================== 内部方法 ====================
+
+    /**
+     * 构建 ProfileDto, 如果 avatar 是 OSS key 则生成预签名 URL
+     */
+    private ProfileDto buildProfileDto(User user) {
+        String avatar = user.getAvatar();
+        if (avatar != null && avatar.startsWith("avatar/")) {
+            avatar = ossService.generatePresignedUrl(avatar, 60);
+        }
+        return new ProfileDto(user.getId(), user.getUsername(), user.getNickname(), avatar);
+    }
+
+    private static String extractExtension(String filename) {
+        if (filename == null) return ".jpg";
+        int dot = filename.lastIndexOf('.');
+        return dot >= 0 ? filename.substring(dot) : ".jpg";
+    }
 
     private UserSettings getOrCreateSettings(Long userId) {
         return userSettingsRepository.findByUserId(userId)
