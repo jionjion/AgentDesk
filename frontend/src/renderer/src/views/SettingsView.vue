@@ -131,9 +131,12 @@
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">{{ activeSectionLabel }}</h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ activeSectionDescription }}</p>
 
-        <!-- 占位内容 -->
-        <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
-          <div class="text-gray-400 dark:text-gray-500 text-sm">设置内容开发中...</div>
+        <!-- 动态内容区 -->
+        <ProfileSection v-if="activeSection === 'profile'" />
+        <AppSection v-else-if="activeSection === 'preferences'" />
+        <PrivacySection v-else-if="activeSection === 'privacy'" />
+        <div v-else class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
+          <div class="text-gray-400 dark:text-gray-500 text-sm">开发中...</div>
         </div>
       </div>
     </main>
@@ -142,15 +145,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TitleBar from '@/components/TitleBar.vue'
+import ProfileSection from '@/components/settings/ProfileSection.vue'
+import AppSection from '@/components/settings/AppSection.vue'
+import PrivacySection from '@/components/settings/PrivacySection.vue'
+import { useSettingsStore } from '@/stores/settings'
 import {
   ArrowLeft,
   SlidersHorizontal,
   User,
-  Monitor,
-  Keyboard,
   Shield,
   Link,
   Cpu,
@@ -161,13 +166,18 @@ import {
 } from 'lucide-vue-next'
 
 const router = useRouter()
+const settingsStore = useSettingsStore()
 const activeSection = ref('preferences')
+
+onMounted(() => {
+  if (!settingsStore.loaded) {
+    settingsStore.fetchSettings()
+  }
+})
 
 const generalItems = [
   { key: 'preferences', label: '偏好设置', icon: SlidersHorizontal },
-  { key: 'profile', label: '个人资料', icon: User },
-  { key: 'system', label: '系统设置', icon: Monitor },
-  { key: 'shortcuts', label: '快捷键', icon: Keyboard }
+  { key: 'profile', label: '个人资料', icon: User }
 ]
 
 const privacyItems = [
@@ -191,8 +201,6 @@ const developerItems = [
 const sectionMeta: Record<string, { label: string; description: string }> = {
   preferences: { label: '偏好设置', description: '自定义应用行为和外观。' },
   profile: { label: '个人资料', description: '头像、邮箱与订阅档位信息。' },
-  system: { label: '系统设置', description: '管理系统级别的配置。' },
-  shortcuts: { label: '快捷键', description: '查看和自定义键盘快捷键。' },
   privacy: { label: '隐私', description: '管理数据收集与隐私偏好。' },
   connectors: { label: '连接器', description: '管理外部服务连接。' },
   mcp: { label: 'MCP 服务', description: '配置 MCP 服务器连接。' },

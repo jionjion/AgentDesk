@@ -1,0 +1,79 @@
+<template>
+  <div class="space-y-6">
+    <!-- 主题 -->
+    <div class="space-y-2">
+      <Label>主题</Label>
+      <Select v-model="form.theme">
+        <SelectTrigger>
+          <SelectValue placeholder="选择主题" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="opt in themeOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <!-- 发送键 -->
+    <div class="space-y-2">
+      <Label>发送快捷键</Label>
+      <RadioGroup v-model="form.sendKey" class="flex gap-4">
+        <div class="flex items-center gap-2">
+          <RadioGroupItem value="Enter" id="send-enter" />
+          <Label for="send-enter" class="font-normal cursor-pointer">Enter</Label>
+        </div>
+        <div class="flex items-center gap-2">
+          <RadioGroupItem value="Ctrl+Enter" id="send-ctrl-enter" />
+          <Label for="send-ctrl-enter" class="font-normal cursor-pointer">Ctrl+Enter</Label>
+        </div>
+      </RadioGroup>
+    </div>
+
+    <!-- 保存 -->
+    <div class="flex justify-end">
+      <Button :disabled="saving" @click="handleSave">
+        {{ saving ? '保存中...' : '保存' }}
+      </Button>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { reactive, ref, watch } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
+import type { AppSettings } from '@/types/settings'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+
+const settingsStore = useSettingsStore()
+
+const form = reactive<AppSettings>({
+  theme: 'auto',
+  language: 'zh-CN',
+  sendKey: 'Enter',
+  fontSize: 14
+})
+const saving = ref(false)
+
+const themeOptions = [
+  { label: '跟随系统', value: 'auto' },
+  { label: '浅色', value: 'light' },
+  { label: '深色', value: 'dark' }
+]
+
+watch(() => settingsStore.app, (val) => {
+  Object.assign(form, val)
+}, { immediate: true })
+
+async function handleSave() {
+  saving.value = true
+  try {
+    await settingsStore.saveAppSettings(form)
+  } finally {
+    saving.value = false
+  }
+}
+</script>

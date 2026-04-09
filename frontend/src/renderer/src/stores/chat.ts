@@ -191,7 +191,7 @@ export const useChatStore = defineStore('chat', () => {
     // 1. 自动创建会话
     let sessionId = currentSessionId.value
     if (!sessionId) {
-      sessionId = await createNewSession(messageContent.substring(0, 20))
+      sessionId = await createNewSession()
     }
 
     // 2. 推入用户消息
@@ -328,6 +328,18 @@ export const useChatStore = defineStore('chat', () => {
         msg.isStreaming = false
       }
       cleanup()
+    })
+
+    es.addEventListener('title_generated', (e: MessageEvent) => {
+      try {
+        const data: SSEEventData = JSON.parse(e.data)
+        if (data.content) {
+          const session = sessions.value.find(s => s.id === sessionId)
+          if (session) session.title = data.content
+        }
+      } catch {
+        // ignore parse errors
+      }
     })
 
     es.addEventListener('error', (e: MessageEvent) => {

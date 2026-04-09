@@ -104,7 +104,7 @@
           :placeholder="chatStore.isStreaming ? '等待回复中...' : '描述任务，/ 调用技能与工具'"
           :disabled="chatStore.isStreaming"
           class="resize-none border-none shadow-none focus-visible:ring-0"
-          @keydown.enter.exact.prevent="handleSend"
+          @keydown="handleKeydown"
         />
         <div class="flex items-center justify-between mt-3">
           <div class="flex items-center gap-2">
@@ -164,6 +164,7 @@ import {
   X
 } from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chat'
+import { useSettingsStore } from '@/stores/settings'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
@@ -173,6 +174,7 @@ import PlanCard from '@/components/chat/PlanCard.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 
 const chatStore = useChatStore()
+const settingsStore = useSettingsStore()
 const route = useRoute()
 
 const inputText = ref('')
@@ -244,8 +246,19 @@ function fillExample(example: string) {
   inputText.value = example
 }
 
-function handleSend(e?: KeyboardEvent) {
-  if (e?.isComposing) return
+function handleKeydown(e: KeyboardEvent) {
+  if (e.isComposing) return
+  const sendKey = settingsStore.app.sendKey
+  if (sendKey === 'Ctrl+Enter' && e.key === 'Enter' && e.ctrlKey) {
+    e.preventDefault()
+    handleSend()
+  } else if (sendKey === 'Enter' && e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
+    e.preventDefault()
+    handleSend()
+  }
+}
+
+function handleSend() {
   const hasAttachments = chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)
   if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
   chatStore.sendMessage(inputText.value)
