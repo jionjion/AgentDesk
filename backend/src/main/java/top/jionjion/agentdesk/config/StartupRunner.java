@@ -31,15 +31,17 @@ public class StartupRunner implements ApplicationRunner {
         String[] activeProfiles = environment.getActiveProfiles();
         String profiles = activeProfiles.length > 0 ? String.join(", ", activeProfiles) : "default";
         String host = InetAddress.getLocalHost().getHostAddress();
+        String datasourceUrl = environment.getProperty("spring.datasource.url", "未配置");
 
         log.info("""
 
                 ----------------------------------------------------------
                   应用 '{}' 启动成功!
                   环境:        {}
+                  数据库:      {}
                   本地访问:    http://localhost:{}{}
                   外部访问:    http://{}:{}{}
                 ----------------------------------------------------------""",
-                appName, profiles, port, contextPath, host, port, contextPath);
+                appName, profiles, datasourceUrl, port, contextPath, host, port, contextPath);
     }
 }

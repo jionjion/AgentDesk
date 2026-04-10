@@ -10,7 +10,7 @@
     </parent>
     <groupId>top.jionjion</groupId>
     <artifactId>agent-desk</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>agent-desk</name>
     <description>agent-desk</description>
     <url/>

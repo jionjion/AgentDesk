@@ -4,6 +4,7 @@
 .idea
 .vscode
 *.md
-target
+target/*
+!target/*.jar
 logs
 .env
