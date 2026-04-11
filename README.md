@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon.png" alt="AgentDesk" width="120">
+  <img src="frontend/resources/icon_255.png" alt="AgentDesk" width="120">
 </p>
 
 <h1 align="center">AgentDesk (搭子)</h1>
