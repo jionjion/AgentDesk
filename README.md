@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/resources/icon_255.png" alt="AgentDesk" width="120">
+  <img src="frontend/resources/icon_255_rounded.png" alt="AgentDesk" width="120">
 </p>
 
 <h1 align="center">AgentDesk (搭子)</h1>
@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">你的本地 AI 智能体工作台</p>
+
+<p align="center">
+  <a href="https://jionjion.github.io/AgentDesk/">&#x1f310; 项目主页</a>
+</p>
 
 AgentDesk 是一款桌面端智能体应用，让你通过自然语言对话驱动 AI Agent 完成各种任务。
 

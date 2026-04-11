@@ -23,3 +23,5 @@ nsis:
   shortcutName: AgentDesk
   uninstallDisplayName: AgentDesk
   createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
