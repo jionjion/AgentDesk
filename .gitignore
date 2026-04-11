@@ -11,6 +11,7 @@ out
 node_modules
 
 
-docs
+frontend/docs
+backend/docs
 
 .env
