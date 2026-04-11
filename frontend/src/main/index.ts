@@ -39,25 +39,57 @@ function setCloseAction(action: CloseAction): void {
   writeLocalSettings(s)
 }
 
-// ── 托盘图标 ─────────────────────────────────────
-function createTrayIcon(): Electron.NativeImage {
-  // 创建一个 16x16 的简单图标（蓝色圆形）
-  const size = 16
-  const canvas = Buffer.alloc(size * size * 4)
-  const cx = size / 2, cy = size / 2, r = 6
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-      if (dist <= r) {
-        canvas[idx] = 59     // R
-        canvas[idx + 1] = 130 // G
-        canvas[idx + 2] = 246 // B
-        canvas[idx + 3] = 255 // A
+// ── 应用图标 ─────────────────────────────────────
+function getAppIcon(): Electron.NativeImage {
+  const iconPath = is.dev
+    ? join(app.getAppPath(), 'resources/icon_255.png')
+    : join(process.resourcesPath, 'icon_255.png')
+  return nativeImage.createFromPath(iconPath)
+}
+
+/** 对 NativeImage 做圆角裁剪（带抗锯齿） */
+function roundIcon(image: Electron.NativeImage, radius: number): Electron.NativeImage {
+  const { width, height } = image.getSize()
+  const bitmap = image.toBitmap()
+  const r = Math.min(radius, width / 2, height / 2)
+
+  // 四个圆心坐标
+  const corners = [
+    { cx: r, cy: r },                         // 左上
+    { cx: width - r - 1, cy: r },              // 右上
+    { cx: r, cy: height - r - 1 },             // 左下
+    { cx: width - r - 1, cy: height - r - 1 }  // 右下
+  ]
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let cornerDist = -1
+      // 判断是否落在某个圆角区域内
+      if (x < r && y < r) {
+        cornerDist = Math.sqrt((x - corners[0].cx) ** 2 + (y - corners[0].cy) ** 2)
+      } else if (x > width - r - 1 && y < r) {
+        cornerDist = Math.sqrt((x - corners[1].cx) ** 2 + (y - corners[1].cy) ** 2)
+      } else if (x < r && y > height - r - 1) {
+        cornerDist = Math.sqrt((x - corners[2].cx) ** 2 + (y - corners[2].cy) ** 2)
+      } else if (x > width - r - 1 && y > height - r - 1) {
+        cornerDist = Math.sqrt((x - corners[3].cx) ** 2 + (y - corners[3].cy) ** 2)
+      }
+
+      if (cornerDist < 0) continue // 不在圆角区域，保持原样
+
+      const idx = (y * width + x) * 4
+      if (cornerDist > r + 0.5) {
+        // 完全在圆角外
+        bitmap[idx + 3] = 0
+      } else if (cornerDist > r - 0.5) {
+        // 边缘 1px 过渡带：按距离线性插值 alpha，实现抗锯齿
+        const alpha = Math.round((r + 0.5 - cornerDist) * bitmap[idx + 3])
+        bitmap[idx + 3] = alpha
       }
     }
   }
-  return nativeImage.createFromBuffer(canvas, { width: size, height: size })
+
+  return nativeImage.createFromBuffer(bitmap, { width, height })
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -73,6 +105,7 @@ function createWindow(): void {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
+    icon: roundIcon(getAppIcon(), 50),
     ...(process.platform === 'win32' ? { thickFrame: true } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -148,8 +181,8 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  const icon = createTrayIcon()
-  tray = new Tray(icon)
+  const icon = getAppIcon().resize({ width: 16, height: 16 })
+  tray = new Tray(roundIcon(icon, 3))
   tray.setToolTip('AgentDesk')
 
   const contextMenu = Menu.buildFromTemplate([
@@ -182,12 +215,13 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('top.jionjion.agentdesk')
 
   // 允许加载外部图片（如 OSS 头像）
+  const apiBaseUrl: string = __API_BASE_URL__
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:8080 https:; font-src 'self' data:"
+          `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; connect-src 'self' ${apiBaseUrl} https:; font-src 'self' data:`
         ]
       }
     })

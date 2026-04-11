@@ -3,12 +3,10 @@
     <!-- 左侧 -->
     <div class="flex-1 flex flex-col items-start justify-center px-16">
       <!-- Logo -->
-      <div class="w-12 h-12 bg-green-600 dark:bg-green-700 rounded-xl flex items-center justify-center mb-6">
-        <Bot :size="28" class="text-white" />
-      </div>
+      <img src="@/assets/icon_255.png" alt="AgentDesk" class="w-12 h-12 rounded-xl mb-6" />
 
       <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">欢迎使用搭子</h1>
-      <p class="text-sm text-green-600 dark:text-green-400 mb-4">面向所有人的 AI 桌面助手</p>
+      <p class="text-sm text-violet-600 dark:text-violet-400 mb-4">面向所有人的 AI 桌面助手</p>
       <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-8 max-w-md">
         Agent-Desk 将 Agent 能力从代码领域扩展到日常工作场景，描述需求，自动执行，直接交付结果。
       </p>
@@ -21,7 +19,7 @@
             type="text"
             placeholder="用户名"
             required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
         <div>
@@ -30,7 +28,7 @@
             type="password"
             placeholder="密码"
             required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
         <div v-if="isRegister">
@@ -39,7 +37,7 @@
             type="text"
             placeholder="昵称"
             required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
 
@@ -49,7 +47,7 @@
         <button
           type="submit"
           :disabled="loading"
-          class="w-full py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full py-2.5 bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium rounded-lg hover:bg-violet-700 dark:hover:bg-violet-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {{ loading ? '请稍候...' : (isRegister ? '注册' : '登录') }}
         </button>
@@ -58,23 +56,23 @@
       <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
         <span v-if="!isRegister">
           还没有账号?
-          <button class="text-green-600 dark:text-green-400 hover:underline" @click="toggleMode">去注册</button>
+          <button class="text-violet-600 dark:text-violet-400 hover:underline" @click="toggleMode">去注册</button>
         </span>
         <span v-else>
           已有账号?
-          <button class="text-green-600 dark:text-green-400 hover:underline" @click="toggleMode">去登录</button>
+          <button class="text-violet-600 dark:text-violet-400 hover:underline" @click="toggleMode">去登录</button>
         </span>
       </p>
     </div>
 
     <!-- 右侧装饰区 -->
-    <div class="w-[480px] bg-green-100 dark:bg-green-900/30 flex items-center justify-center relative overflow-hidden">
+    <div class="w-[480px] bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center relative overflow-hidden">
       <div class="absolute inset-0 opacity-30">
         <svg class="w-full h-full" viewBox="0 0 480 720" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path v-for="i in 20" :key="i" :d="`M${i * 24} 0 Q${i * 24 + 12} 360 ${i * 24} 720`" stroke="#22c55e" stroke-width="1.5" fill="none" />
+          <path v-for="i in 20" :key="i" :d="`M${i * 24} 0 Q${i * 24 + 12} 360 ${i * 24} 720`" stroke="#7C3AED" stroke-width="1.5" fill="none" />
         </svg>
       </div>
-      <p class="relative z-10 text-green-800 dark:text-green-300 text-lg font-medium text-center leading-relaxed px-12">
+      <p class="relative z-10 text-violet-800 dark:text-violet-300 text-lg font-medium text-center leading-relaxed px-12">
         Go from answers to action with<br />your agentic work partner
       </p>
     </div>
@@ -84,7 +82,6 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bot } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()

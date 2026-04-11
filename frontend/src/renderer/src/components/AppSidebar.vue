@@ -6,7 +6,7 @@
         class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md w-full"
         @click="handleNewSession"
       >
-        <Plus :size="16" class="text-green-600" />
+        <Plus :size="16" class="text-violet-600" />
         <span>新任务</span>
       </button>
     </div>
@@ -65,7 +65,7 @@
               <div
                 class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
                 :class="chatStore.currentSessionId === session.id
-                  ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium'
+                  ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
                 @click="handleSwitchSession(session.id)"
               >
@@ -108,7 +108,7 @@
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ appStore.currentUser.name }}</div>
-        <div class="text-xs text-blue-500">{{ appStore.currentUser.plan }}</div>
+        <div class="text-xs text-violet-500">{{ appStore.currentUser.plan }}</div>
       </div>
       <Popover>
         <PopoverTrigger as-child>
@@ -141,7 +141,7 @@
                 :key="item.value"
                 class="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md transition-colors"
                 :class="appStore.theme === item.value
-                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                  ? 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20'
                   : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'"
                 @click="appStore.setTheme(item.value)"
               >

@@ -10,9 +10,7 @@
     <!-- 消息区域 / 欢迎页 -->
     <div v-else-if="chatStore.currentMessages.length === 0" class="flex-1 flex flex-col items-center justify-center px-8">
       <!-- Logo + 标语 -->
-      <div class="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-6">
-        <Bot :size="32" class="text-gray-600 dark:text-gray-400" />
-      </div>
+      <img src="@/assets/icon_255.png" alt="AgentDesk" class="w-16 h-16 rounded-2xl mb-6" />
       <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">说做就做，交付结果</h1>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-10">本地运行、自主规划、安全可控的 AI 工作搭子</p>
 
@@ -22,7 +20,7 @@
           v-for="card in featureCards"
           :key="card.title"
           class="flex-1 p-5 border rounded-xl hover:shadow-sm transition-all cursor-pointer"
-          :class="selectedCard?.title === card.title ? 'border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'"
+          :class="selectedCard?.title === card.title ? 'border-violet-400 dark:border-violet-500 bg-violet-50/50 dark:bg-violet-900/20' : 'border-gray-200 dark:border-gray-700'"
           @click="toggleCard(card)"
         >
           <div class="w-10 h-10 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-3">
@@ -67,7 +65,7 @@
             <div
               v-for="(example, idx) in selectedCard.examples"
               :key="idx"
-              class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
+              class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 cursor-pointer transition-colors"
               @click.stop="fillExample(example)"
             >
               <span class="mt-0.5 w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
@@ -162,7 +160,6 @@ import {
   FileText,
   Camera,
   BarChart3,
-  Bot,
   Loader2,
   X
 } from 'lucide-vue-next'

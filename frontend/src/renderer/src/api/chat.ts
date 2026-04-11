@@ -1,7 +1,7 @@
 import request from './request'
 import type { BackendChatMessage, SearchResult } from '@/types/chat'
 
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 /**
  * 获取会话的历史消息

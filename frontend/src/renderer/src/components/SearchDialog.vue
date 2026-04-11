@@ -55,7 +55,7 @@
             >
               <div class="flex items-center gap-2 mb-1">
                 <Badge variant="secondary" class="text-[10px] px-1.5 py-0"
-                  :class="item.role === 'user' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'">
+                  :class="item.role === 'user' ? 'bg-violet-200 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'">
                   {{ item.role === 'user' ? '用户' : '助手' }}
                 </Badge>
                 <span class="text-xs text-gray-400">{{ formatTime(item.createdAt) }}</span>

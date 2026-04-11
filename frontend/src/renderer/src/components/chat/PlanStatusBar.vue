@@ -16,8 +16,8 @@
         <!-- 折叠时：显示当前任务名 -->
         <template v-if="!expanded && currentTaskName">
           <span class="mx-1 text-gray-300 dark:text-gray-600">|</span>
-          <Loader2 :size="12" class="shrink-0 animate-spin text-blue-500" />
-          <span class="ml-1 text-blue-500 dark:text-blue-400 truncate">
+          <Loader2 :size="12" class="shrink-0 animate-spin text-violet-500" />
+          <span class="ml-1 text-violet-500 dark:text-violet-400 truncate">
             {{ currentTaskName }}
           </span>
         </template>
@@ -50,7 +50,7 @@
         >
           <!-- 状态图标 -->
           <CheckCircle2 v-if="subtask.state === 'done'" :size="14" class="shrink-0 text-green-500" />
-          <Loader2 v-else-if="subtask.state === 'in_progress'" :size="14" class="shrink-0 animate-spin text-blue-500" />
+          <Loader2 v-else-if="subtask.state === 'in_progress'" :size="14" class="shrink-0 animate-spin text-violet-500" />
           <XCircle v-else-if="subtask.state === 'abandoned'" :size="14" class="shrink-0 text-gray-400" />
           <Circle v-else :size="14" class="shrink-0 text-gray-300 dark:text-gray-600" />
           <!-- 子任务名 -->
@@ -58,7 +58,7 @@
             class="text-xs flex-1 truncate"
             :class="{
               'text-green-600 dark:text-green-400': subtask.state === 'done',
-              'text-blue-600 dark:text-blue-400 font-medium': subtask.state === 'in_progress',
+              'text-violet-600 dark:text-violet-400 font-medium': subtask.state === 'in_progress',
               'text-gray-400 dark:text-gray-500 line-through': subtask.state === 'abandoned',
               'text-gray-600 dark:text-gray-400': subtask.state === 'todo'
             }"
@@ -74,7 +74,7 @@
           class="flex items-center gap-2.5 px-3 py-1.5"
         >
           <CheckCircle2 v-if="msg.result" :size="14" class="shrink-0 text-green-500" />
-          <Loader2 v-else :size="14" class="shrink-0 animate-spin text-blue-500" />
+          <Loader2 v-else :size="14" class="shrink-0 animate-spin text-violet-500" />
           <span
             class="text-xs flex-1 truncate"
             :class="msg.result ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-200'"

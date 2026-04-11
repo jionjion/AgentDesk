@@ -116,7 +116,7 @@
       <!-- 底部升级方案 -->
       <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-700">
         <button
-          class="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-green-600 dark:text-green-400 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+          class="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-violet-600 dark:text-violet-400 rounded-md hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
           @click="activeSection = 'upgrade'"
         >
           <Sparkles :size="16" />

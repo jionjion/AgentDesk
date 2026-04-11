@@ -18,7 +18,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <input id="remember" v-model="remember" type="checkbox" class="h-4 w-4 rounded border-gray-300 accent-blue-500 cursor-pointer" />
+        <input id="remember" v-model="remember" type="checkbox" class="h-4 w-4 rounded border-gray-300 accent-violet-500 cursor-pointer" />
         <label for="remember" class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer select-none">记住我的选择</label>
       </div>
     </DialogContent>

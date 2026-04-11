@@ -4,7 +4,7 @@
   "description": "AgentDesk - 智能体本地工作台",
   "main": "./out/main/index.js",
   "author": "Jion Jion",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

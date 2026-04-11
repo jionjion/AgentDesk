@@ -10,7 +10,7 @@
             @click="contentCollapsed = !contentCollapsed"
           >
             <CheckCircle2 v-if="subtaskDone" :size="14" class="shrink-0 text-green-500" />
-            <Loader2 v-else-if="(message as AssistantMessage).isStreaming" :size="14" class="shrink-0 animate-spin text-blue-500" />
+            <Loader2 v-else-if="(message as AssistantMessage).isStreaming" :size="14" class="shrink-0 animate-spin text-violet-500" />
             <CheckCircle2 v-else :size="14" class="shrink-0 text-green-500" />
             <span class="text-xs text-gray-700 dark:text-gray-300 flex-1 truncate font-medium">{{ subtaskName }}</span>
             <ChevronRight
@@ -24,7 +24,7 @@
             <div class="markdown-body text-xs overflow-hidden" v-html="renderedContent" />
             <span
               v-if="(message as AssistantMessage).isStreaming"
-              class="inline-block w-1.5 h-4 bg-green-500 ml-0.5 animate-pulse align-middle"
+              class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
             />
           </div>
         </div>
@@ -35,7 +35,7 @@
         <!-- 头像 -->
         <div
           class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
-          :class="isUser ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400' : 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'"
+          :class="isUser ? 'bg-violet-200 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'"
         >
           {{ isUser ? '你' : 'AI' }}
         </div>
@@ -44,7 +44,7 @@
           <div
             class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
             :class="isUser
-              ? 'bg-blue-500 text-white rounded-br-md'
+              ? 'bg-violet-500 text-white rounded-br-md'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
           >
             <div v-if="isUser">
@@ -89,7 +89,7 @@
                     >
                       <Settings2 :size="13" class="shrink-0 text-gray-500 dark:text-gray-400" />
                       <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ seg.toolCall.toolName }}</span>
-                      <Loader2 v-if="seg.toolCall.status === 'calling'" :size="12" class="shrink-0 animate-spin text-blue-500" />
+                      <Loader2 v-if="seg.toolCall.status === 'calling'" :size="12" class="shrink-0 animate-spin text-violet-500" />
                       <CheckCircle2 v-else :size="13" class="shrink-0 text-green-500" />
                       <ChevronRight
                         :size="11"
@@ -119,7 +119,7 @@
                 />
                 <button
                   v-if="shouldCollapse"
-                  class="mt-1 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+                  class="mt-1 text-xs text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
                   @click="contentCollapsed = !contentCollapsed"
                 >
                   {{ contentCollapsed ? '展开全文...' : '收起' }}
@@ -127,12 +127,12 @@
               </template>
               <span
                 v-if="(message as AssistantMessage).isStreaming"
-                class="inline-block w-1.5 h-4 bg-green-500 ml-0.5 animate-pulse align-middle"
+                class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
               />
               <!-- 计划确认操作卡片 -->
               <div v-if="showPlanConfirm" class="mt-3 flex gap-2">
                 <button
-                  class="px-4 py-1.5 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+                  class="px-4 py-1.5 text-xs font-medium rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors"
                   @click="handlePlanAction('好的，请执行计划')"
                 >
                   执行计划

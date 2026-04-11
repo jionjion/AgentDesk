@@ -1,7 +1,7 @@
 <template>
   <div
     class="my-1 mx-11 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors"
-    :class="message.result ? 'bg-white dark:bg-gray-800' : 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'"
+    :class="message.result ? 'bg-white dark:bg-gray-800' : 'bg-violet-50/50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'"
   >
     <!-- 单行头部：点击展开 -->
     <div
@@ -10,7 +10,7 @@
     >
       <!-- 状态图标 -->
       <CheckCircle2 v-if="message.result" :size="14" class="shrink-0 text-green-500" />
-      <Loader2 v-else :size="14" class="shrink-0 animate-spin text-blue-500" />
+      <Loader2 v-else :size="14" class="shrink-0 animate-spin text-violet-500" />
       <!-- 任务名 -->
       <span class="text-xs text-gray-600 dark:text-gray-400 flex-1 truncate">{{ displayName }}</span>
       <!-- 展开箭头 -->

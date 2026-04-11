@@ -4,14 +4,14 @@
     <template v-for="i in 3" :key="i">
       <!-- 用户消息 (右侧) -->
       <div class="flex gap-3 flex-row-reverse">
-        <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 shrink-0" />
+        <div class="w-8 h-8 rounded-full bg-violet-200 dark:bg-violet-900/30 shrink-0" />
         <div class="max-w-[60%] space-y-2">
-          <div class="h-4 bg-blue-100 dark:bg-blue-900/20 rounded-full" :style="{ width: userWidths[i - 1] }" />
+          <div class="h-4 bg-violet-100 dark:bg-violet-900/20 rounded-full" :style="{ width: userWidths[i - 1] }" />
         </div>
       </div>
       <!-- 助手消息 (左侧) -->
       <div class="flex gap-3">
-        <div class="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 shrink-0" />
+        <div class="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/30 shrink-0" />
         <div class="max-w-[70%] space-y-2">
           <div
             v-for="j in assistantLines[i - 1]"

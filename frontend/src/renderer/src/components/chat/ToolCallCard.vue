@@ -5,7 +5,7 @@
       <Settings2 :size="14" class="text-gray-500 dark:text-gray-400" />
       <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ message.toolName }}</span>
       <span v-if="message.status === 'calling'" class="ml-auto">
-        <Loader2 :size="12" class="animate-spin text-blue-500" />
+        <Loader2 :size="12" class="animate-spin text-violet-500" />
       </span>
       <CheckCircle2 v-else :size="14" class="ml-auto text-green-500" />
     </div>
