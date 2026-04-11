@@ -13,19 +13,30 @@
 
     <!-- 导航菜单 -->
     <nav class="px-3 space-y-0.5">
-      <router-link
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md"
-        :class="[isActive(item.path) ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800']"
-      >
-        <component :is="item.icon" :size="16" />
-        <span>{{ item.label }}</span>
-        <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-          {{ item.badge }}
-        </Badge>
-      </router-link>
+      <template v-for="item in navItems" :key="item.path">
+        <div
+          v-if="item.disabled"
+          class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60"
+        >
+          <component :is="item.icon" :size="16" />
+          <span>{{ item.label }}</span>
+          <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0 bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+            {{ item.badge }}
+          </Badge>
+        </div>
+        <router-link
+          v-else
+          :to="item.path"
+          class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md"
+          :class="[isActive(item.path) ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800']"
+        >
+          <component :is="item.icon" :size="16" />
+          <span>{{ item.label }}</span>
+          <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            {{ item.badge }}
+          </Badge>
+        </router-link>
+      </template>
     </nav>
 
     <!-- 任务列表 -->
@@ -269,8 +280,8 @@ watch(() => appStore.currentUser.avatar, () => {
 })
 
 const navItems = [
-  { path: '/skills', label: '技能', icon: Ticket, badge: 'Beta' },
-  { path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: 'Beta' }
+  { path: '/skills', label: '技能', icon: Ticket, badge: '即将推出', disabled: true },
+  { path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: '即将推出', disabled: true }
 ]
 
 const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [
