@@ -1,23 +1,37 @@
 # Changelog
 
-## v1.0.0 (2026-04-12)
+## AgentDesk v0.1.0
 
-### 🚀 新功能
+### 构建与发布
+- 修复 Windows runner 下 PowerShell 兼容性问题（retry 步骤添加 `shell: bash`）
+- 新增版本发布说明管理：通过 `releases/` 目录按版本维护发布说明，构建时自动读取
+- 移除无用的 PR label 分类模板（`.github/release.yml`）
 
-- 智能体对话功能，支持流式输出和思维链展示
-- 子任务计划管理，支持创建、修改和跟踪执行状态
-- 文件上传附件功能
-- 会话管理：创建、删除、置顶、导出 Markdown
-- 工具调用可视化展示
-- 右键上下文菜单（复制、重新生成等）
-- Toast 通知系统
-- 邀请码功能
+### 代码质量
+- 修复 `MessageBubble.vue` 类型断言错误（ChatMessage 联合类型）
+- 修复 `ContextMenuContent.vue` 中 `sideOffset` 默认值类型不匹配
+- 移除 `use-toast.ts` 未使用的 `Component` 导入
+- 修复 `chat.ts` 未使用参数警告及 `PendingFile` 接口私有名称导出问题
 
-### 🐛 Bug 修复
+---
 
-- 修复 TypeScript 类型检查错误
+## AgentDesk v0.0.9
 
-### 🔧 维护
+### 构建与发布
+- 新增 GitHub Actions 自动构建 Windows 安装包并发布到 Releases
+- 添加 main 分支保护，仅允许主分支 tag 触发构建
+- 构建失败自动重试，最多 3 次（依赖安装、应用打包）
+- 新增 `releases/` 目录管理版本发布说明，支持按版本读取
 
-- 添加 ESLint 代码规范配置
-- 添加 GitHub Actions 自动构建和发布流程
+### 代码质量
+- 修复 `MessageBubble.vue` 类型断言错误（ChatMessage 联合类型）
+- 修复 `ContextMenuContent.vue` 中 `sideOffset` 默认值类型不匹配
+- 移除 `use-toast.ts` 未使用的 `Component` 导入
+- 修复 `chat.ts` 中未使用的参数警告
+- 修复 `PendingFile` 接口私有名称导出问题
+
+### 文档
+- 添加 CHANGELOG.md 变更记录
+
+---
+
