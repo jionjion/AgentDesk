@@ -40,6 +40,15 @@
             class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
+        <div v-if="isRegister">
+          <input
+            v-model="form.inviteCode"
+            type="text"
+            placeholder="邀请码"
+            required
+            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          />
+        </div>
 
         <!-- 错误提示 -->
         <p v-if="errorMsg" class="text-red-500 text-sm">{{ errorMsg }}</p>
@@ -91,10 +100,13 @@ const isRegister = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
 
+const INVITE_CODE = '123456'
+
 const form = reactive({
   username: '',
   password: '',
-  nickname: ''
+  nickname: '',
+  inviteCode: ''
 })
 
 function toggleMode() {
@@ -107,6 +119,10 @@ async function handleSubmit() {
   errorMsg.value = ''
   try {
     if (isRegister.value) {
+      if (form.inviteCode !== INVITE_CODE) {
+        errorMsg.value = '邀请码错误'
+        return
+      }
       await authStore.doRegister(form)
     } else {
       await authStore.doLogin({ username: form.username, password: form.password })
