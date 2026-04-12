@@ -96,3 +96,26 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
+      - name: Generate CHANGELOG.md
+        shell: bash
+        run: |
+          echo "# Changelog" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          for file in $(ls releases/*.md 2>/dev/null | sed 's/.*\/v//' | sed 's/\.md$//' | sort -t. -k1,1nr -k2,2nr -k3,3nr | sed 's|^|releases/v|;s|$|.md|'); do
+            cat "$file" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "---" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          done
+        working-directory: .
+
+      - name: Commit CHANGELOG.md
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet && echo "No changes" || git commit -m "docs: update CHANGELOG.md [skip ci]"
+          git push origin HEAD:main
+        working-directory: .
