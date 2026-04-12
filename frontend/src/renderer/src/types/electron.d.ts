@@ -1,7 +1,7 @@
-import type { ElectronAPI } from '../../../preload'
+import type {ElectronAPI} from '../../../preload'
 
 declare global {
-  interface Window {
-    electronAPI: ElectronAPI
-  }
+    interface Window {
+        electronAPI: ElectronAPI
+    }
 }

@@ -6,25 +6,25 @@
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
           <!-- 卡片头部：子任务名 + 状态 -->
           <div
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-            @click="contentCollapsed = !contentCollapsed"
+              class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+              @click="contentCollapsed = !contentCollapsed"
           >
-            <CheckCircle2 v-if="subtaskDone" :size="14" class="shrink-0 text-green-500" />
-            <Loader2 v-else-if="(message as AssistantMessage).isStreaming" :size="14" class="shrink-0 animate-spin text-violet-500" />
-            <CheckCircle2 v-else :size="14" class="shrink-0 text-green-500" />
+            <CheckCircle2 v-if="subtaskDone" :size="14" class="shrink-0 text-green-500"/>
+            <Loader2 v-else-if="(message as AssistantMessage).isStreaming" :size="14" class="shrink-0 animate-spin text-violet-500"/>
+            <CheckCircle2 v-else :size="14" class="shrink-0 text-green-500"/>
             <span class="text-xs text-gray-700 dark:text-gray-300 flex-1 truncate font-medium">{{ subtaskName }}</span>
             <ChevronRight
-              :size="12"
-              class="shrink-0 text-gray-400 transition-transform"
-              :class="contentCollapsed ? '' : 'rotate-90'"
+                :size="12"
+                class="shrink-0 text-gray-400 transition-transform"
+                :class="contentCollapsed ? '' : 'rotate-90'"
             />
           </div>
           <!-- 展开的内容 -->
           <div v-if="!contentCollapsed" class="px-3 py-2 border-t border-gray-100 dark:border-gray-700">
-            <div class="markdown-body text-xs overflow-hidden" v-html="renderedContent" />
+            <div class="markdown-body text-xs overflow-hidden" v-html="renderedContent"/>
             <span
-              v-if="(message as AssistantMessage).isStreaming"
-              class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
+                v-if="(message as AssistantMessage).isStreaming"
+                class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
             />
           </div>
         </div>
@@ -34,16 +34,16 @@
       <div v-else ref="bubbleRef" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
         <!-- 头像 -->
         <div
-          class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
-          :class="isUser ? 'bg-violet-200 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'"
+            class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
+            :class="isUser ? 'bg-violet-200 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'"
         >
           {{ isUser ? '你' : 'AI' }}
         </div>
         <!-- 消息内容 -->
         <div class="max-w-[75%] min-w-0">
           <div
-            class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
-            :class="isUser
+              class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
+              :class="isUser
               ? 'bg-violet-500 text-white rounded-br-md'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
           >
@@ -53,7 +53,7 @@
                    class="flex flex-wrap gap-1.5 mt-2">
                 <div v-for="att in (message as UserMessage).attachments" :key="att.id"
                      class="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs">
-                  <FileText :size="12" />
+                  <FileText :size="12"/>
                   <span class="truncate max-w-[120px]">{{ att.name }}</span>
                 </div>
               </div>
@@ -62,19 +62,19 @@
               <!-- 有标记时：分段渲染，每段后插入卡片 -->
               <template v-if="contentSegments.length > 0">
                 <template v-for="(seg, segIdx) in contentSegments" :key="segIdx">
-                  <div v-if="seg.html" class="markdown-body overflow-hidden" v-html="seg.html" />
+                  <div v-if="seg.html" class="markdown-body overflow-hidden" v-html="seg.html"/>
                   <!-- 子任务完成卡片 -->
                   <div v-if="seg.card" class="my-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
                     <div
-                      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                      @click="toggleFinishCard(seg.subtaskIdx!)"
+                        class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                        @click="toggleFinishCard(seg.subtaskIdx!)"
                     >
-                      <CheckCircle2 :size="13" class="shrink-0 text-green-500" />
+                      <CheckCircle2 :size="13" class="shrink-0 text-green-500"/>
                       <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ seg.card.name }}</span>
                       <ChevronRight
-                        :size="11"
-                        class="shrink-0 text-gray-400 transition-transform"
-                        :class="expandedFinishCards.has(seg.subtaskIdx!) ? 'rotate-90' : ''"
+                          :size="11"
+                          class="shrink-0 text-gray-400 transition-transform"
+                          :class="expandedFinishCards.has(seg.subtaskIdx!) ? 'rotate-90' : ''"
                       />
                     </div>
                     <div v-if="expandedFinishCards.has(seg.subtaskIdx!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50">
@@ -84,17 +84,17 @@
                   <!-- 工具调用卡片 -->
                   <div v-if="seg.toolCall" class="my-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
                     <div
-                      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                      @click="toggleToolCall(seg.toolCallId!)"
+                        class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                        @click="toggleToolCall(seg.toolCallId!)"
                     >
-                      <Settings2 :size="13" class="shrink-0 text-gray-500 dark:text-gray-400" />
+                      <Settings2 :size="13" class="shrink-0 text-gray-500 dark:text-gray-400"/>
                       <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ seg.toolCall.toolName }}</span>
-                      <Loader2 v-if="seg.toolCall.status === 'calling'" :size="12" class="shrink-0 animate-spin text-violet-500" />
-                      <CheckCircle2 v-else :size="13" class="shrink-0 text-green-500" />
+                      <Loader2 v-if="seg.toolCall.status === 'calling'" :size="12" class="shrink-0 animate-spin text-violet-500"/>
+                      <CheckCircle2 v-else :size="13" class="shrink-0 text-green-500"/>
                       <ChevronRight
-                        :size="11"
-                        class="shrink-0 text-gray-400 transition-transform"
-                        :class="expandedToolCalls.has(seg.toolCallId!) ? 'rotate-90' : ''"
+                          :size="11"
+                          class="shrink-0 text-gray-400 transition-transform"
+                          :class="expandedToolCalls.has(seg.toolCallId!) ? 'rotate-90' : ''"
                       />
                     </div>
                     <div v-if="expandedToolCalls.has(seg.toolCallId!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50">
@@ -113,33 +113,33 @@
               <!-- 无标记时：正常渲染 -->
               <template v-else>
                 <div
-                  class="markdown-body overflow-hidden"
-                  :class="shouldCollapse && contentCollapsed ? 'max-h-24' : ''"
-                  v-html="renderedContent"
+                    class="markdown-body overflow-hidden"
+                    :class="shouldCollapse && contentCollapsed ? 'max-h-24' : ''"
+                    v-html="renderedContent"
                 />
                 <button
-                  v-if="shouldCollapse"
-                  class="mt-1 text-xs text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
-                  @click="contentCollapsed = !contentCollapsed"
+                    v-if="shouldCollapse"
+                    class="mt-1 text-xs text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
+                    @click="contentCollapsed = !contentCollapsed"
                 >
                   {{ contentCollapsed ? '展开全文...' : '收起' }}
                 </button>
               </template>
               <span
-                v-if="(message as AssistantMessage).isStreaming"
-                class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
+                  v-if="(message as AssistantMessage).isStreaming"
+                  class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
               />
               <!-- 计划确认操作卡片 -->
               <div v-if="showPlanConfirm" class="mt-3 flex gap-2">
                 <button
-                  class="px-4 py-1.5 text-xs font-medium rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors"
-                  @click="handlePlanAction('好的，请执行计划')"
+                    class="px-4 py-1.5 text-xs font-medium rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+                    @click="handlePlanAction('好的，请执行计划')"
                 >
                   执行计划
                 </button>
                 <button
-                  class="px-4 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  @click="handlePlanAction('请调整计划')"
+                    class="px-4 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    @click="handlePlanAction('请调整计划')"
                 >
                   调整计划
                 </button>
@@ -151,16 +151,16 @@
     </ContextMenuTrigger>
     <ContextMenuContent class="w-36">
       <ContextMenuItem class="cursor-pointer" @select="handleCopyContent">
-        <Copy :size="14" />
+        <Copy :size="14"/>
         <span>复制</span>
       </ContextMenuItem>
       <ContextMenuItem v-if="!isUser" class="cursor-pointer" @select="handleRegenerate">
-        <RefreshCw :size="14" />
+        <RefreshCw :size="14"/>
         <span>重新生成</span>
       </ContextMenuItem>
-      <ContextMenuSeparator />
+      <ContextMenuSeparator/>
       <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDelete">
-        <Trash2 :size="14" />
+        <Trash2 :size="14"/>
         <span>删除</span>
       </ContextMenuItem>
     </ContextMenuContent>
@@ -180,27 +180,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import { Marked } from 'marked'
+import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
+import {Marked} from 'marked'
 import hljs from 'highlight.js'
-import { FileText, Copy, RefreshCw, Trash2, CheckCircle2, Loader2, ChevronRight, Settings2 } from 'lucide-vue-next'
-import type { ChatMessage, AssistantMessage, UserMessage, ToolCallMessage } from '@/types/chat'
-import { useChatStore } from '@/stores/chat'
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu'
-import {
-  AlertDialog, AlertDialogContent, AlertDialogTitle,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
-} from '@/components/ui/alert-dialog'
+import {CheckCircle2, ChevronRight, Copy, FileText, Loader2, RefreshCw, Settings2, Trash2} from 'lucide-vue-next'
+import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
+import {useChatStore} from '@/stores/chat'
+import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger} from '@/components/ui/context-menu'
+import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 
 const marked = new Marked()
 
 // 自定义 code block 渲染，注入复制按钮 + 高亮
 marked.use({
   renderer: {
-    code({ text, lang }) {
+    code({text, lang}) {
       const highlighted = lang && hljs.getLanguage(lang)
-        ? hljs.highlight(text, { language: lang }).value
-        : hljs.highlightAuto(text).value
+          ? hljs.highlight(text, {language: lang}).value
+          : hljs.highlightAuto(text).value
       const langLabel = lang || ''
       const escaped = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><button class="code-copy-btn" data-code="${escaped}">复制</button></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
@@ -308,12 +305,12 @@ const contentSegments = computed<ContentSegment[]>(() => {
       // subtask_done marker
       const subtaskIdx = parseInt(match[1])
       const card = cards[String(subtaskIdx)]
-      segments.push({ html, subtaskIdx, card })
+      segments.push({html, subtaskIdx, card})
     } else if (match[2] !== undefined) {
       // tool_call marker
       const toolCallId = match[2]
       const toolCall = tools[toolCallId]
-      segments.push({ html, toolCallId, toolCall })
+      segments.push({html, toolCallId, toolCall})
     }
 
     lastIndex = regex.lastIndex
@@ -321,7 +318,7 @@ const contentSegments = computed<ContentSegment[]>(() => {
 
   const remaining = content.slice(lastIndex)
   if (remaining.trim()) {
-    segments.push({ html: marked.parse(remaining) as string })
+    segments.push({html: marked.parse(remaining) as string})
   }
 
   return segments
@@ -335,8 +332,8 @@ const renderedContent = computed(() => {
 
 function handleCopyContent() {
   const content = props.message.role === 'user'
-    ? (props.message as UserMessage).content
-    : (props.message as AssistantMessage).content
+      ? (props.message as UserMessage).content
+      : (props.message as AssistantMessage).content
   const clean = (content || '').replace(new RegExp(ANY_MARKER.source, 'g'), '')
   navigator.clipboard.writeText(clean)
 }
@@ -363,11 +360,13 @@ function handleCopyClick(e: Event) {
   const target = (e.target as HTMLElement).closest('.code-copy-btn') as HTMLButtonElement | null
   if (!target) return
   const code = target.getAttribute('data-code')
-    ?.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+      ?.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
   if (!code) return
   navigator.clipboard.writeText(code)
   target.textContent = '已复制'
-  setTimeout(() => { target.textContent = '复制' }, 2000)
+  setTimeout(() => {
+    target.textContent = '复制'
+  }, 2000)
 }
 
 onMounted(() => {

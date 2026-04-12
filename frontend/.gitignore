@@ -1,8 +1,6 @@
 node_modules
 dist
 out
-.env
-.env.*
 *.local
 auto-imports.d.ts
 components.d.ts

@@ -4,17 +4,17 @@
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
       <div class="flex items-center gap-3">
         <div class="relative w-60">
-          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" :size="16" />
-          <Input placeholder="搜索技能" class="pl-8" />
+          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" :size="16"/>
+          <Input placeholder="搜索技能" class="pl-8"/>
         </div>
       </div>
       <div class="flex items-center gap-2">
         <Button variant="outline">
-          <Link :size="16" class="mr-1" />
+          <Link :size="16" class="mr-1"/>
           通过搭子创建
         </Button>
         <Button>
-          <Download :size="16" class="mr-1" />
+          <Download :size="16" class="mr-1"/>
           安装技能
         </Button>
       </div>
@@ -38,7 +38,8 @@
             <TabsTrigger value="marketplace">技能广场</TabsTrigger>
             <TabsTrigger value="builtin">内置</TabsTrigger>
             <TabsTrigger value="installed">
-              用户安装 <Badge variant="secondary" class="ml-1.5">1</Badge>
+              用户安装
+              <Badge variant="secondary" class="ml-1.5">1</Badge>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -50,26 +51,26 @@
 
         <!-- 技能卡片网格 / 空状态 -->
         <EmptyState
-          v-if="skills.length === 0"
-          :icon="Sparkles"
-          title="还没有技能"
-          description="探索技能广场，安装你需要的技能来扩展搭子的能力"
-          action-label="浏览技能广场"
-          :action-icon="Search"
-          @action="() => {}"
+            v-if="skills.length === 0"
+            :icon="Sparkles"
+            title="还没有技能"
+            description="探索技能广场，安装你需要的技能来扩展搭子的能力"
+            action-label="浏览技能广场"
+            :action-icon="Search"
+            @action="() => {}"
         />
         <div v-else class="grid grid-cols-3 gap-4">
           <div
-            v-for="skill in skills"
-            :key="skill.name"
-            class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-sm transition-shadow cursor-pointer"
+              v-for="skill in skills"
+              :key="skill.name"
+              class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-sm transition-shadow cursor-pointer"
           >
             <div class="flex items-start gap-3 mb-2">
               <div
-                class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                :style="{ backgroundColor: skill.bgColor }"
+                  class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                  :style="{ backgroundColor: skill.bgColor }"
               >
-                <component :is="skill.icon" :size="20" class="text-gray-600 dark:text-gray-400" />
+                <component :is="skill.icon" :size="20" class="text-gray-600 dark:text-gray-400"/>
               </div>
               <div class="min-w-0">
                 <h3 class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ skill.name }}</h3>
@@ -84,22 +85,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Search, Link, Download, SearchCode, BarChart3, Palette, Presentation, FileEdit, CalendarDays, Sparkles } from 'lucide-vue-next'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {ref} from 'vue'
+import {BarChart3, CalendarDays, Download, FileEdit, Link, Palette, Presentation, Search, SearchCode, Sparkles} from 'lucide-vue-next'
+import {ScrollArea} from '@/components/ui/scroll-area'
+import {Input} from '@/components/ui/input'
+import {Button} from '@/components/ui/button'
+import {Badge} from '@/components/ui/badge'
+import {Tabs, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import EmptyState from '@/components/ui/empty-state/EmptyState.vue'
 
 const mockSkills = [
-  { name: '深度研究', icon: SearchCode, bgColor: '#F3F4F6', description: '综合多来源搜索引擎和深度浏览器助手' },
-  { name: '技术图表生成', icon: BarChart3, bgColor: '#F3F4F6', description: '帮你编写名立意图、流程图和时序图' },
-  { name: 'UI 设计师', icon: Palette, bgColor: '#F3F4F6', description: 'Web UI 设计和原型专家' },
-  { name: '搭子演示文稿', icon: Presentation, bgColor: '#F3F4F6', description: '生成搭子风格演示文稿' },
-  { name: 'Notion 信息助手', icon: FileEdit, bgColor: '#F3F4F6', description: '解析整合文本数据生成 Notion 风格内容' },
-  { name: '定制周历生成器', icon: CalendarDays, bgColor: '#F3F4F6', description: '帮助生成定制化的周历' }
+  {name: '深度研究', icon: SearchCode, bgColor: '#F3F4F6', description: '综合多来源搜索引擎和深度浏览器助手'},
+  {name: '技术图表生成', icon: BarChart3, bgColor: '#F3F4F6', description: '帮你编写名立意图、流程图和时序图'},
+  {name: 'UI 设计师', icon: Palette, bgColor: '#F3F4F6', description: 'Web UI 设计和原型专家'},
+  {name: '搭子演示文稿', icon: Presentation, bgColor: '#F3F4F6', description: '生成搭子风格演示文稿'},
+  {name: 'Notion 信息助手', icon: FileEdit, bgColor: '#F3F4F6', description: '解析整合文本数据生成 Notion 风格内容'},
+  {name: '定制周历生成器', icon: CalendarDays, bgColor: '#F3F4F6', description: '帮助生成定制化的周历'}
 ]
 
 const skills = ref(mockSkills)

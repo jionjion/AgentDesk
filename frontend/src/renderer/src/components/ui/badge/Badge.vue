@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { Primitive, type PrimitiveProps } from 'reka-ui'
-import { type BadgeVariants, badgeVariants } from '.'
-import { cn } from '@/lib/utils'
+import type {HTMLAttributes} from 'vue'
+import {Primitive, type PrimitiveProps} from 'reka-ui'
+import {type BadgeVariants, badgeVariants} from '.'
+import {cn} from '@/lib/utils'
 
 interface Props extends PrimitiveProps {
   variant?: BadgeVariants['variant']
@@ -16,10 +16,10 @@ const props = withDefaults(defineProps<Props>(), {
 
 <template>
   <Primitive
-    :as="as"
-    :as-child="asChild"
-    :class="cn(badgeVariants({ variant }), props.class)"
+      :as="as"
+      :as-child="asChild"
+      :class="cn(badgeVariants({ variant }), props.class)"
   >
-    <slot />
+    <slot/>
   </Primitive>
 </template>

@@ -1,24 +1,24 @@
 <template>
   <div
-    class="my-1 mx-11 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors"
-    :class="message.result ? 'bg-white dark:bg-gray-800' : 'bg-violet-50/50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'"
+      class="my-1 mx-11 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors"
+      :class="message.result ? 'bg-white dark:bg-gray-800' : 'bg-violet-50/50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'"
   >
     <!-- 单行头部：点击展开 -->
     <div
-      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-      @click="collapsed = !collapsed"
+        class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+        @click="collapsed = !collapsed"
     >
       <!-- 状态图标 -->
-      <CheckCircle2 v-if="message.result" :size="14" class="shrink-0 text-green-500" />
-      <Loader2 v-else :size="14" class="shrink-0 animate-spin text-violet-500" />
+      <CheckCircle2 v-if="message.result" :size="14" class="shrink-0 text-green-500"/>
+      <Loader2 v-else :size="14" class="shrink-0 animate-spin text-violet-500"/>
       <!-- 任务名 -->
       <span class="text-xs text-gray-600 dark:text-gray-400 flex-1 truncate">{{ displayName }}</span>
       <!-- 展开箭头 -->
       <ChevronRight
-        v-if="message.result"
-        :size="12"
-        class="shrink-0 text-gray-400 transition-transform"
-        :class="collapsed ? '' : 'rotate-90'"
+          v-if="message.result"
+          :size="12"
+          class="shrink-0 text-gray-400 transition-transform"
+          :class="collapsed ? '' : 'rotate-90'"
       />
     </div>
     <!-- 展开内容 -->
@@ -29,9 +29,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { CheckCircle2, Loader2, ChevronRight } from 'lucide-vue-next'
-import type { PlanMessage } from '@/types/chat'
+import {computed, ref, watch} from 'vue'
+import {CheckCircle2, ChevronRight, Loader2} from 'lucide-vue-next'
+import type {PlanMessage} from '@/types/chat'
 
 const props = defineProps<{
   message: PlanMessage
@@ -50,7 +50,7 @@ const DISPLAY_NAMES: Record<string, string> = {
 }
 
 const displayName = computed(() =>
-  DISPLAY_NAMES[props.message.toolName] || props.message.toolName
+    DISPLAY_NAMES[props.message.toolName] || props.message.toolName
 )
 
 // 默认折叠

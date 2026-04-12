@@ -8,15 +8,15 @@
       <div class="space-y-4">
         <div class="space-y-2">
           <Label>当前密码</Label>
-          <Input v-model="form.oldPassword" type="password" placeholder="请输入当前密码" />
+          <Input v-model="form.oldPassword" type="password" placeholder="请输入当前密码"/>
         </div>
         <div class="space-y-2">
           <Label>新密码</Label>
-          <Input v-model="form.newPassword" type="password" placeholder="至少 6 个字符" />
+          <Input v-model="form.newPassword" type="password" placeholder="至少 6 个字符"/>
         </div>
         <div class="space-y-2">
           <Label>确认密码</Label>
-          <Input v-model="form.confirmPassword" type="password" placeholder="再次输入新密码" />
+          <Input v-model="form.confirmPassword" type="password" placeholder="再次输入新密码"/>
         </div>
         <p v-if="errorMsg" class="text-sm text-red-500">{{ errorMsg }}</p>
       </div>
@@ -32,14 +32,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
-import { useSettingsStore } from '@/stores/settings'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {reactive, ref, watch} from 'vue'
+import {useSettingsStore} from '@/stores/settings'
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
 
-const open = defineModel<boolean>('open', { default: false })
+const open = defineModel<boolean>('open', {default: false})
 const settingsStore = useSettingsStore()
 
 const form = reactive({

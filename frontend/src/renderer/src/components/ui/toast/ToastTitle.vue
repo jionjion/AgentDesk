@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { ToastTitle, type ToastTitleProps } from 'reka-ui'
-import { cn } from '@/lib/utils'
+import type {HTMLAttributes} from 'vue'
+import {ToastTitle, type ToastTitleProps} from 'reka-ui'
+import {cn} from '@/lib/utils'
 
 const props = defineProps<ToastTitleProps & { class?: HTMLAttributes['class'] }>()
 </script>
 
 <template>
   <ToastTitle :class="cn('text-sm font-semibold [&+div]:text-xs', props.class)">
-    <slot />
+    <slot/>
   </ToastTitle>
 </template>

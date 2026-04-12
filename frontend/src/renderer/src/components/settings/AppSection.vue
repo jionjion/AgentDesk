@@ -5,7 +5,7 @@
       <Label>主题</Label>
       <Select v-model="form.theme">
         <SelectTrigger>
-          <SelectValue placeholder="选择主题" />
+          <SelectValue placeholder="选择主题"/>
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="opt in themeOptions" :key="opt.value" :value="opt.value">
@@ -20,15 +20,15 @@
       <Label>关闭窗口时</Label>
       <RadioGroup v-model="closeAction" class="space-y-1">
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="ask" id="close-ask" />
+          <RadioGroupItem value="ask" id="close-ask"/>
           <Label for="close-ask" class="font-normal cursor-pointer">每次询问</Label>
         </div>
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="minimize" id="close-minimize" />
+          <RadioGroupItem value="minimize" id="close-minimize"/>
           <Label for="close-minimize" class="font-normal cursor-pointer">最小化到系统托盘</Label>
         </div>
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="quit" id="close-quit" />
+          <RadioGroupItem value="quit" id="close-quit"/>
           <Label for="close-quit" class="font-normal cursor-pointer">直接退出</Label>
         </div>
       </RadioGroup>
@@ -39,11 +39,11 @@
       <Label>发送快捷键</Label>
       <RadioGroup v-model="form.sendKey" class="flex gap-4">
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="Enter" id="send-enter" />
+          <RadioGroupItem value="Enter" id="send-enter"/>
           <Label for="send-enter" class="font-normal cursor-pointer">Enter</Label>
         </div>
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="Ctrl+Enter" id="send-ctrl-enter" />
+          <RadioGroupItem value="Ctrl+Enter" id="send-ctrl-enter"/>
           <Label for="send-ctrl-enter" class="font-normal cursor-pointer">Ctrl+Enter</Label>
         </div>
       </RadioGroup>
@@ -59,13 +59,13 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch, onMounted } from 'vue'
-import { useSettingsStore } from '@/stores/settings'
-import type { AppSettings } from '@/types/settings'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {onMounted, reactive, ref, watch} from 'vue'
+import {useSettingsStore} from '@/stores/settings'
+import type {AppSettings} from '@/types/settings'
+import {Button} from '@/components/ui/button'
+import {Label} from '@/components/ui/label'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group'
 
 const settingsStore = useSettingsStore()
 
@@ -79,14 +79,14 @@ const saving = ref(false)
 const closeAction = ref<'ask' | 'minimize' | 'quit'>('ask')
 
 const themeOptions = [
-  { label: '跟随系统', value: 'auto' },
-  { label: '浅色', value: 'light' },
-  { label: '深色', value: 'dark' }
+  {label: '跟随系统', value: 'auto'},
+  {label: '浅色', value: 'light'},
+  {label: '深色', value: 'dark'}
 ]
 
 watch(() => settingsStore.app, (val) => {
   Object.assign(form, val)
-}, { immediate: true })
+}, {immediate: true})
 
 // 关闭行为独立于后端设置，通过 Electron IPC 读写本地配置
 watch(closeAction, async (val) => {

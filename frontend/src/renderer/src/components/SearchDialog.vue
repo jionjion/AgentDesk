@@ -3,21 +3,21 @@
     <DialogContent class="w-[90vw] max-w-3xl min-w-[320px] p-0 gap-0">
       <!-- 搜索输入框 -->
       <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-        <Search :size="18" class="text-gray-400 flex-shrink-0" />
+        <Search :size="18" class="text-gray-400 flex-shrink-0"/>
         <input
-          ref="inputRef"
-          v-model="keyword"
-          type="text"
-          placeholder="搜索消息内容..."
-          class="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
-          @input="onInput"
+            ref="inputRef"
+            v-model="keyword"
+            type="text"
+            placeholder="搜索消息内容..."
+            class="flex-1 bg-transparent border-none outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
+            @input="onInput"
         />
         <button
-          v-if="keyword"
-          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          @click="keyword = ''; results = []"
+            v-if="keyword"
+            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            @click="keyword = ''; results = []"
         >
-          <X :size="16" />
+          <X :size="16"/>
         </button>
       </div>
 
@@ -25,19 +25,19 @@
       <ScrollArea class="h-[50vh] min-h-[200px]">
         <!-- 加载中 -->
         <div v-if="loading" class="flex items-center justify-center py-8">
-          <Loader2 :size="20" class="animate-spin text-gray-400" />
+          <Loader2 :size="20" class="animate-spin text-gray-400"/>
           <span class="ml-2 text-sm text-gray-400">搜索中...</span>
         </div>
 
         <!-- 无结果 -->
         <div v-else-if="keyword && !loading && results.length === 0 && searched" class="py-8 text-center">
-          <SearchX :size="32" class="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+          <SearchX :size="32" class="mx-auto text-gray-300 dark:text-gray-600 mb-2"/>
           <p class="text-sm text-gray-400">未找到相关消息</p>
         </div>
 
         <!-- 初始状态 -->
         <div v-else-if="!keyword && results.length === 0" class="py-8 text-center">
-          <Search :size="32" class="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+          <Search :size="32" class="mx-auto text-gray-300 dark:text-gray-600 mb-2"/>
           <p class="text-sm text-gray-400">输入关键词搜索聊天记录</p>
         </div>
 
@@ -48,14 +48,14 @@
               {{ group.sessionTitle }}
             </div>
             <button
-              v-for="item in group.items"
-              :key="item.id"
-              class="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-              @click="handleSelect(item)"
+                v-for="item in group.items"
+                :key="item.id"
+                class="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                @click="handleSelect(item)"
             >
               <div class="flex items-center gap-2 mb-1">
                 <Badge variant="secondary" class="text-[10px] px-1.5 py-0"
-                  :class="item.role === 'user' ? 'bg-violet-200 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'">
+                       :class="item.role === 'user' ? 'bg-violet-200 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'">
                   {{ item.role === 'user' ? '用户' : '助手' }}
                 </Badge>
                 <span class="text-xs text-gray-400">{{ formatTime(item.createdAt) }}</span>
@@ -70,17 +70,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
-import { useChatStore } from '@/stores/chat'
-import { searchMessages } from '@/api/chat'
-import type { SearchResult } from '@/types/chat'
-import { Search, X, Loader2, SearchX } from 'lucide-vue-next'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
+import {computed, nextTick, ref, watch} from 'vue'
+import {useRouter} from 'vue-router'
+import {useChatStore} from '@/stores/chat'
+import {searchMessages} from '@/api/chat'
+import type {SearchResult} from '@/types/chat'
+import {Loader2, Search, SearchX, X} from 'lucide-vue-next'
+import {Dialog, DialogContent} from '@/components/ui/dialog'
+import {ScrollArea} from '@/components/ui/scroll-area'
+import {Badge} from '@/components/ui/badge'
 
-const open = defineModel<boolean>('open', { default: false })
+const open = defineModel<boolean>('open', {default: false})
 const router = useRouter()
 const chatStore = useChatStore()
 
@@ -132,7 +132,7 @@ const groupedResults = computed(() => {
   const map = new Map<string, { sessionId: string; sessionTitle: string; items: SearchResult[] }>()
   for (const item of results.value) {
     if (!map.has(item.sessionId)) {
-      map.set(item.sessionId, { sessionId: item.sessionId, sessionTitle: item.sessionTitle, items: [] })
+      map.set(item.sessionId, {sessionId: item.sessionId, sessionTitle: item.sessionTitle, items: []})
     }
     map.get(item.sessionId)!.items.push(item)
   }
@@ -167,8 +167,8 @@ function formatTime(ts: number): string {
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
   if (isToday) {
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    return date.toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'})
   }
-  return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleDateString('zh-CN', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})
 }
 </script>

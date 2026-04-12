@@ -1,28 +1,28 @@
 import request from './request'
 
 export interface FileResponse {
-  id: number
-  originalName: string
-  contentType: string
-  size: number
-  sessionId: string | null
-  url: string
-  createdAt: number
+    id: number
+    originalName: string
+    contentType: string
+    size: number
+    sessionId: string | null
+    url: string
+    createdAt: number
 }
 
 /** 上传文件 */
 export function uploadFile(file: File, sessionId?: string) {
-  const formData = new FormData()
-  formData.append('file', file)
-  if (sessionId) {
-    formData.append('sessionId', sessionId)
-  }
-  return request.post<FileResponse>('/api/files/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+    const formData = new FormData()
+    formData.append('file', file)
+    if (sessionId) {
+        formData.append('sessionId', sessionId)
+    }
+    return request.post<FileResponse>('/api/files/upload', formData, {
+        headers: {'Content-Type': 'multipart/form-data'}
+    })
 }
 
 /** 查询会话下的文件列表 */
 export function getSessionFiles(sessionId: string) {
-  return request.get<FileResponse[]>(`/api/files/session/${sessionId}`)
+    return request.get<FileResponse[]>(`/api/files/session/${sessionId}`)
 }

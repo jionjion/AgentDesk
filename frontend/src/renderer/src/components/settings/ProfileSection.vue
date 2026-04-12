@@ -4,37 +4,37 @@
     <div class="flex items-center gap-4">
       <div class="relative cursor-pointer group" @click="avatarInputRef?.click()">
         <div class="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-          <img v-if="avatarPreview || (form.avatar && !avatarError)" :src="avatarPreview || form.avatar" alt="头像" class="h-full w-full object-cover" @error="onImgError" />
-          <UserIcon v-else :size="28" class="text-gray-400" />
+          <img v-if="avatarPreview || (form.avatar && !avatarError)" :src="avatarPreview || form.avatar" alt="头像" class="h-full w-full object-cover" @error="onImgError"/>
+          <UserIcon v-else :size="28" class="text-gray-400"/>
         </div>
         <div class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <CameraIcon :size="18" class="text-white" />
+          <CameraIcon :size="18" class="text-white"/>
         </div>
-        <Loader2 v-if="uploadingAvatar" :size="18" class="absolute inset-0 m-auto text-white animate-spin" />
+        <Loader2 v-if="uploadingAvatar" :size="18" class="absolute inset-0 m-auto text-white animate-spin"/>
       </div>
       <div class="space-y-1">
         <p class="text-sm font-medium text-gray-900 dark:text-gray-100">头像</p>
         <p class="text-xs text-gray-500 dark:text-gray-400">点击更换头像图片</p>
       </div>
       <input
-        ref="avatarInputRef"
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        class="hidden"
-        @change="handleAvatarSelect"
+          ref="avatarInputRef"
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          class="hidden"
+          @change="handleAvatarSelect"
       />
     </div>
 
     <!-- 昵称 -->
     <div class="space-y-2">
       <Label>昵称</Label>
-      <Input v-model="form.nickname" placeholder="输入你的昵称" />
+      <Input v-model="form.nickname" placeholder="输入你的昵称"/>
     </div>
 
     <!-- 修改密码 -->
     <div>
       <Button variant="outline" @click="showPasswordDialog = true">
-        <KeyRound :size="16" class="mr-1" />
+        <KeyRound :size="16" class="mr-1"/>
         修改密码
       </Button>
     </div>
@@ -46,18 +46,18 @@
       </Button>
     </div>
 
-    <ChangePasswordDialog v-model:open="showPasswordDialog" />
+    <ChangePasswordDialog v-model:open="showPasswordDialog"/>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
-import { User as UserIcon, KeyRound, Camera as CameraIcon, Loader2 } from 'lucide-vue-next'
-import { useSettingsStore } from '@/stores/settings'
-import { useAuthStore } from '@/stores/auth'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {reactive, ref, watch} from 'vue'
+import {Camera as CameraIcon, KeyRound, Loader2, User as UserIcon} from 'lucide-vue-next'
+import {useSettingsStore} from '@/stores/settings'
+import {useAuthStore} from '@/stores/auth'
+import {Button} from '@/components/ui/button'
+import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
 
 const settingsStore = useSettingsStore()
@@ -80,7 +80,7 @@ watch(() => settingsStore.profile, (val) => {
     form.avatar = val.avatar
     avatarError.value = false
   }
-}, { immediate: true })
+}, {immediate: true})
 
 function onImgError() {
   // blob URL 不会出错，只有远程 URL 可能失败

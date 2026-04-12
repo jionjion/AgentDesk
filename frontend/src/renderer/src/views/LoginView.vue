@@ -3,7 +3,7 @@
     <!-- 左侧 -->
     <div class="flex-1 flex flex-col items-start justify-center px-16">
       <!-- Logo -->
-      <img src="@/assets/icon_255.png" alt="AgentDesk" class="w-12 h-12 rounded-xl mb-6" />
+      <img src="@/assets/icon_255.png" alt="AgentDesk" class="w-12 h-12 rounded-xl mb-6"/>
 
       <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">欢迎使用搭子</h1>
       <p class="text-sm text-violet-600 dark:text-violet-400 mb-4">面向所有人的 AI 桌面助手</p>
@@ -15,38 +15,38 @@
       <form class="w-full max-w-sm space-y-4" @submit.prevent="handleSubmit">
         <div>
           <input
-            v-model="form.username"
-            type="text"
-            placeholder="用户名"
-            required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              v-model="form.username"
+              type="text"
+              placeholder="用户名"
+              required
+              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
         <div>
           <input
-            v-model="form.password"
-            type="password"
-            placeholder="密码"
-            required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              v-model="form.password"
+              type="password"
+              placeholder="密码"
+              required
+              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
         <div v-if="isRegister">
           <input
-            v-model="form.nickname"
-            type="text"
-            placeholder="昵称"
-            required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              v-model="form.nickname"
+              type="text"
+              placeholder="昵称"
+              required
+              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
         <div v-if="isRegister">
           <input
-            v-model="form.inviteCode"
-            type="text"
-            placeholder="邀请码"
-            required
-            class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              v-model="form.inviteCode"
+              type="text"
+              placeholder="邀请码"
+              required
+              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
 
@@ -54,9 +54,9 @@
         <p v-if="errorMsg" class="text-red-500 text-sm">{{ errorMsg }}</p>
 
         <button
-          type="submit"
-          :disabled="loading"
-          class="w-full py-2.5 bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium rounded-lg hover:bg-violet-700 dark:hover:bg-violet-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            type="submit"
+            :disabled="loading"
+            class="w-full py-2.5 bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium rounded-lg hover:bg-violet-700 dark:hover:bg-violet-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {{ loading ? '请稍候...' : (isRegister ? '注册' : '登录') }}
         </button>
@@ -78,20 +78,20 @@
     <div class="w-[480px] bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center relative overflow-hidden">
       <div class="absolute inset-0 opacity-30">
         <svg class="w-full h-full" viewBox="0 0 480 720" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path v-for="i in 20" :key="i" :d="`M${i * 24} 0 Q${i * 24 + 12} 360 ${i * 24} 720`" stroke="#7C3AED" stroke-width="1.5" fill="none" />
+          <path v-for="i in 20" :key="i" :d="`M${i * 24} 0 Q${i * 24 + 12} 360 ${i * 24} 720`" stroke="#7C3AED" stroke-width="1.5" fill="none"/>
         </svg>
       </div>
       <p class="relative z-10 text-violet-800 dark:text-violet-300 text-lg font-medium text-center leading-relaxed px-12">
-        Go from answers to action with<br />your agentic work partner
+        Go from answers to action with<br/>your agentic work partner
       </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import {reactive, ref} from 'vue'
+import {useRouter} from 'vue-router'
+import {useAuthStore} from '@/stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -125,7 +125,7 @@ async function handleSubmit() {
       }
       await authStore.doRegister(form)
     } else {
-      await authStore.doLogin({ username: form.username, password: form.password })
+      await authStore.doLogin({username: form.username, password: form.password})
     }
     router.push('/chat')
   } catch (err: any) {

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { AlertDialogAction, type AlertDialogActionProps, useForwardProps } from 'reka-ui'
-import { cn } from '@/lib/utils'
-import { buttonVariants } from '@/components/ui/button'
+import type {HTMLAttributes} from 'vue'
+import {AlertDialogAction, type AlertDialogActionProps, useForwardProps} from 'reka-ui'
+import {cn} from '@/lib/utils'
+import {buttonVariants} from '@/components/ui/button'
 
 const props = withDefaults(
-  defineProps<AlertDialogActionProps & { class?: HTMLAttributes['class'] }>(),
-  { as: 'button' },
+    defineProps<AlertDialogActionProps & { class?: HTMLAttributes['class'] }>(),
+    {as: 'button'},
 )
 
 const forwardedProps = useForwardProps(props)
@@ -14,9 +14,9 @@ const forwardedProps = useForwardProps(props)
 
 <template>
   <AlertDialogAction
-    v-bind="forwardedProps"
-    :class="cn(buttonVariants({ variant: 'destructive', size: 'sm' }), props.class)"
+      v-bind="forwardedProps"
+      :class="cn(buttonVariants({ variant: 'destructive', size: 'sm' }), props.class)"
   >
-    <slot />
+    <slot/>
   </AlertDialogAction>
 </template>

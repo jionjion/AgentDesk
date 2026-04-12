@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { TabsRoot, type TabsRootEmits, type TabsRootProps, useForwardPropsEmits } from 'reka-ui'
-import { cn } from '@/lib/utils'
+import type {HTMLAttributes} from 'vue'
+import {TabsRoot, type TabsRootEmits, type TabsRootProps, useForwardPropsEmits} from 'reka-ui'
+import {cn} from '@/lib/utils'
 
 const props = defineProps<TabsRootProps & { class?: HTMLAttributes['class'] }>()
 const emits = defineEmits<TabsRootEmits>()
@@ -11,6 +11,6 @@ const forwarded = useForwardPropsEmits(props, emits)
 
 <template>
   <TabsRoot v-bind="forwarded" :class="cn(props.class)">
-    <slot />
+    <slot/>
   </TabsRoot>
 </template>

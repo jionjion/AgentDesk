@@ -3,28 +3,28 @@
     <!-- 骨架屏 - 切换会话加载中 -->
     <div v-if="chatStore.isLoadingSession" class="flex-1 overflow-hidden">
       <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
-        <MessageSkeleton />
+        <MessageSkeleton/>
       </div>
     </div>
 
     <!-- 消息区域 / 欢迎页 -->
     <div v-else-if="chatStore.currentMessages.length === 0" class="flex-1 flex flex-col items-center justify-center px-8">
       <!-- Logo + 标语 -->
-      <img src="@/assets/icon_255.png" alt="AgentDesk" class="w-16 h-16 rounded-2xl mb-6" />
+      <img src="@/assets/icon_255.png" alt="AgentDesk" class="w-16 h-16 rounded-2xl mb-6"/>
       <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">说做就做，交付结果</h1>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-10">本地运行、自主规划、安全可控的 AI 工作搭子</p>
 
       <!-- 功能卡片 -->
       <div class="flex gap-4 mb-16 w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl">
         <div
-          v-for="card in featureCards"
-          :key="card.title"
-          class="flex-1 p-5 border rounded-xl hover:shadow-sm transition-all cursor-pointer"
-          :class="selectedCard?.title === card.title ? 'border-violet-400 dark:border-violet-500 bg-violet-50/50 dark:bg-violet-900/20' : 'border-gray-200 dark:border-gray-700'"
-          @click="toggleCard(card)"
+            v-for="card in featureCards"
+            :key="card.title"
+            class="flex-1 p-5 border rounded-xl hover:shadow-sm transition-all cursor-pointer"
+            :class="selectedCard?.title === card.title ? 'border-violet-400 dark:border-violet-500 bg-violet-50/50 dark:bg-violet-900/20' : 'border-gray-200 dark:border-gray-700'"
+            @click="toggleCard(card)"
         >
           <div class="w-10 h-10 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-3">
-            <component :is="card.icon" :size="22" class="text-gray-600 dark:text-gray-400" />
+            <component :is="card.icon" :size="22" class="text-gray-600 dark:text-gray-400"/>
           </div>
           <h3 class="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">{{ card.title }}</h3>
           <p class="text-xs text-gray-400 dark:text-gray-500">{{ card.description }}</p>
@@ -36,12 +36,13 @@
     <div v-else ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4">
       <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
         <template v-for="(msg, idx) in chatStore.currentMessages" :key="msg.id">
-          <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg" />
-          <template v-else-if="msg.role === 'tool_call'" />
-          <template v-else-if="msg.role === 'plan'" />
-          <MessageBubble v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)" :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)" />
+          <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
+          <template v-else-if="msg.role === 'tool_call'"/>
+          <template v-else-if="msg.role === 'plan'"/>
+          <MessageBubble v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
+                         :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"/>
         </template>
-        <div ref="scrollAnchorRef" />
+        <div ref="scrollAnchorRef"/>
       </div>
     </div>
 
@@ -50,12 +51,12 @@
       <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto relative">
         <!-- 技能使用说明（浮动弹出） -->
         <div
-          v-if="selectedCard"
-          class="absolute bottom-full mb-2 left-0 right-0 border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-800 shadow-lg z-10"
+            v-if="selectedCard"
+            class="absolute bottom-full mb-2 left-0 right-0 border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-800 shadow-lg z-10"
         >
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
-              <component :is="selectedCard.icon" :size="16" class="text-gray-600 dark:text-gray-400" />
+              <component :is="selectedCard.icon" :size="16" class="text-gray-600 dark:text-gray-400"/>
               <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ selectedCard.title }}</span>
             </div>
           </div>
@@ -63,85 +64,85 @@
           <div class="space-y-1.5">
             <p class="text-xs text-gray-400 dark:text-gray-500">试试这样说：</p>
             <div
-              v-for="(example, idx) in selectedCard.examples"
-              :key="idx"
-              class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 cursor-pointer transition-colors"
-              @click.stop="fillExample(example)"
+                v-for="(example, idx) in selectedCard.examples"
+                :key="idx"
+                class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 cursor-pointer transition-colors"
+                @click.stop="fillExample(example)"
             >
-              <span class="mt-0.5 w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+              <span class="mt-0.5 w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0"/>
               <span>{{ example }}</span>
             </div>
           </div>
         </div>
 
         <!-- 任务状态栏（输入框上方） -->
-        <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState" />
+        <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState"/>
 
         <!-- 输入框 -->
         <div class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-        <!-- 隐藏的文件选择器 -->
-        <input ref="fileInputRef" type="file" multiple
-               accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh"
-               class="hidden"
-               @change="handleFileSelect" />
-        <!-- 附件预览区 -->
-        <div v-if="chatStore.pendingAttachments.length > 0"
-             class="flex flex-wrap gap-2 mb-2 px-1">
-          <div v-for="file in chatStore.pendingAttachments" :key="file.name"
-               class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm dark:text-gray-200">
-            <FileText :size="14" />
-            <span class="truncate max-w-[150px]">{{ file.name }}</span>
-            <span class="text-gray-400 dark:text-gray-500 text-xs">{{ formatSize(file.size) }}</span>
-            <Loader2 v-if="file.uploading" :size="14" class="animate-spin" />
-            <button v-else @click="chatStore.removeAttachment(file.id)"
-                    class="text-gray-400 hover:text-red-500">
-              <X :size="14" />
-            </button>
+          <!-- 隐藏的文件选择器 -->
+          <input ref="fileInputRef" type="file" multiple
+                 accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh"
+                 class="hidden"
+                 @change="handleFileSelect"/>
+          <!-- 附件预览区 -->
+          <div v-if="chatStore.pendingAttachments.length > 0"
+               class="flex flex-wrap gap-2 mb-2 px-1">
+            <div v-for="file in chatStore.pendingAttachments" :key="file.name"
+                 class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm dark:text-gray-200">
+              <FileText :size="14"/>
+              <span class="truncate max-w-[150px]">{{ file.name }}</span>
+              <span class="text-gray-400 dark:text-gray-500 text-xs">{{ formatSize(file.size) }}</span>
+              <Loader2 v-if="file.uploading" :size="14" class="animate-spin"/>
+              <button v-else @click="chatStore.removeAttachment(file.id)"
+                      class="text-gray-400 hover:text-red-500">
+                <X :size="14"/>
+              </button>
+            </div>
           </div>
-        </div>
-        <Textarea
-          v-model="inputText"
-          :rows="2"
-          :placeholder="chatStore.isStreaming ? '等待回复中...' : '描述任务，/ 调用技能与工具'"
-          :disabled="chatStore.isStreaming"
-          class="resize-none border-none shadow-none focus-visible:ring-0"
-          @keydown="handleKeydown"
-        />
-        <div class="flex items-center justify-between mt-3">
-          <div class="flex items-center gap-2">
-            <Button variant="ghost" size="sm">
-              <FolderOpen :size="14" class="mr-1" />
-              <span class="text-xs text-gray-500 dark:text-gray-400">选择工作目录</span>
-            </Button>
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
-              <Paintbrush :size="16" />
-            </Button>
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="fileInputRef?.click()">
-              <Paperclip :size="16" />
-            </Button>
+          <Textarea
+              v-model="inputText"
+              :rows="2"
+              :placeholder="chatStore.isStreaming ? '等待回复中...' : '描述任务，/ 调用技能与工具'"
+              :disabled="chatStore.isStreaming"
+              class="resize-none border-none shadow-none focus-visible:ring-0"
+              @keydown="handleKeydown"
+          />
+          <div class="flex items-center justify-between mt-3">
+            <div class="flex items-center gap-2">
+              <Button variant="ghost" size="sm">
+                <FolderOpen :size="14" class="mr-1"/>
+                <span class="text-xs text-gray-500 dark:text-gray-400">选择工作目录</span>
+              </Button>
+              <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
+                <Paintbrush :size="16"/>
+              </Button>
+              <Button variant="ghost" size="icon" class="h-8 w-8" @click="fileInputRef?.click()">
+                <Paperclip :size="16"/>
+              </Button>
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- 发送 / 停止按钮 -->
+              <Button
+                  v-if="!chatStore.isStreaming"
+                  size="icon"
+                  class="h-8 w-8 rounded-full"
+                  :disabled="!inputText.trim() && !chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)"
+                  @click="handleSend"
+              >
+                <ArrowUp :size="16"/>
+              </Button>
+              <Button
+                  v-else
+                  variant="destructive"
+                  size="icon"
+                  class="h-8 w-8 rounded-full"
+                  @click="chatStore.interrupt()"
+              >
+                <Square :size="14"/>
+              </Button>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <!-- 发送 / 停止按钮 -->
-            <Button
-              v-if="!chatStore.isStreaming"
-              size="icon"
-              class="h-8 w-8 rounded-full"
-              :disabled="!inputText.trim() && !chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)"
-              @click="handleSend"
-            >
-              <ArrowUp :size="16" />
-            </Button>
-            <Button
-              v-else
-              variant="destructive"
-              size="icon"
-              class="h-8 w-8 rounded-full"
-              @click="chatStore.interrupt()"
-            >
-              <Square :size="14" />
-            </Button>
-          </div>
-        </div>
         </div>
       </div>
     </div>
@@ -149,38 +150,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import {
-  FolderOpen,
-  Paintbrush,
-  Paperclip,
-  ArrowUp,
-  Square,
-  FileText,
-  Camera,
-  BarChart3,
-  Loader2,
-  X
-} from 'lucide-vue-next'
-import { useChatStore } from '@/stores/chat'
-import { useSettingsStore } from '@/stores/settings'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import {computed, nextTick, onMounted, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {ArrowUp, BarChart3, Camera, FileText, FolderOpen, Loader2, Paintbrush, Paperclip, Square, X} from 'lucide-vue-next'
+import {useChatStore} from '@/stores/chat'
+import {useSettingsStore} from '@/stores/settings'
+import {Button} from '@/components/ui/button'
+import {Textarea} from '@/components/ui/textarea'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
 import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
-import { usePlanSubtasks } from '@/composables/usePlanSubtasks'
-import type { PlanMessage, ToolCallMessage } from '@/types/chat'
+import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
+import type {PlanMessage, ToolCallMessage} from '@/types/chat'
 
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const route = useRoute()
-const { planState } = usePlanSubtasks()
+const {planState} = usePlanSubtasks()
 
 const planMessages = computed(() =>
-  chatStore.currentMessages.filter((m): m is PlanMessage => m.role === 'plan')
+    chatStore.currentMessages.filter((m): m is PlanMessage => m.role === 'plan')
 )
 
 /**
@@ -264,7 +254,7 @@ function getSubtaskCardsMap(index: number): Record<string, { name: string; outco
         if (match) name = match[1]
       }
       const outcome = (args.subtask_outcome as string) || planMsg.result || ''
-      map[String(idx)] = { name, outcome }
+      map[String(idx)] = {name, outcome}
     }
   }
   return map
@@ -441,13 +431,13 @@ function handleSend() {
 
 // 自动滚动到底部
 watch(
-  () => chatStore.currentMessages,
-  () => {
-    nextTick(() => {
-      scrollAnchorRef.value?.scrollIntoView({ behavior: 'smooth' })
-    })
-  },
-  { deep: true }
+    () => chatStore.currentMessages,
+    () => {
+      nextTick(() => {
+        scrollAnchorRef.value?.scrollIntoView({behavior: 'smooth'})
+      })
+    },
+    {deep: true}
 )
 
 // 路由参数处理

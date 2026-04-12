@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { cn } from '@/lib/utils'
+import type {HTMLAttributes} from 'vue'
+import {cn} from '@/lib/utils'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
@@ -10,8 +10,8 @@ const props = defineProps<{
 
 <template>
   <div
-    role="alert"
-    :class="
+      role="alert"
+      :class="
       cn(
         'relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7',
         variant === 'destructive'
@@ -21,6 +21,6 @@ const props = defineProps<{
       )
     "
   >
-    <slot />
+    <slot/>
   </div>
 </template>
