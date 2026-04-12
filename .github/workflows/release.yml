@@ -115,7 +115,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
           git add CHANGELOG.md
           git diff --cached --quiet && echo "No changes" || git commit -m "docs: update CHANGELOG.md [skip ci]"
-          git push origin HEAD:main
+          git push origin main
         working-directory: .
