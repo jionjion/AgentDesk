@@ -217,11 +217,11 @@ app.whenReady().then(() => {
     // 允许加载外部图片（如 OSS 头像）
     const apiBaseUrl: string = __API_BASE_URL__
 
-    // 生产模式下 file:// 协议的 Origin 为 null，后端 CORS 会拒绝，需替换为合法 Origin
+    // 生产模式下 file:// 协议的 Origin 为 null，删除 Origin 头让后端视为非浏览器请求（跳过 CORS 检查）
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         const origin = details.requestHeaders['Origin']
         if (!origin || origin === 'null' || origin.startsWith('file://')) {
-            details.requestHeaders['Origin'] = apiBaseUrl
+            delete details.requestHeaders['Origin']
         }
         callback({requestHeaders: details.requestHeaders})
     })
