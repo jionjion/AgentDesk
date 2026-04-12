@@ -22,6 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Verify tag is on main branch
+        shell: bash
         run: |
           if ! git branch -r --contains ${{ github.sha }} | grep -q 'origin/main'; then
             echo "::error::Tag is not on main branch. Only tags on main can trigger a release."
