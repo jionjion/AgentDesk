@@ -47,9 +47,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
      * @return 匹配的消息列表
      */
     @Query("SELECT m FROM ChatMessage m WHERE m.sessionId IN " +
-           "(SELECT s.id FROM SessionMetadata s WHERE s.userId = :userId) " +
-           "AND m.content IS NOT NULL AND LOWER(m.content) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "AND m.role IN ('user', 'assistant') " +
-           "ORDER BY m.createdAt DESC")
+            "(SELECT s.id FROM SessionMetadata s WHERE s.userId = :userId) " +
+            "AND m.content IS NOT NULL AND LOWER(m.content) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "AND m.role IN ('user', 'assistant') " +
+            "ORDER BY m.createdAt DESC")
     List<ChatMessage> searchByContent(@Param("userId") Long userId, @Param("keyword") String keyword);
 }

@@ -18,7 +18,9 @@ public class JsonMapConverter implements AttributeConverter<Map<String, Object>,
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** 将Map转换为JSON字符串写入数据库 */
+    /**
+     * 将Map转换为JSON字符串写入数据库
+     */
     @Override
     public String convertToDatabaseColumn(Map<String, Object> attribute) {
         if (attribute == null) {
@@ -31,14 +33,17 @@ public class JsonMapConverter implements AttributeConverter<Map<String, Object>,
         }
     }
 
-    /** 将数据库中的JSON字符串转换为Map */
+    /**
+     * 将数据库中的JSON字符串转换为Map
+     */
     @Override
     public Map<String, Object> convertToEntityAttribute(String dbData) {
         if (dbData == null) {
             return null;
         }
         try {
-            return MAPPER.readValue(dbData, new TypeReference<>() {});
+            return MAPPER.readValue(dbData, new TypeReference<>() {
+            });
         } catch (JsonProcessingException e) {
             return Map.of();
         }

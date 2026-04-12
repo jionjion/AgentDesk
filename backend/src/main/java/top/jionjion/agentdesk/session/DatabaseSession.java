@@ -36,7 +36,9 @@ public class DatabaseSession implements Session {
         this.repository = repository;
     }
 
-    /** 保存单个状态到数据库, 存在则更新 */
+    /**
+     * 保存单个状态到数据库, 存在则更新
+     */
     @Override
     public void save(SessionKey sessionKey, String key, State value) {
         String sessionId = extractSessionId(sessionKey);
@@ -48,7 +50,9 @@ public class DatabaseSession implements Session {
         }
     }
 
-    /** 保存状态列表到数据库, 存在则更新 */
+    /**
+     * 保存状态列表到数据库, 存在则更新
+     */
     @Override
     public void save(SessionKey sessionKey, String key, List<? extends State> values) {
         String sessionId = extractSessionId(sessionKey);
@@ -60,7 +64,9 @@ public class DatabaseSession implements Session {
         }
     }
 
-    /** 获取单个状态, 反序列化为指定类型 */
+    /**
+     * 获取单个状态, 反序列化为指定类型
+     */
     @Override
     public <T extends State> Optional<T> get(SessionKey sessionKey, String key, Class<T> type) {
         String sessionId = extractSessionId(sessionKey);
@@ -76,7 +82,9 @@ public class DatabaseSession implements Session {
         }
     }
 
-    /** 获取状态列表, 反序列化为指定类型的集合 */
+    /**
+     * 获取状态列表, 反序列化为指定类型的集合
+     */
     @Override
     public <T extends State> List<T> getList(SessionKey sessionKey, String key, Class<T> itemType) {
         String sessionId = extractSessionId(sessionKey);
@@ -93,14 +101,18 @@ public class DatabaseSession implements Session {
         }
     }
 
-    /** 判断会话是否存在状态记录 */
+    /**
+     * 判断会话是否存在状态记录
+     */
     @Override
     public boolean exists(SessionKey sessionKey) {
         String sessionId = extractSessionId(sessionKey);
         return repository.existsBySessionId(sessionId);
     }
 
-    /** 删除会话的所有状态记录 */
+    /**
+     * 删除会话的所有状态记录
+     */
     @Override
     @Transactional
     public void delete(SessionKey sessionKey) {
@@ -108,7 +120,9 @@ public class DatabaseSession implements Session {
         repository.deleteBySessionId(sessionId);
     }
 
-    /** 列出所有存在状态记录的会话Key */
+    /**
+     * 列出所有存在状态记录的会话Key
+     */
     @Override
     public Set<SessionKey> listSessionKeys() {
         List<String> ids = repository.findDistinctSessionIds();
@@ -119,13 +133,17 @@ public class DatabaseSession implements Session {
         return keys;
     }
 
-    /** 关闭Session, JPA由Spring管理无需手动关闭 */
+    /**
+     * 关闭Session, JPA由Spring管理无需手动关闭
+     */
     @Override
     public void close() {
         // JPA 由 Spring 管理, 无需手动关闭
     }
 
-    /** 保存或更新状态 */
+    /**
+     * 保存或更新状态
+     */
     private void saveState(String sessionId, String key, String json) {
         AgentState entity = repository.findBySessionIdAndStateKey(sessionId, key)
                 .orElseGet(() -> {
@@ -139,7 +157,9 @@ public class DatabaseSession implements Session {
         repository.save(entity);
     }
 
-    /** 从SessionKey中提取会话ID字符串 */
+    /**
+     * 从SessionKey中提取会话ID字符串
+     */
     private String extractSessionId(SessionKey sessionKey) {
         if (sessionKey instanceof SimpleSessionKey(String sessionId)) {
             return sessionId;

@@ -28,47 +28,65 @@ public record ChatEventDto(
         /* 错误信息 */
         String error
 ) {
-    /** 文本片段事件 */
+    /**
+     * 文本片段事件
+     */
     public static ChatEventDto textChunk(String content) {
         return new ChatEventDto("text_chunk", content, null, null, null, null, null, null);
     }
 
-    /** 思考片段事件 */
+    /**
+     * 思考片段事件
+     */
     public static ChatEventDto thinkingChunk(String content) {
         return new ChatEventDto("thinking_chunk", content, null, null, null, null, null, null);
     }
 
-    /** Agent开始事件 */
+    /**
+     * Agent开始事件
+     */
     public static ChatEventDto agentStart() {
         return new ChatEventDto("agent_start", null, null, null, null, null, null, null);
     }
 
-    /** 推理完成事件, content标识是否包含工具调用 */
+    /**
+     * 推理完成事件, content标识是否包含工具调用
+     */
     public static ChatEventDto reasoningComplete(boolean hasToolCalls) {
         return new ChatEventDto("reasoning_complete", String.valueOf(hasToolCalls), null, null, null, null, null, null);
     }
 
-    /** 工具调用开始事件 */
+    /**
+     * 工具调用开始事件
+     */
     public static ChatEventDto toolCallStart(String toolName, String toolId, Map<String, Object> arguments) {
         return new ChatEventDto("tool_call_start", null, toolName, toolId, arguments, null, null, null);
     }
 
-    /** 工具调用结束事件 */
+    /**
+     * 工具调用结束事件
+     */
     public static ChatEventDto toolCallEnd(String toolName, String toolId, String result) {
         return new ChatEventDto("tool_call_end", null, toolName, toolId, null, result, null, null);
     }
 
-    /** Agent完成事件 */
+    /**
+     * Agent完成事件
+     */
     public static ChatEventDto agentComplete(String content, String reason) {
         return new ChatEventDto("agent_complete", content, null, null, null, null, reason, null);
     }
 
-    /** 标题生成事件 */
+    /**
+     * 标题生成事件
+     */
     public static ChatEventDto titleGenerated(String title) {
         return new ChatEventDto("title_generated", title, null, null, null, null, null, null);
     }
 
-    /** 错误事件 */
+    /**
+     * 错误事件
+     */
     public static ChatEventDto error(String message) {
         return new ChatEventDto("error", null, null, null, null, null, null, message);
     }

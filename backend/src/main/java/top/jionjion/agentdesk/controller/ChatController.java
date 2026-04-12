@@ -231,7 +231,9 @@ public class ChatController {
         return Map.of("status", "interrupted");
     }
 
-    /** 向客户端发送错误事件 */
+    /**
+     * 向客户端发送错误事件
+     */
     private void sendErrorEvent(SseEmitter emitter, String message) {
         try {
             String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.error(message != null ? message : "unknown error"));
@@ -241,7 +243,9 @@ public class ChatController {
         }
     }
 
-    /** 解析逗号分隔的 fileIds 字符串 */
+    /**
+     * 解析逗号分隔的 fileIds 字符串
+     */
     private List<Long> parseFileIds(String fileIds) {
         if (fileIds == null || fileIds.isBlank()) {
             return Collections.emptyList();
@@ -253,7 +257,9 @@ public class ChatController {
                 .toList();
     }
 
-    /** 将文件元信息拼入用户消息 */
+    /**
+     * 将文件元信息拼入用户消息
+     */
     private String buildMessageWithFiles(String message, List<FileResponse> files) {
         if (files.isEmpty()) {
             return message;

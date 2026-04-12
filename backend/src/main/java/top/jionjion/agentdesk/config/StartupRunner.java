@@ -36,14 +36,14 @@ public class StartupRunner implements ApplicationRunner {
         String datasourceUrl = environment.getProperty("spring.datasource.url", "未配置");
 
         log.info("""
-
-                ----------------------------------------------------------
-                  应用 '{}' 启动成功!
-                  环境:        {}
-                  数据库:      {}
-                  本地访问:    http://localhost:{}{}
-                  外部访问:    http://{}:{}{}
-                ----------------------------------------------------------""",
+                        
+                        ----------------------------------------------------------
+                          应用 '{}' 启动成功!
+                          环境:        {}
+                          数据库:      {}
+                          本地访问:    http://localhost:{}{}
+                          外部访问:    http://{}:{}{}
+                        ----------------------------------------------------------""",
                 appName, profiles, datasourceUrl, port, contextPath, host, port, contextPath);
     }
 }

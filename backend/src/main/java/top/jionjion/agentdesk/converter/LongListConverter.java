@@ -36,7 +36,8 @@ public class LongListConverter implements AttributeConverter<List<Long>, String>
             return null;
         }
         try {
-            return MAPPER.readValue(dbData, new TypeReference<>() {});
+            return MAPPER.readValue(dbData, new TypeReference<>() {
+            });
         } catch (JsonProcessingException e) {
             return List.of();
         }
