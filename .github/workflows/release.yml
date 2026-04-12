@@ -38,7 +38,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: cd frontend && npm ci
 
       - name: Type check
         run: npm run typecheck
@@ -47,7 +51,11 @@ jobs:
         run: npm run lint
 
       - name: Build Electron app for Windows
-        run: npm run build:win
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: cd frontend && npm run build:win
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -55,10 +63,25 @@ jobs:
           name: windows-installer
           path: frontend/dist/*.exe
 
+      - name: Get release notes
+        id: release_notes
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          NOTES_FILE="releases/${TAG}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "file=$NOTES_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+        working-directory: .
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: frontend/dist/*.exe
+          body_path: ${{ steps.release_notes.outputs.found == 'true' && steps.release_notes.outputs.file || '' }}
           generate_release_notes: true
           draft: false
           prerelease: false
