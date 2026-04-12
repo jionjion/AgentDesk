@@ -181,7 +181,7 @@
               @click="handleOpenAbout"
           >
             <Info :size="16" class="text-gray-500 dark:text-gray-400"/>
-            <span>关于我们</span>
+            <span>关于作者</span>
           </button>
           <div class="my-1 border-t border-gray-200 dark:border-gray-700"/>
           <button
@@ -340,15 +340,15 @@ function handleOpenSettings() {
 }
 
 function handleOpenHelp() {
-  window.open('https://github.com/jionjion', '_blank')
+  window.open('https://jionjion.github.io/AgentDesk', '_blank')
 }
 
 function handleOpenChangelog() {
-  window.open('https://github.com/', '_blank')
+  window.open('https://github.com/jionjion/AgentDesk/blob/main/CHANGELOG.md', '_blank')
 }
 
 function handleOpenAbout() {
-  window.open('https://github.com/', '_blank')
+  window.open('https://github.com/jionjion', '_blank')
 }
 
 function handleLogout() {
