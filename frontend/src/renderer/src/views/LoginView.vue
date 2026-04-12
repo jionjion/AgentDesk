@@ -12,42 +12,46 @@
       </p>
 
       <!-- 表单 -->
-      <form class="w-full max-w-sm space-y-4" @submit.prevent="handleSubmit">
+      <form class="w-full max-w-sm space-y-4" @submit.prevent="handleSubmit" novalidate>
         <div>
           <input
               v-model="form.username"
               type="text"
               placeholder="用户名"
-              required
-              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              :class="['w-full px-4 py-2.5 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors',
+                fieldErrors.username ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600']"
           />
+          <p v-if="fieldErrors.username" class="text-red-500 text-xs mt-1">{{ fieldErrors.username }}</p>
         </div>
         <div>
           <input
               v-model="form.password"
               type="password"
               placeholder="密码"
-              required
-              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              :class="['w-full px-4 py-2.5 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors',
+                fieldErrors.password ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600']"
           />
+          <p v-if="fieldErrors.password" class="text-red-500 text-xs mt-1">{{ fieldErrors.password }}</p>
         </div>
         <div v-if="isRegister">
           <input
               v-model="form.nickname"
               type="text"
               placeholder="昵称"
-              required
-              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              :class="['w-full px-4 py-2.5 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors',
+                fieldErrors.nickname ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600']"
           />
+          <p v-if="fieldErrors.nickname" class="text-red-500 text-xs mt-1">{{ fieldErrors.nickname }}</p>
         </div>
         <div v-if="isRegister">
           <input
               v-model="form.inviteCode"
               type="text"
               placeholder="邀请码"
-              required
-              class="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              :class="['w-full px-4 py-2.5 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors',
+                fieldErrors.inviteCode ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600']"
           />
+          <p v-if="fieldErrors.inviteCode" class="text-red-500 text-xs mt-1">{{ fieldErrors.inviteCode }}</p>
         </div>
 
         <!-- 错误提示 -->
@@ -109,12 +113,59 @@ const form = reactive({
   inviteCode: ''
 })
 
+const fieldErrors = reactive({
+  username: '',
+  password: '',
+  nickname: '',
+  inviteCode: ''
+})
+
+function clearFieldErrors() {
+  fieldErrors.username = ''
+  fieldErrors.password = ''
+  fieldErrors.nickname = ''
+  fieldErrors.inviteCode = ''
+}
+
+function validate(): boolean {
+  clearFieldErrors()
+  let valid = true
+
+  if (!form.username.trim()) {
+    fieldErrors.username = '请输入用户名'
+    valid = false
+  }
+  if (!form.password) {
+    fieldErrors.password = '请输入密码'
+    valid = false
+  } else if (form.password.length < 6) {
+    fieldErrors.password = '密码至少 6 位'
+    valid = false
+  }
+
+  if (isRegister.value) {
+    if (!form.nickname.trim()) {
+      fieldErrors.nickname = '请输入昵称'
+      valid = false
+    }
+    if (!form.inviteCode.trim()) {
+      fieldErrors.inviteCode = '请输入邀请码'
+      valid = false
+    }
+  }
+
+  return valid
+}
+
 function toggleMode() {
   isRegister.value = !isRegister.value
   errorMsg.value = ''
+  clearFieldErrors()
 }
 
 async function handleSubmit() {
+  if (!validate()) return
+
   loading.value = true
   errorMsg.value = ''
   try {
@@ -129,7 +180,7 @@ async function handleSubmit() {
     }
     router.push('/chat')
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.error || '操作失败，请重试'
+    errorMsg.value = err.response?.data?.message || err.response?.data?.error || '操作失败，请重试'
   } finally {
     loading.value = false
   }

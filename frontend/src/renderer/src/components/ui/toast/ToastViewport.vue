@@ -9,7 +9,7 @@ const props = defineProps<ToastViewportProps & { class?: HTMLAttributes['class']
 <template>
   <ToastViewport
       :class="cn(
-      'fixed top-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:flex-col md:max-w-[420px]',
+      'fixed top-6 right-6 z-[100] w-full md:max-w-[420px]',
       props.class,
     )"
   />
