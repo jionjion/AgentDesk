@@ -1,6 +1,0 @@
-node_modules
-dist
-out
-*.local
-auto-imports.d.ts
-components.d.ts

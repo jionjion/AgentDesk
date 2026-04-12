@@ -7,8 +7,10 @@ nul
 target
 
 
+dist
 out
 node_modules
+
 
 
 frontend/docs
