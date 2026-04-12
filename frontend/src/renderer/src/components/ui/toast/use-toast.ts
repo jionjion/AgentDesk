@@ -1,4 +1,4 @@
-import { ref, type Component } from 'vue'
+import { ref } from 'vue'
 
 const TOAST_LIMIT = 5
 const TOAST_REMOVE_DELAY = 1000

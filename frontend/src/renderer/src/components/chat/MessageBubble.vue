@@ -48,7 +48,7 @@
               : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
           >
             <div v-if="isUser">
-              {{ message.content }}
+              {{ (message as UserMessage).content }}
               <div v-if="(message as UserMessage).attachments?.length"
                    class="flex flex-wrap gap-1.5 mt-2">
                 <div v-for="att in (message as UserMessage).attachments" :key="att.id"

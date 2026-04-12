@@ -20,6 +20,14 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
 }
 
+interface PendingFile {
+  id: number
+  name: string
+  size: number
+  contentType: string
+  uploading: boolean
+}
+
 export const useChatStore = defineStore('chat', () => {
   // === State ===
   const sessions = ref<ChatSession[]>([])
@@ -30,13 +38,6 @@ export const useChatStore = defineStore('chat', () => {
   const eventSource = ref<EventSource | null>(null)
   const pinnedSessionIds = ref<Set<string>>(new Set())
 
-  interface PendingFile {
-    id: number
-    name: string
-    size: number
-    contentType: string
-    uploading: boolean
-  }
   const pendingAttachments = ref<PendingFile[]>([])
 
   // === Computed ===
@@ -338,7 +339,7 @@ export const useChatStore = defineStore('chat', () => {
       }
     })
 
-    es.addEventListener('reasoning_complete', (e: MessageEvent) => {
+    es.addEventListener('reasoning_complete', (_e: MessageEvent) => {
       // 折叠当前 thinking 块
       const msgs = messagesBySession.value[sessionId!]
       if (!msgs) return
