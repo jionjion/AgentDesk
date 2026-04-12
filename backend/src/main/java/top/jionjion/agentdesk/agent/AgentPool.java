@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Agent 池: 管理 per-session 的 Agent 生命周期
+ *
+ * @author Jion
  */
 @Service
 public class AgentPool {

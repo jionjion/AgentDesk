@@ -6,6 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * 阿里云 OSS 配置属性
+ *
+ * @author Jion
  */
 @Getter
 @Setter

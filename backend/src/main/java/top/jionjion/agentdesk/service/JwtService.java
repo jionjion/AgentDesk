@@ -12,6 +12,8 @@ import java.util.Date;
 
 /**
  * JWT Token 生成/解析/校验
+ *
+ * @author Jion
  */
 @Service
 public class JwtService {

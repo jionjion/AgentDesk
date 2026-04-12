@@ -13,9 +13,13 @@ import top.jionjion.agentdesk.security.UserContext;
 
 /**
  * 认证业务逻辑
+ *
+ * @author Jion
  */
 @Service
 public class AuthService {
+
+    private static final String AVATAR_PATH_PREFIX = "avatar/";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -78,7 +82,7 @@ public class AuthService {
      * 将 OSS key 转为预签名 URL
      */
     private String resolveAvatarUrl(String avatar) {
-        if (avatar != null && avatar.startsWith("avatar/")) {
+        if (avatar != null && avatar.startsWith(AVATAR_PATH_PREFIX)) {
             return ossService.generatePresignedUrl(avatar, 60);
         }
         return avatar;

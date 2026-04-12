@@ -16,6 +16,8 @@ import top.jionjion.agentdesk.dto.ErrorResponse;
 
 /**
  * 全局统一异常处理
+ *
+ * @author Jion
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {

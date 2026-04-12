@@ -1,22 +1,12 @@
 package top.jionjion.agentdesk.security;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
 /**
  * 当前认证用户主体, 存入 SecurityContext 的 principal
+ *
+ * @param id       用户 ID
+ * @param username 用户名
+ * @author Jion
  */
-@Getter
-@AllArgsConstructor
-public class UserPrincipal {
+public record UserPrincipal(Long id, String username) {
 
-    /**
-     * 用户 ID
-     */
-    private final Long id;
-
-    /**
-     * 用户名
-     */
-    private final String username;
 }

@@ -9,6 +9,8 @@ import java.util.Map;
 
 /**
  * 设置控制器: 个人资料/模型配置/应用偏好
+ *
+ * @author Jion
  */
 @RestController
 @RequestMapping("/api/settings")

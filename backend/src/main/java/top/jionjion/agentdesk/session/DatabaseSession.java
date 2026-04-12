@@ -12,12 +12,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.repository.AgentStateRepository;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * 基于 PostgreSQL + JPA 的 AgentScope Session 实现
  * <p>
  * agent_state 表中以 session_id + state_key 为唯一标识, state_data 存储 JSON 序列化的状态
+ *
+ * @author Jion
  */
 @Component
 public class DatabaseSession implements Session {
@@ -136,8 +141,8 @@ public class DatabaseSession implements Session {
 
     /** 从SessionKey中提取会话ID字符串 */
     private String extractSessionId(SessionKey sessionKey) {
-        if (sessionKey instanceof SimpleSessionKey simple) {
-            return simple.sessionId();
+        if (sessionKey instanceof SimpleSessionKey(String sessionId)) {
+            return sessionId;
         }
         return sessionKey.toString();
     }

@@ -9,6 +9,8 @@ import java.lang.annotation.Target;
  * 接口限流注解, 基于用户维度进行请求频率限制.
  * <p>
  * 在 Controller 方法上标注, 限制同一用户在指定时间窗口内的最大请求次数.
+ *
+ * @author Jion
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

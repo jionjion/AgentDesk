@@ -17,6 +17,8 @@ import java.util.List;
 
 /**
  * 使用 AI 模型根据用户消息生成会话标题
+ *
+ * @author Jion
  */
 @Service
 public class TitleGenerationService {

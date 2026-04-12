@@ -12,6 +12,8 @@ import java.util.Map;
 
 /**
  * 对话消息实体
+ *
+ * @author Jion
  */
 @Getter
 @Setter

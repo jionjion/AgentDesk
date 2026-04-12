@@ -2,6 +2,8 @@ package top.jionjion.agentdesk.dto;
 
 /**
  * 文件信息响应
+ *
+ * @author Jion
  */
 public record FileResponse(
         Long id,

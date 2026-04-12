@@ -10,6 +10,8 @@ import java.util.List;
 
 /**
  * JPA 转换器：List<Long> ↔ JSONB 字符串
+ *
+ * @author Jion
  */
 @Converter
 public class LongListConverter implements AttributeConverter<List<Long>, String> {

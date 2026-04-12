@@ -5,11 +5,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
  * 启动类
+ *
+ * @author Jion
  */
 @SpringBootApplication
 public class AgentDeskApplication {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(AgentDeskApplication.class, args);
     }
 

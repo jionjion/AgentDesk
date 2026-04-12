@@ -11,6 +11,8 @@ import lombok.Setter;
 
 /**
  * 会话元数据
+ *
+ * @author Jion
  */
 @Getter
 @Setter

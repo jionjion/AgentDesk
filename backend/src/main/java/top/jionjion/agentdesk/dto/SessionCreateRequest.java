@@ -2,6 +2,8 @@ package top.jionjion.agentdesk.dto;
 
 /**
  * 创建会话请求
+ *
+ * @author Jion
  */
 public record SessionCreateRequest(
         /* 会话标题 */

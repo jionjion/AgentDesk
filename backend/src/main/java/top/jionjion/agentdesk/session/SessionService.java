@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 
 /**
  * 会话管理服务
+ *
+ * @author Jion
  */
 @Service
 public class SessionService {
@@ -70,7 +72,7 @@ public class SessionService {
     /**
      * 删除当前用户的会话
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(String id) {
         Long userId = UserContext.getUserId();
         sessionRepository.findByIdAndUserId(id, userId).ifPresent(m -> {

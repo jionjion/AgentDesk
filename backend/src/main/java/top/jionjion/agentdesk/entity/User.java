@@ -7,6 +7,8 @@ import lombok.Setter;
 
 /**
  * 用户实体
+ *
+ * @author Jion
  */
 @Getter
 @Setter

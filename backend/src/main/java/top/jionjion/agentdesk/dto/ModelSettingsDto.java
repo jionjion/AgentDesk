@@ -1,5 +1,10 @@
 package top.jionjion.agentdesk.dto;
 
+/**
+ * 模型设置 DTO
+ *
+ * @author Jion
+ */
 public record ModelSettingsDto(
         String provider,
         String modelName,

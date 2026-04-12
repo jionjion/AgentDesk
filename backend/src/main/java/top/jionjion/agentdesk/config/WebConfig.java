@@ -9,6 +9,8 @@ import top.jionjion.agentdesk.interceptor.RateLimitInterceptor;
 
 /**
  * Web 配置: CORS + 异步支持 + 拦截器
+ *
+ * @author Jion
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {

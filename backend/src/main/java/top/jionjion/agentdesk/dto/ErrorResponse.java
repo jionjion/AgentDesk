@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * 统一错误响应体
+ *
+ * @author Jion
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ErrorResponse(

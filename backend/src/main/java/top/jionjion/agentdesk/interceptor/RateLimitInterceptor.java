@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * <p>
  * 使用内存 ConcurrentHashMap 存储每个用户每个接口的请求时间戳队列,
  * 通过滑动窗口算法判断是否超过限流阈值.
+ *
+ * @author Jion
  */
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {

@@ -7,6 +7,8 @@ import lombok.Setter;
 
 /**
  * Agent 序列化状态实体, 映射 agent_state 表
+ *
+ * @author Jion
  */
 @Getter
 @Setter

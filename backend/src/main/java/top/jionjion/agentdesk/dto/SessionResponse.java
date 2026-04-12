@@ -2,6 +2,8 @@ package top.jionjion.agentdesk.dto;
 
 /**
  * 会话响应
+ *
+ * @author Jion
  */
 public record SessionResponse(
         /* 会话ID */

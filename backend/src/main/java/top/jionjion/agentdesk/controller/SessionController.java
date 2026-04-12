@@ -11,6 +11,8 @@ import java.util.List;
 
 /**
  * 会话管理控制器
+ *
+ * @author Jion
  */
 @RestController
 @RequestMapping("/api/sessions")

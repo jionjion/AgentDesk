@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Agent 配置类: 仅提供共享的无状态 Bean
+ *
+ * @author Jion
  */
 @Configuration
 public class AgentConfig {

@@ -13,8 +13,26 @@ import java.util.Set;
 
 /**
  * 示例工具类, 提供给 Agent 调用
+ *
+ * @author Jion
  */
 public class SimpleTools {
+
+    private static final int BYTES_PER_KB = 1024;
+    private static final int BYTES_PER_MB = 1024 * 1024;
+    private static final double KB_DIVISOR = 1024.0;
+    private static final String FORMAT_KB = "%.1fKB";
+    private static final String FORMAT_MB = "%.1fMB";
+    private static final String UNIT_BYTE = "B";
+    private static final String TEXT_CONTENT_TYPE_PREFIX = "text/";
+    private static final int MAX_READ_SIZE = 512 * 1024;
+    private static final char CHAR_PLUS = '+';
+    private static final char CHAR_MINUS = '-';
+    private static final char CHAR_LPAREN = '(';
+    private static final char CHAR_RPAREN = ')';
+    private static final char CHAR_DOT = '.';
+    private static final char CHAR_ZERO = '0';
+    private static final char CHAR_NINE = '9';
 
     private static final Set<String> TEXT_EXTENSIONS = Set.of(
             "txt", "md", "csv", "json", "xml", "log",
@@ -71,7 +89,7 @@ public class SimpleTools {
                     "。仅支持文本类文件 (txt, md, csv, json, xml 等)";
         }
 
-        if (record.getSize() > 512 * 1024) {
+        if (record.getSize() > MAX_READ_SIZE) {
             return "文件过大 (" + formatSize(record.getSize()) +
                     ")，超过 500KB 限制。请告知用户裁剪文件后重试。";
         }
@@ -85,21 +103,29 @@ public class SimpleTools {
     }
 
     private boolean isTextFile(String contentType, String fileName) {
-        if (contentType != null && contentType.startsWith("text/")) return true;
+        if (contentType != null && contentType.startsWith(TEXT_CONTENT_TYPE_PREFIX)) {
+            return true;
+        }
         String ext = getExtension(fileName).toLowerCase();
         return TEXT_EXTENSIONS.contains(ext);
     }
 
     private String getExtension(String fileName) {
-        if (fileName == null) return "";
+        if (fileName == null) {
+            return "";
+        }
         int dot = fileName.lastIndexOf('.');
         return dot >= 0 ? fileName.substring(dot + 1) : "";
     }
 
     private String formatSize(long bytes) {
-        if (bytes < 1024) return bytes + "B";
-        if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
-        return String.format("%.1fMB", bytes / (1024.0 * 1024));
+        if (bytes < BYTES_PER_KB) {
+            return bytes + UNIT_BYTE;
+        }
+        if (bytes < BYTES_PER_MB) {
+            return String.format(FORMAT_KB, bytes / KB_DIVISOR);
+        }
+        return String.format(FORMAT_MB, bytes / (KB_DIVISOR * BYTES_PER_KB));
     }
 
     private double evalExpression(String expression) {
@@ -145,24 +171,24 @@ public class SimpleTools {
     }
 
     private double parseFactor(String expr, int[] pos, int[] ch, Runnable nextChar) {
-        if (ch[0] == '+') {
+        if (ch[0] == CHAR_PLUS) {
             nextChar.run();
             return parseFactor(expr, pos, ch, nextChar);
         }
-        if (ch[0] == '-') {
+        if (ch[0] == CHAR_MINUS) {
             nextChar.run();
             return -parseFactor(expr, pos, ch, nextChar);
         }
         double x;
-        if (ch[0] == '(') {
+        if (ch[0] == CHAR_LPAREN) {
             nextChar.run();
             x = parseExpression(expr, pos, ch, nextChar);
-            if (ch[0] == ')') {
+            if (ch[0] == CHAR_RPAREN) {
                 nextChar.run();
             }
         } else {
             int startPos = pos[0];
-            while (ch[0] >= '0' && ch[0] <= '9' || ch[0] == '.') {
+            while (ch[0] >= CHAR_ZERO && ch[0] <= CHAR_NINE || ch[0] == CHAR_DOT) {
                 nextChar.run();
             }
             x = Double.parseDouble(expr.substring(startPos, pos[0]));

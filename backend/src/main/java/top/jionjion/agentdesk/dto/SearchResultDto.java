@@ -2,6 +2,8 @@ package top.jionjion.agentdesk.dto;
 
 /**
  * 消息搜索结果
+ *
+ * @author Jion
  */
 public record SearchResultDto(
         Long id,

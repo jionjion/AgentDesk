@@ -7,6 +7,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * 当前用户上下文, 从 SecurityContext 中获取认证信息.
  * <p>
  * 用法: {@code UserContext.getUserId()}, {@code UserContext.getUsername()} 等
+ *
+ * @author Jion
  */
 public final class UserContext {
 
@@ -28,14 +30,14 @@ public final class UserContext {
      * 获取当前用户 ID
      */
     public static Long getUserId() {
-        return getPrincipal().getId();
+        return getPrincipal().id();
     }
 
     /**
      * 获取当前用户名
      */
     public static String getUsername() {
-        return getPrincipal().getUsername();
+        return getPrincipal().username();
     }
 
     /**
@@ -50,6 +52,6 @@ public final class UserContext {
      * 获取当前用户 ID, 未认证时返回 null (适用于可选认证场景)
      */
     public static Long getUserIdOrNull() {
-        return isAuthenticated() ? getPrincipal().getId() : null;
+        return isAuthenticated() ? getPrincipal().id() : null;
     }
 }

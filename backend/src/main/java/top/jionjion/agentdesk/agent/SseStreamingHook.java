@@ -1,21 +1,8 @@
 package top.jionjion.agentdesk.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.agentscope.core.hook.Hook;
-import io.agentscope.core.hook.HookEvent;
-import io.agentscope.core.hook.PreCallEvent;
-import io.agentscope.core.hook.ReasoningChunkEvent;
-import io.agentscope.core.hook.PostReasoningEvent;
-import io.agentscope.core.hook.PreActingEvent;
-import io.agentscope.core.hook.PostActingEvent;
-import io.agentscope.core.hook.PostCallEvent;
-import io.agentscope.core.hook.ErrorEvent;
-import io.agentscope.core.message.ContentBlock;
-import io.agentscope.core.message.Msg;
-import io.agentscope.core.message.TextBlock;
-import io.agentscope.core.message.ThinkingBlock;
-import io.agentscope.core.message.ToolResultBlock;
-import io.agentscope.core.message.ToolUseBlock;
+import io.agentscope.core.hook.*;
+import io.agentscope.core.message.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -27,6 +14,8 @@ import java.util.Map;
 
 /**
  * Hook-SSE bridge: listens to AgentScope Hook events and pushes to SseEmitter
+ *
+ * @author Jion
  */
 public class SseStreamingHook implements Hook {
 

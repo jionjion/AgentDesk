@@ -15,6 +15,8 @@ import top.jionjion.agentdesk.service.SettingsService;
 
 /**
  * Agent 工厂: 为每个会话创建独立的 Agent 实例
+ *
+ * @author Jion
  */
 @Component
 public class AgentFactory {

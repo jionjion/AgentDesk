@@ -10,8 +10,19 @@ import java.util.Set;
 
 /**
  * 文件读取工具, 供子代理使用
+ *
+ * @author Jion
  */
 public class FileTools {
+
+    private static final int BYTES_PER_KB = 1024;
+    private static final int BYTES_PER_MB = 1024 * 1024;
+    private static final double KB_DIVISOR = 1024.0;
+    private static final String FORMAT_KB = "%.1fKB";
+    private static final String FORMAT_MB = "%.1fMB";
+    private static final String UNIT_BYTE = "B";
+    private static final String TEXT_CONTENT_TYPE_PREFIX = "text/";
+    private static final int MAX_READ_SIZE = 512 * 1024;
 
     private static final Set<String> TEXT_EXTENSIONS = Set.of(
             "txt", "md", "csv", "json", "xml", "log",
@@ -45,7 +56,7 @@ public class FileTools {
                     "。仅支持文本类文件 (txt, md, csv, json, xml 等)";
         }
 
-        if (record.getSize() > 512 * 1024) {
+        if (record.getSize() > MAX_READ_SIZE) {
             return "文件过大 (" + formatSize(record.getSize()) +
                     ")，超过 500KB 限制。请告知用户裁剪文件后重试。";
         }
@@ -59,20 +70,28 @@ public class FileTools {
     }
 
     private boolean isTextFile(String contentType, String fileName) {
-        if (contentType != null && contentType.startsWith("text/")) return true;
+        if (contentType != null && contentType.startsWith(TEXT_CONTENT_TYPE_PREFIX)) {
+            return true;
+        }
         String ext = getExtension(fileName).toLowerCase();
         return TEXT_EXTENSIONS.contains(ext);
     }
 
     private String getExtension(String fileName) {
-        if (fileName == null) return "";
+        if (fileName == null) {
+            return "";
+        }
         int dot = fileName.lastIndexOf('.');
         return dot >= 0 ? fileName.substring(dot + 1) : "";
     }
 
     private String formatSize(long bytes) {
-        if (bytes < 1024) return bytes + "B";
-        if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
-        return String.format("%.1fMB", bytes / (1024.0 * 1024));
+        if (bytes < BYTES_PER_KB) {
+            return bytes + UNIT_BYTE;
+        }
+        if (bytes < BYTES_PER_MB) {
+            return String.format(FORMAT_KB, bytes / KB_DIVISOR);
+        }
+        return String.format(FORMAT_MB, bytes / (KB_DIVISOR * BYTES_PER_KB));
     }
 }

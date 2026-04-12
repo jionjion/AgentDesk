@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * 阿里云 OSS 客户端配置
+ *
+ * @author Jion
  */
 @Configuration
 @EnableConfigurationProperties(OssProperties.class)

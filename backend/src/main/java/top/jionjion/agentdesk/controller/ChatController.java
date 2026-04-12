@@ -11,16 +11,16 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import top.jionjion.agentdesk.agent.AgentHandle;
 import top.jionjion.agentdesk.agent.AgentPool;
+import top.jionjion.agentdesk.annotation.RateLimit;
 import top.jionjion.agentdesk.dto.ChatEventDto;
 import top.jionjion.agentdesk.dto.FileResponse;
 import top.jionjion.agentdesk.dto.SearchResultDto;
 import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
-import top.jionjion.agentdesk.annotation.RateLimit;
+import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.FileService;
 import top.jionjion.agentdesk.service.TitleGenerationService;
 import top.jionjion.agentdesk.session.SessionService;
-import top.jionjion.agentdesk.security.UserContext;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +30,8 @@ import java.util.regex.Pattern;
 
 /**
  * 对话控制器, 通过SSE流式推送对话事件
+ *
+ * @author Jion
  */
 @RestController
 @RequestMapping("/api/chat")
@@ -38,6 +40,12 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private static final Pattern SESSION_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final int BYTES_PER_KB = 1024;
+    private static final int BYTES_PER_MB = 1024 * 1024;
+    private static final double KB_DIVISOR = 1024.0;
+    private static final String FORMAT_KB = "%.1fKB";
+    private static final String FORMAT_MB = "%.1fMB";
+    private static final String UNIT_BYTE = "B";
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
@@ -77,9 +85,7 @@ public class ChatController {
     public SseEmitter streamChat(@RequestParam String sessionId,
                                  @RequestParam String message,
                                  @RequestParam(required = false) String fileIds) {
-        if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
-        }
+        validateSessionId(sessionId);
         if (message == null || message.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is empty");
         }
@@ -105,59 +111,16 @@ public class ChatController {
         String enrichedMessage = buildMessageWithFiles(message, files);
 
         // 持久化用户消息 (含 fileIds)
-        ChatMessage chatMsg = new ChatMessage(sessionId, "user", message);
-        if (!parsedFileIds.isEmpty()) {
-            chatMsg.setFileIds(parsedFileIds);
-        }
-        chatMessageRepository.save(chatMsg);
+        saveUserMessage(sessionId, message, parsedFileIds);
 
-        emitter.onTimeout(() -> {
-            log.warn("Session {} SSE timeout", sessionId);
-            agentPool.release(sessionId);
-        });
-        emitter.onCompletion(() -> {
-            log.debug("Session {} SSE completed", sessionId);
-            handle.hook().setEmitter(null);
-        });
-        emitter.onError(e -> {
-            log.warn("Session {} SSE error: {}", sessionId, e.getMessage());
-            agentPool.release(sessionId);
-            handle.hook().setEmitter(null);
-        });
+        configureSseCallbacks(emitter, sessionId, handle);
 
         Msg userMsg = Msg.builder()
                 .textContent(enrichedMessage)
                 .build();
 
         handle.agent().stream(userMsg)
-                .doOnComplete(() -> {
-                    try {
-                        // 持久化 Agent 回复: 从 Hook 的 PostCallEvent 中获取最终文本
-                        String reply = handle.hook().getLastReply();
-                        if (reply != null && !reply.isEmpty()) {
-                            chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
-                        }
-                        agentPool.save(sessionId);
-                        sessionService.touch(sessionId);
-                        emitter.complete();
-                    } catch (Exception e) {
-                        log.warn("Error completing SSE: {}", e.getMessage());
-                    }
-
-                    // 首次对话时异步生成标题 (emitter 已关闭, 不再通过 SSE 推送)
-                    if (sessionService.hasDefaultTitle(sessionId)) {
-                        java.util.concurrent.CompletableFuture.runAsync(() -> {
-                            try {
-                                String generatedTitle = titleGenerationService.generateTitle(message);
-                                if (generatedTitle != null && !generatedTitle.isEmpty()) {
-                                    sessionService.updateTitleInternal(sessionId, generatedTitle);
-                                }
-                            } catch (Exception e) {
-                                log.warn("自动生成标题失败: {}", e.getMessage());
-                            }
-                        });
-                    }
-                })
+                .doOnComplete(() -> onStreamComplete(sessionId, message, handle, emitter))
                 .doOnError(e -> {
                     log.error("Agent error: {}", e.getMessage(), e);
                     try {
@@ -171,6 +134,64 @@ public class ChatController {
                 .subscribe();
 
         return emitter;
+    }
+
+    private void validateSessionId(String sessionId) {
+        if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
+        }
+    }
+
+    private void saveUserMessage(String sessionId, String message, List<Long> parsedFileIds) {
+        ChatMessage chatMsg = new ChatMessage(sessionId, "user", message);
+        if (!parsedFileIds.isEmpty()) {
+            chatMsg.setFileIds(parsedFileIds);
+        }
+        chatMessageRepository.save(chatMsg);
+    }
+
+    private void configureSseCallbacks(SseEmitter emitter, String sessionId, AgentHandle handle) {
+        emitter.onTimeout(() -> {
+            log.warn("Session {} SSE timeout", sessionId);
+            agentPool.release(sessionId);
+        });
+        emitter.onCompletion(() -> {
+            log.debug("Session {} SSE completed", sessionId);
+            handle.hook().setEmitter(null);
+        });
+        emitter.onError(e -> {
+            log.warn("Session {} SSE error: {}", sessionId, e.getMessage());
+            agentPool.release(sessionId);
+            handle.hook().setEmitter(null);
+        });
+    }
+
+    private void onStreamComplete(String sessionId, String message, AgentHandle handle, SseEmitter emitter) {
+        try {
+            String reply = handle.hook().getLastReply();
+            if (reply != null && !reply.isEmpty()) {
+                chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
+            }
+            agentPool.save(sessionId);
+            sessionService.touch(sessionId);
+            emitter.complete();
+        } catch (Exception e) {
+            log.warn("Error completing SSE: {}", e.getMessage());
+        }
+
+        // 首次对话时异步生成标题 (emitter 已关闭, 不再通过 SSE 推送)
+        if (sessionService.hasDefaultTitle(sessionId)) {
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    String generatedTitle = titleGenerationService.generateTitle(message);
+                    if (generatedTitle != null && !generatedTitle.isEmpty()) {
+                        sessionService.updateTitleInternal(sessionId, generatedTitle);
+                    }
+                } catch (Exception e) {
+                    log.warn("自动生成标题失败: {}", e.getMessage());
+                }
+            });
+        }
     }
 
     /**
@@ -234,7 +255,9 @@ public class ChatController {
 
     /** 将文件元信息拼入用户消息 */
     private String buildMessageWithFiles(String message, List<FileResponse> files) {
-        if (files.isEmpty()) return message;
+        if (files.isEmpty()) {
+            return message;
+        }
 
         StringBuilder sb = new StringBuilder();
         sb.append("[用户上传了以下文件]\n");
@@ -251,8 +274,12 @@ public class ChatController {
     }
 
     private String formatSize(long bytes) {
-        if (bytes < 1024) return bytes + "B";
-        if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
-        return String.format("%.1fMB", bytes / (1024.0 * 1024));
+        if (bytes < BYTES_PER_KB) {
+            return bytes + UNIT_BYTE;
+        }
+        if (bytes < BYTES_PER_MB) {
+            return String.format(FORMAT_KB, bytes / KB_DIVISOR);
+        }
+        return String.format(FORMAT_MB, bytes / (KB_DIVISOR * BYTES_PER_KB));
     }
 }

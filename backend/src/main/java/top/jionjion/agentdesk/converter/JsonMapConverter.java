@@ -10,6 +10,8 @@ import java.util.Map;
 
 /**
  * JPA 转换器：Map<String, Object> ↔ JSONB 字符串
+ *
+ * @author Jion
  */
 @Converter
 public class JsonMapConverter implements AttributeConverter<Map<String, Object>, String> {

@@ -8,6 +8,8 @@ import top.jionjion.agentdesk.service.AuthService;
 
 /**
  * 认证控制器: 注册/登录/获取用户信息
+ *
+ * @author Jion
  */
 @RestController
 @RequestMapping("/api/auth")

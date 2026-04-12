@@ -6,6 +6,8 @@ import java.util.Map;
 
 /**
  * SSE 事件载荷 DTO
+ *
+ * @author Jion
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ChatEventDto(
