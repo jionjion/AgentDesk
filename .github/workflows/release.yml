@@ -79,11 +79,20 @@ jobs:
           fi
         working-directory: .
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (with notes)
+        if: steps.release_notes.outputs.found == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: frontend/dist/*.exe
-          body_path: ${{ steps.release_notes.outputs.found == 'true' && steps.release_notes.outputs.file || '' }}
+          body_path: ${{ steps.release_notes.outputs.file }}
+          draft: false
+          prerelease: false
+
+      - name: Create GitHub Release (auto)
+        if: steps.release_notes.outputs.found != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: frontend/dist/*.exe
           generate_release_notes: true
           draft: false
           prerelease: false
