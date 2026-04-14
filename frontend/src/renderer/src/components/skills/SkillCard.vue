@@ -13,14 +13,7 @@
           <Badge v-if="skill.builtin" variant="outline" class="text-[10px] shrink-0">内置</Badge>
           <Badge v-if="skill.category" variant="secondary" class="text-[10px] shrink-0">{{ skill.category }}</Badge>
         </div>
-        <Popover>
-          <PopoverTrigger as-child>
-            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2 cursor-default">{{ skill.description }}</p>
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="start" class="w-72 text-xs text-gray-600 dark:text-gray-300 p-3">
-            {{ skill.description }}
-          </PopoverContent>
-        </Popover>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2" :title="skill.description">{{ skill.description }}</p>
       </div>
     </div>
 
@@ -51,7 +44,6 @@
 import {Pencil, Sparkles, Trash2, Zap} from 'lucide-vue-next'
 import {Button} from '@/components/ui/button'
 import {Badge} from '@/components/ui/badge'
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import type {Skill} from '@/types/skill'
 
 defineProps<{
