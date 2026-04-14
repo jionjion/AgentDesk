@@ -4,29 +4,36 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.tool.Toolkit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.dto.ModelSettingsDto;
+import top.jionjion.agentdesk.entity.Skill;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.OssService;
 import top.jionjion.agentdesk.service.SettingsService;
+import top.jionjion.agentdesk.service.SkillService;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Agent 工厂: 为每个会话创建独立的 Agent 实例
+ * <p>
+ * 子代理由数据库中启用的技能动态注册, 不再硬编码。
  *
  * @author Jion
  */
 @Component
 public class AgentFactory {
 
-    private static final String DEFAULT_SYS_PROMPT = """
+    private static final Logger log = LoggerFactory.getLogger(AgentFactory.class);
+
+    private static final String SYS_PROMPT_TEMPLATE = """
             你是一个名为 Assistant 的智能助手协调者。你可以直接回答简单问题，也可以将复杂任务委派给专业的子助手。
 
-            你有以下专家可以调用：
-            - call_file_analyzer: 文件分析专家。当用户上传文件并需要分析（CSV结构、代码审查、配置校验、日志分析）时使用。
-            - call_writer: 写作助手。当用户需要撰写邮件、润色文本、写周报、编写技术文档时使用。
-            - call_coder: 编程助手。当用户需要代码生成、Bug分析、算法讲解、代码优化时使用。
-            - call_data_analyst: 数据分析师。当用户上传数据并需要统计分析、趋势分析、异常检测时使用。
+            %s
 
             当用户上传了文件时，消息中会包含文件的元信息 (文件名、大小、类型、fileId)。
             对于文件相关任务，请将 fileId 传递给相应的子助手。
@@ -37,19 +44,24 @@ public class AgentFactory {
             请用中文回答。
             """;
 
+    private static final String FALLBACK_SYS_PROMPT = SYS_PROMPT_TEMPLATE.formatted("你暂时没有可调用的专家，请直接回答用户问题。");
+
     private final ChatModelFactory chatModelFactory;
     private final FileRecordRepository fileRecordRepository;
     private final OssService ossService;
     private final SettingsService settingsService;
+    private final SkillService skillService;
 
     public AgentFactory(ChatModelFactory chatModelFactory,
                         FileRecordRepository fileRecordRepository,
                         OssService ossService,
-                        SettingsService settingsService) {
+                        SettingsService settingsService,
+                        SkillService skillService) {
         this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
         this.settingsService = settingsService;
+        this.skillService = skillService;
     }
 
     /**
@@ -69,22 +81,30 @@ public class AgentFactory {
         // 读取用户模型配置 + API Key
         ModelSettingsDto ms = ModelSettingsDto.defaults();
         String userApiKey = null;
-        String sysPrompt = DEFAULT_SYS_PROMPT;
+        String sysPrompt;
+        List<Skill> enabledSkills = List.of();
 
         if (UserContext.isAuthenticated()) {
             Long userId = UserContext.getUserId();
             ms = settingsService.getModelSettings(userId);
             userApiKey = settingsService.getDashScopeApiKey(userId);
-            if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
-                sysPrompt = ms.systemPrompt();
-            }
+            enabledSkills = skillService.getEnabledSkills(userId);
         }
 
         // 通过工厂创建模型（自动 fallback 到系统默认 Key）
         DashScopeChatModel model = chatModelFactory.create(ms, userApiKey);
 
-        // 注册子代理（全部使用同一个 model 实例）
-        registerSubAgents(toolkit, model);
+        // 动态注册子代理（基于启用的技能）
+        registerSkillSubAgents(toolkit, model, enabledSkills);
+
+        // 构建系统提示词
+        sysPrompt = buildSystemPrompt(enabledSkills);
+
+        // 用户自定义系统提示词优先，但追加技能列表
+        if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
+            String skillSection = buildSkillSection(enabledSkills);
+            sysPrompt = ms.systemPrompt() + (skillSection.isEmpty() ? "" : "\n\n" + skillSection);
+        }
 
         // 构建 ReActAgent
         ReActAgent agent = ReActAgent.builder()
@@ -102,97 +122,72 @@ public class AgentFactory {
     }
 
     /**
-     * 注册 4 个子代理，共用同一个 ChatModel 实例
+     * 根据启用的技能动态注册子代理
      */
-    private void registerSubAgents(Toolkit toolkit, DashScopeChatModel model) {
-        // FileAnalyzer
-        toolkit.registration()
-                .subAgent(() -> {
-                    Toolkit subToolkit = new Toolkit();
-                    subToolkit.registerTool(new FileTools(fileRecordRepository, ossService));
-                    return ReActAgent.builder()
-                            .name("FileAnalyzer")
-                            .description("文件分析专家。擅长读取和分析上传的文件：CSV结构解析、代码审查、配置文件校验、日志分析。当用户上传文件并需要分析时调用。")
-                            .sysPrompt("""
-                                    你是文件分析专家。你的职责是读取用户上传的文件并进行深入分析。
-                                    请先使用 read_file 工具获取文件内容，然后根据文件类型进行分析：
-                                    - CSV文件：描述列结构、数据类型、行数、数据质量问题
-                                    - 代码文件：进行代码审查，指出问题和改进建议
-                                    - 配置文件：校验格式正确性，指出潜在问题
-                                    - 日志文件：提取关键信息、错误模式、时间线
-                                    请用中文回答，分析要具体、有条理。
-                                    """)
-                            .model(model)
-                            .toolkit(subToolkit)
-                            .maxIters(5)
-                            .build();
-                })
-                .apply();
+    private void registerSkillSubAgents(Toolkit toolkit, DashScopeChatModel model, List<Skill> skills) {
+        for (Skill skill : skills) {
+            toolkit.registration()
+                    .subAgent(() -> {
+                        ReActAgent.Builder builder = ReActAgent.builder()
+                                .name(skill.getId().replace("-", "_"))
+                                .description(skill.getDescription())
+                                .sysPrompt(skill.getSysPrompt())
+                                .model(model)
+                                .maxIters(skill.getMaxIters());
 
-        // Writer
-        toolkit.registration()
-                .subAgent(() -> ReActAgent.builder()
-                        .name("Writer")
-                        .description("写作助手。擅长邮件撰写、文本润色、周报生成、技术文档编写。当用户需要写作相关帮助时调用。")
-                        .sysPrompt("""
-                                你是专业写作助手。你的职责是帮助用户完成各类写作任务：
-                                - 邮件撰写：根据场景调整语气，正式/非正式皆可
-                                - 文本润色：改善表达、修正语法、提升可读性
-                                - 周报生成：结构化、突出重点成果和计划
-                                - 技术文档：清晰准确，适当使用示例
-                                请用中文回答，注重文字质量和结构。
-                                """)
-                        .model(model)
-                        .maxIters(3)
-                        .build())
-                .apply();
+                        // 如果技能配置了工具，创建独立的 Toolkit
+                        if (skill.getTools() != null && !skill.getTools().isEmpty()) {
+                            Toolkit subToolkit = new Toolkit();
+                            for (String toolName : skill.getTools()) {
+                                Object toolInstance = resolveToolInstance(toolName);
+                                if (toolInstance != null) {
+                                    subToolkit.registerTool(toolInstance);
+                                }
+                            }
+                            builder.toolkit(subToolkit);
+                        }
 
-        // Coder
-        toolkit.registration()
-                .subAgent(() -> {
-                    Toolkit subToolkit = new Toolkit();
-                    subToolkit.registerTool(new CalculateTools());
-                    return ReActAgent.builder()
-                            .name("Coder")
-                            .description("编程助手。擅长代码生成、Bug分析、算法讲解、代码优化。当用户需要编程相关帮助时调用。")
-                            .sysPrompt("""
-                                    你是编程助手。你的职责是帮助用户解决编程问题：
-                                    - 代码生成：根据需求生成高质量代码，包含注释
-                                    - Bug分析：分析代码问题，给出修复方案
-                                    - 算法讲解：用清晰的方式解释算法原理和复杂度
-                                    - 代码优化：改善性能、可读性和最佳实践
-                                    你可以使用 calculate 工具验证数学计算。
-                                    请用中文回答，代码块使用合适的语言标记。
-                                    """)
-                            .model(model)
-                            .toolkit(subToolkit)
-                            .maxIters(5)
-                            .build();
-                })
-                .apply();
+                        return builder.build();
+                    })
+                    .apply();
+        }
+    }
 
-        // DataAnalyst
-        toolkit.registration()
-                .subAgent(() -> {
-                    Toolkit subToolkit = new Toolkit();
-                    subToolkit.registerTool(new FileTools(fileRecordRepository, ossService));
-                    return ReActAgent.builder()
-                            .name("DataAnalyst")
-                            .description("数据分析师。擅长数据统计、趋势分析、异常检测、生成分析结论。当用户上传数据并需要分析洞察时调用。")
-                            .sysPrompt("""
-                                    你是数据分析师。你的职责是分析用户提供的数据并给出洞察：
-                                    - 数据统计：计算均值、中位数、分布等基本统计量
-                                    - 趋势分析：识别数据中的趋势和模式
-                                    - 异常检测：发现异常值和数据质量问题
-                                    - 分析结论：基于数据给出可执行的建议
-                                    请先使用 read_file 工具获取数据内容，然后进行分析。
-                                    请用中文回答，使用结构化的格式呈现分析结果。
-                                    """)
-                            .model(model)
-                            .toolkit(subToolkit)
-                            .maxIters(5)
-                            .build();
-                })
-                .apply();
+    /**
+     * 根据工具类名创建工具实例
+     */
+    private Object resolveToolInstance(String toolName) {
+        return switch (toolName) {
+            case "FileTools" -> new FileTools(fileRecordRepository, ossService);
+            case "CalculateTools" -> new CalculateTools();
+            default -> {
+                log.warn("未知的工具类名: {}, 已跳过", toolName);
+                yield null;
+            }
+        };
+    }
+
+    /**
+     * 基于启用的技能构建完整的系统提示词
+     */
+    private String buildSystemPrompt(List<Skill> skills) {
+        if (skills.isEmpty()) {
+            return FALLBACK_SYS_PROMPT;
+        }
+        String skillSection = buildSkillSection(skills);
+        return SYS_PROMPT_TEMPLATE.formatted(skillSection);
+    }
+
+    /**
+     * 构建技能列表描述段落
+     */
+    private String buildSkillSection(List<Skill> skills) {
+        if (skills.isEmpty()) {
+            return "";
+        }
+        String skillList = skills.stream()
+                .map(s -> "- call_" + s.getId().replace("-", "_") + ": " + s.getDescription())
+                .collect(Collectors.joining("\n"));
+        return "你有以下专家可以调用：\n" + skillList;
     }
 }
