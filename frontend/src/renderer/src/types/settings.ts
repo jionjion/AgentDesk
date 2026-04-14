@@ -20,11 +20,11 @@ export interface ChangePasswordRequest {
 
 /** 模型配置 */
 export interface ModelSettings {
-    provider: 'dashscope'
-    modelName: string
+    modelId: string
     temperature: number
     maxTokens: number
     topP: number
+    enableThinking: boolean
     systemPrompt: string
 }
 

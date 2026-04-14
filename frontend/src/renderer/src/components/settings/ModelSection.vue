@@ -1,29 +1,19 @@
 <template>
   <div class="space-y-6">
-    <!-- 模型提供商 -->
+    <!-- 模型选择 -->
     <div class="space-y-2">
-      <Label>模型提供商</Label>
-      <Select v-model="form.provider">
-        <SelectTrigger>
-          <SelectValue placeholder="选择提供商"/>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="dashscope">DashScope</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <!-- 模型名称 -->
-    <div class="space-y-2">
-      <Label>模型名称</Label>
-      <Select v-model="form.modelName">
+      <Label>模型</Label>
+      <Select v-model="form.modelId">
         <SelectTrigger>
           <SelectValue placeholder="选择模型"/>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </SelectItem>
+          <template v-for="(models, group) in groupedModels" :key="group">
+            <div class="px-2 py-1.5 text-xs font-medium text-gray-400">{{ group }}</div>
+            <SelectItem v-for="m in models" :key="m.id" :value="m.id">
+              {{ m.displayName }}
+            </SelectItem>
+          </template>
         </SelectContent>
       </Select>
     </div>
@@ -43,7 +33,7 @@
         <Label>最大 Token</Label>
         <span class="text-sm text-gray-500 dark:text-gray-400">{{ form.maxTokens }}</span>
       </div>
-      <Slider v-model="maxTokensValue" :min="256" :max="32768" :step="256"/>
+      <Slider v-model="maxTokensValue" :min="256" :max="65536" :step="256"/>
     </div>
 
     <!-- Top P -->
@@ -53,6 +43,15 @@
         <span class="text-sm text-gray-500 dark:text-gray-400">{{ form.topP }}</span>
       </div>
       <Slider v-model="topPValue" :min="0" :max="100" :step="1"/>
+    </div>
+
+    <!-- 深度思考 -->
+    <div class="flex items-center justify-between">
+      <div>
+        <Label>深度思考</Label>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">启用后模型会展示推理过程（需模型支持）</p>
+      </div>
+      <Switch v-model:checked="form.enableThinking"/>
     </div>
 
     <!-- 系统提示词 -->
@@ -71,32 +70,35 @@
 </template>
 
 <script setup lang="ts">
-import {computed, reactive, ref, watch} from 'vue'
+import {computed, onMounted, reactive, ref, watch} from 'vue'
 import {useSettingsStore} from '@/stores/settings'
 import type {ModelSettings} from '@/types/settings'
 import {Button} from '@/components/ui/button'
 import {Label} from '@/components/ui/label'
 import {Slider} from '@/components/ui/slider'
+import {Switch} from '@/components/ui/switch'
 import {Textarea} from '@/components/ui/textarea'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 
 const settingsStore = useSettingsStore()
 
 const form = reactive<ModelSettings>({
-  provider: 'dashscope',
-  modelName: 'qwen-plus',
+  modelId: 'qwen3.6-plus',
   temperature: 0.7,
   maxTokens: 4096,
   topP: 0.9,
+  enableThinking: false,
   systemPrompt: ''
 })
 const saving = ref(false)
 
-const modelOptions = [
-  {label: 'Qwen Plus', value: 'qwen-plus'},
-  {label: 'Qwen Max', value: 'qwen-max'},
-  {label: 'Qwen Turbo', value: 'qwen-turbo'}
-]
+const groupedModels = computed(() => settingsStore.groupedModels)
+
+onMounted(() => {
+  if (Object.keys(settingsStore.groupedModels).length === 0) {
+    settingsStore.fetchModels()
+  }
+})
 
 // Slider needs array values; temperature/topP are 0-1 mapped to 0-100
 const temperatureValue = computed({

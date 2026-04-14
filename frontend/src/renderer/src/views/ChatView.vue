@@ -82,7 +82,7 @@
         <div class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
           <!-- 隐藏的文件选择器 -->
           <input ref="fileInputRef" type="file" multiple
-                 accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh"
+                 accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh,.png,.jpg,.jpeg,.gif,.webp"
                  class="hidden"
                  @change="handleFileSelect"/>
           <!-- 附件预览区 -->
@@ -122,6 +122,7 @@
               </Button>
             </div>
             <div class="flex items-center gap-2">
+              <ModelSelector/>
               <!-- 发送 / 停止按钮 -->
               <Button
                   v-if="!chatStore.isStreaming"
@@ -161,6 +162,7 @@ import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
 import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
+import ModelSelector from '@/components/chat/ModelSelector.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import type {PlanMessage, ToolCallMessage} from '@/types/chat'
 
