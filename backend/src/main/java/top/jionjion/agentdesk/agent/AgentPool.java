@@ -3,8 +3,12 @@ package top.jionjion.agentdesk.agent;
 import io.agentscope.core.session.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import top.jionjion.agentdesk.repository.SessionRepository;
+import top.jionjion.agentdesk.session.SessionMetadata;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -20,13 +24,15 @@ public class AgentPool {
 
     private final AgentFactory agentFactory;
     private final Session session;
+    private final SessionRepository sessionRepository;
 
     private final ConcurrentHashMap<String, AgentHandle> agents = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicBoolean> busyFlags = new ConcurrentHashMap<>();
 
-    public AgentPool(AgentFactory agentFactory, Session session) {
+    public AgentPool(AgentFactory agentFactory, Session session, SessionRepository sessionRepository) {
         this.agentFactory = agentFactory;
         this.session = session;
+        this.sessionRepository = sessionRepository;
         log.info("Agent 会话状态存储: PostgreSQL (DatabaseSession)");
     }
 
@@ -76,6 +82,35 @@ public class AgentPool {
             } catch (Exception e) {
                 log.warn("删除会话 {} 数据库状态失败: {}", sessionId, e.getMessage());
             }
+        }
+    }
+
+    /**
+     * 使指定会话的 Agent 失效, 下次调用 getOrCreate 时会重建。
+     * 仅移除内存中的引用, 不删除数据库中的对话状态。
+     */
+    public void invalidate(String sessionId) {
+        AgentHandle handle = agents.remove(sessionId);
+        if (handle != null) {
+            log.info("已使会话 {} 的 Agent 失效 (模型切换)", sessionId);
+        }
+    }
+
+    /**
+     * 使指定用户所有会话的 Agent 失效。
+     * 切换模型后调用, 确保后续对话使用新模型。
+     */
+    public void invalidateAll(Long userId) {
+        List<SessionMetadata> sessions = sessionRepository.findByUserId(userId,
+                Sort.by(Sort.Direction.DESC, "lastUsedAt"));
+        int count = 0;
+        for (SessionMetadata s : sessions) {
+            if (agents.remove(s.getId()) != null) {
+                count++;
+            }
+        }
+        if (count > 0) {
+            log.info("已使用户 {} 的 {} 个 Agent 失效 (模型切换)", userId, count);
         }
     }
 

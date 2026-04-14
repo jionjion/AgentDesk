@@ -37,15 +37,18 @@ public class SettingsService {
     private final UserSettingsRepository userSettingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final OssService ossService;
+    private final ModelRegistryService modelRegistryService;
 
     public SettingsService(UserRepository userRepository,
                            UserSettingsRepository userSettingsRepository,
                            PasswordEncoder passwordEncoder,
-                           OssService ossService) {
+                           OssService ossService,
+                           ModelRegistryService modelRegistryService) {
         this.userRepository = userRepository;
         this.userSettingsRepository = userSettingsRepository;
         this.passwordEncoder = passwordEncoder;
         this.ossService = ossService;
+        this.modelRegistryService = modelRegistryService;
     }
 
     /**
@@ -210,6 +213,48 @@ public class SettingsService {
                 .orElse(ModelSettingsDto.defaults());
     }
 
+    /**
+     * 获取用户的 DashScope API Key。
+     * 优先返回用户自定义 Key, 未配置则返回 null (由 ChatModelFactory fallback 到系统 Key)。
+     */
+    public String getDashScopeApiKey(Long userId) {
+        return userSettingsRepository.findByUserId(userId)
+                .map(entity -> parseDashScopeKey(entity.getSettings()))
+                .orElse(null);
+    }
+
+    /**
+     * 更新用户的 DashScope API Key
+     */
+    @Transactional
+    public void updateDashScopeApiKey(Long userId, String apiKey) {
+        UserSettings entity = getOrCreateSettings(userId);
+        ObjectNode root = parseSettingsJson(entity.getSettings());
+
+        ObjectNode providerKeys = root.has("providerKeys")
+                ? (ObjectNode) root.get("providerKeys")
+                : root.putObject("providerKeys");
+        providerKeys.put("dashscope", apiKey);
+
+        entity.setSettings(toJson(root));
+        entity.setUpdatedAt(System.currentTimeMillis());
+        userSettingsRepository.save(entity);
+    }
+
+    /**
+     * 获取脱敏的 DashScope API Key（前端展示用）
+     */
+    public String getMaskedDashScopeKey(Long userId) {
+        String key = getDashScopeApiKey(userId);
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        if (key.length() <= 8) {
+            return "****";
+        }
+        return key.substring(0, 5) + "****" + key.substring(key.length() - 3);
+    }
+
     // ==================== 内部方法 ====================
 
     /**
@@ -251,7 +296,23 @@ public class SettingsService {
             JsonNode root = MAPPER.readTree(json);
             JsonNode modelNode = root.get("model");
             if (modelNode != null) {
-                return MAPPER.treeToValue(modelNode, ModelSettingsDto.class);
+                ModelSettingsDto dto = MAPPER.treeToValue(modelNode, ModelSettingsDto.class);
+                // 向后兼容: 旧数据中可能只有 provider+modelName, 没有 modelId
+                if (dto.modelId() == null || dto.modelId().isBlank()) {
+                    // 旧数据使用 modelName 字段 (如 "qwen-plus"), 直接作为 modelId
+                    String legacyModelName = modelNode.has("modelName")
+                            ? modelNode.get("modelName").asText() : null;
+                    if (legacyModelName != null && !legacyModelName.isBlank()
+                            && modelRegistryService.isValidModelId(legacyModelName)) {
+                        return new ModelSettingsDto(
+                                legacyModelName,
+                                dto.temperature(), dto.maxTokens(), dto.topP(),
+                                dto.enableThinking(), dto.systemPrompt()
+                        );
+                    }
+                    return ModelSettingsDto.defaults();
+                }
+                return dto;
             }
         } catch (JsonProcessingException ignored) {
         }
@@ -278,18 +339,38 @@ public class SettingsService {
         }
     }
 
-    private void validateModelSettings(ModelSettingsDto dto) {
-        if (dto.modelName() == null || dto.modelName().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模型名称不能为空");
+    private String parseDashScopeKey(String json) {
+        try {
+            JsonNode root = MAPPER.readTree(json);
+            JsonNode keysNode = root.get("providerKeys");
+            if (keysNode != null && keysNode.has("dashscope")) {
+                String key = keysNode.get("dashscope").asText();
+                return key.isBlank() ? null : key;
+            }
+        } catch (JsonProcessingException ignored) {
         }
-        if (dto.modelName().length() > 64) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模型名称最长64字符");
+        return null;
+    }
+
+    private void validateModelSettings(ModelSettingsDto dto) {
+        if (dto.modelId() == null || dto.modelId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模型ID不能为空");
+        }
+        if (!modelRegistryService.isValidModelId(dto.modelId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不支持的模型: " + dto.modelId());
         }
         if (dto.temperature() != null && (dto.temperature() < 0.0 || dto.temperature() > 2.0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "temperature 范围: 0.0 ~ 2.0");
         }
-        if (dto.maxTokens() != null && (dto.maxTokens() < 1 || dto.maxTokens() > 32768)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxTokens 范围: 1 ~ 32768");
+        // maxTokens 上限从模型定义中获取
+        if (dto.maxTokens() != null) {
+            int maxAllowed = modelRegistryService.findById(dto.modelId())
+                    .map(ModelDefinition::maxOutputTokens)
+                    .orElse(65536);
+            if (dto.maxTokens() < 1 || dto.maxTokens() > maxAllowed) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "maxTokens 范围: 1 ~ " + maxAllowed);
+            }
         }
         if (dto.topP() != null && (dto.topP() < 0.0 || dto.topP() > 1.0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "topP 范围: 0.0 ~ 1.0");

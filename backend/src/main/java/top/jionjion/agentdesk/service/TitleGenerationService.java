@@ -6,11 +6,11 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.model.GenerateOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import top.jionjion.agentdesk.agent.ChatModelFactory;
+import top.jionjion.agentdesk.dto.ModelSettingsDto;
 
 import java.util.Collections;
 import java.util.List;
@@ -27,16 +27,12 @@ public class TitleGenerationService {
 
     private final DashScopeChatModel model;
 
-    public TitleGenerationService(@Value("${agentscope.dashscope.api-key}") String apiKey) {
-        GenerateOptions options = GenerateOptions.builder()
-                .temperature(0.3)
-                .maxTokens(50)
-                .build();
-        this.model = DashScopeChatModel.builder()
-                .apiKey(apiKey)
-                .modelName("qwen-turbo")
-                .defaultOptions(options)
-                .build();
+    public TitleGenerationService(ChatModelFactory chatModelFactory) {
+        // 标题生成始终使用 qwen-turbo（轻量快速、低成本）
+        ModelSettingsDto titleSettings = new ModelSettingsDto(
+                "qwen-turbo", 0.3, 50, 0.9, false, ""
+        );
+        this.model = chatModelFactory.create(titleSettings);
     }
 
     /**

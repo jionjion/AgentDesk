@@ -3,9 +3,7 @@ package top.jionjion.agentdesk.agent;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.tool.Toolkit;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.dto.ModelSettingsDto;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
@@ -23,35 +21,32 @@ public class AgentFactory {
 
     private static final String DEFAULT_SYS_PROMPT = """
             你是一个名为 Assistant 的智能助手协调者。你可以直接回答简单问题，也可以将复杂任务委派给专业的子助手。
-            
+
             你有以下专家可以调用：
             - call_file_analyzer: 文件分析专家。当用户上传文件并需要分析（CSV结构、代码审查、配置校验、日志分析）时使用。
             - call_writer: 写作助手。当用户需要撰写邮件、润色文本、写周报、编写技术文档时使用。
             - call_coder: 编程助手。当用户需要代码生成、Bug分析、算法讲解、代码优化时使用。
             - call_data_analyst: 数据分析师。当用户上传数据并需要统计分析、趋势分析、异常检测时使用。
-            
+
             当用户上传了文件时，消息中会包含文件的元信息 (文件名、大小、类型、fileId)。
             对于文件相关任务，请将 fileId 传递给相应的子助手。
-            
+
             你也可以直接使用 get_current_time、calculate、read_file 等工具处理简单任务。
             不要猜测文件内容，请先调用 read_file 获取实际内容。
-            
+
             请用中文回答。
             """;
 
-    private final DashScopeChatModel defaultModel;
+    private final ChatModelFactory chatModelFactory;
     private final FileRecordRepository fileRecordRepository;
     private final OssService ossService;
     private final SettingsService settingsService;
 
-    @Value("${agentscope.dashscope.api-key}")
-    private String apiKey;
-
-    public AgentFactory(DashScopeChatModel defaultModel,
+    public AgentFactory(ChatModelFactory chatModelFactory,
                         FileRecordRepository fileRecordRepository,
                         OssService ossService,
                         SettingsService settingsService) {
-        this.defaultModel = defaultModel;
+        this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
         this.settingsService = settingsService;
@@ -71,30 +66,46 @@ public class AgentFactory {
         // 每个 Agent 独立的 Memory
         InMemoryMemory memory = new InMemoryMemory();
 
-        // 读取用户模型配置
-        DashScopeChatModel model = defaultModel;
+        // 读取用户模型配置 + API Key
+        ModelSettingsDto ms = ModelSettingsDto.defaults();
+        String userApiKey = null;
         String sysPrompt = DEFAULT_SYS_PROMPT;
+
         if (UserContext.isAuthenticated()) {
-            ModelSettingsDto ms = settingsService.getModelSettings(UserContext.getUserId());
-            GenerateOptions options = GenerateOptions.builder()
-                    .temperature(ms.temperature())
-                    .topP(ms.topP())
-                    .maxTokens(ms.maxTokens())
-                    .build();
-            model = DashScopeChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(ms.modelName())
-                    .defaultOptions(options)
-                    .build();
+            Long userId = UserContext.getUserId();
+            ms = settingsService.getModelSettings(userId);
+            userApiKey = settingsService.getDashScopeApiKey(userId);
             if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
                 sysPrompt = ms.systemPrompt();
             }
         }
 
-        // Lambda 捕获需要 effectively final
-        final DashScopeChatModel finalModel = model;
+        // 通过工厂创建模型（自动 fallback 到系统默认 Key）
+        DashScopeChatModel model = chatModelFactory.create(ms, userApiKey);
 
-        // 注册子代理: 文件分析专家
+        // 注册子代理（全部使用同一个 model 实例）
+        registerSubAgents(toolkit, model);
+
+        // 构建 ReActAgent
+        ReActAgent agent = ReActAgent.builder()
+                .name("assistant-" + sessionId)
+                .sysPrompt(sysPrompt)
+                .model(model)
+                .toolkit(toolkit)
+                .memory(memory)
+                .enablePlan()
+                .hook(hook)
+                .maxIters(10)
+                .build();
+
+        return new AgentHandle(agent, hook);
+    }
+
+    /**
+     * 注册 4 个子代理，共用同一个 ChatModel 实例
+     */
+    private void registerSubAgents(Toolkit toolkit, DashScopeChatModel model) {
+        // FileAnalyzer
         toolkit.registration()
                 .subAgent(() -> {
                     Toolkit subToolkit = new Toolkit();
@@ -111,14 +122,14 @@ public class AgentFactory {
                                     - 日志文件：提取关键信息、错误模式、时间线
                                     请用中文回答，分析要具体、有条理。
                                     """)
-                            .model(finalModel)
+                            .model(model)
                             .toolkit(subToolkit)
                             .maxIters(5)
                             .build();
                 })
                 .apply();
 
-        // 注册子代理: 写作助手
+        // Writer
         toolkit.registration()
                 .subAgent(() -> ReActAgent.builder()
                         .name("Writer")
@@ -131,12 +142,12 @@ public class AgentFactory {
                                 - 技术文档：清晰准确，适当使用示例
                                 请用中文回答，注重文字质量和结构。
                                 """)
-                        .model(finalModel)
+                        .model(model)
                         .maxIters(3)
                         .build())
                 .apply();
 
-        // 注册子代理: 编程助手
+        // Coder
         toolkit.registration()
                 .subAgent(() -> {
                     Toolkit subToolkit = new Toolkit();
@@ -153,14 +164,14 @@ public class AgentFactory {
                                     你可以使用 calculate 工具验证数学计算。
                                     请用中文回答，代码块使用合适的语言标记。
                                     """)
-                            .model(finalModel)
+                            .model(model)
                             .toolkit(subToolkit)
                             .maxIters(5)
                             .build();
                 })
                 .apply();
 
-        // 注册子代理: 数据分析师
+        // DataAnalyst
         toolkit.registration()
                 .subAgent(() -> {
                     Toolkit subToolkit = new Toolkit();
@@ -177,25 +188,11 @@ public class AgentFactory {
                                     请先使用 read_file 工具获取数据内容，然后进行分析。
                                     请用中文回答，使用结构化的格式呈现分析结果。
                                     """)
-                            .model(finalModel)
+                            .model(model)
                             .toolkit(subToolkit)
                             .maxIters(5)
                             .build();
                 })
                 .apply();
-
-        // 构建 ReActAgent
-        ReActAgent agent = ReActAgent.builder()
-                .name("assistant-" + sessionId)
-                .sysPrompt(sysPrompt)
-                .model(finalModel)
-                .toolkit(toolkit)
-                .memory(memory)
-                .enablePlan()
-                .hook(hook)
-                .maxIters(10)
-                .build();
-
-        return new AgentHandle(agent, hook);
     }
 }
