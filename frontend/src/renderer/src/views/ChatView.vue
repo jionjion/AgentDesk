@@ -75,11 +75,22 @@
           </div>
         </div>
 
+        <!-- 技能状态栏（输入框上方） -->
+        <SkillStatusBar/>
+
         <!-- 任务状态栏（输入框上方） -->
         <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState"/>
 
         <!-- 输入框 -->
-        <div class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <div class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 relative">
+          <!-- 斜杠命令菜单 -->
+          <SlashCommandMenu
+              :show-menu="slashMenuOpen"
+              :selected-index="slashSelectedIndex"
+              :filtered-skills="slashFilteredSkills"
+              @select="slashSelectSkill"
+              @update:selected-index="slashSelectedIndex = $event"
+          />
           <!-- 隐藏的文件选择器 -->
           <input ref="fileInputRef" type="file" multiple
                  accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh,.png,.jpg,.jpeg,.gif,.webp"
@@ -120,6 +131,7 @@
               <Button variant="ghost" size="icon" class="h-8 w-8" @click="fileInputRef?.click()">
                 <Paperclip :size="16"/>
               </Button>
+              <SkillSelector/>
             </div>
             <div class="flex items-center gap-2">
               <ModelSelector/>
@@ -163,7 +175,11 @@ import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
 import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
+import SkillSelector from '@/components/chat/SkillSelector.vue'
+import SkillStatusBar from '@/components/chat/SkillStatusBar.vue'
+import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
+import {useSlashCommand} from '@/composables/useSlashCommand'
 import type {PlanMessage, ToolCallMessage} from '@/types/chat'
 
 const chatStore = useChatStore()
@@ -348,6 +364,8 @@ const messageListRef = ref<HTMLElement>()
 const scrollAnchorRef = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+const {showMenu: slashMenuOpen, selectedIndex: slashSelectedIndex, filteredSkills: slashFilteredSkills, selectSkill: slashSelectSkill, handleKeydown: slashHandleKeydown} = useSlashCommand(inputText)
+
 function handleFileSelect(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files) return
@@ -414,6 +432,8 @@ function fillExample(example: string) {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.isComposing) return
+  // 斜杠命令优先处理
+  if (slashHandleKeydown(e)) return
   const sendKey = settingsStore.app.sendKey
   if (sendKey === 'Ctrl+Enter' && e.key === 'Enter' && e.ctrlKey) {
     e.preventDefault()

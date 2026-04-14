@@ -17,13 +17,7 @@ export interface Channel {
     type: string
 }
 
-export interface Skill {
-    id: string
-    name: string
-    description: string
-    icon: string
-    installed?: boolean
-}
+export type {Skill, SkillFormData} from './skill'
 
 export interface ScheduledTask {
     id: string

@@ -5,17 +5,17 @@
       <div class="flex items-center gap-3">
         <div class="relative w-60">
           <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" :size="16"/>
-          <Input placeholder="搜索技能" class="pl-8"/>
+          <Input v-model="skillsStore.searchQuery" placeholder="搜索技能" class="pl-8"/>
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <Button variant="outline">
-          <Link :size="16" class="mr-1"/>
-          通过搭子创建
+        <Button variant="outline" @click="handleImport">
+          <Upload :size="16" class="mr-1"/>
+          导入技能
         </Button>
-        <Button>
-          <Download :size="16" class="mr-1"/>
-          安装技能
+        <Button @click="openCreateDialog">
+          <Plus :size="16" class="mr-1"/>
+          创建技能
         </Button>
       </div>
     </div>
@@ -23,85 +23,142 @@
     <!-- 内容区 -->
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">技能</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">安装与管理技能，在对话中扩展搭子的能力。</p>
+        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">技能</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 font-normal">管理技能，在对话中扩展 Agent 的能力。启用的技能会自动注册为子代理。</p>
 
-        <!-- 横幅 -->
-        <div class="bg-amber-50 dark:bg-amber-900/30 rounded-xl p-6 mb-6">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-1">为你精选的职场技能</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400">涵盖写作、效率、设计、数据分析等多种特色，一键安装。</p>
-        </div>
-
-        <!-- 标签页 -->
-        <Tabs default-value="marketplace" class="mb-4">
-          <TabsList>
-            <TabsTrigger value="marketplace">技能广场</TabsTrigger>
-            <TabsTrigger value="builtin">内置</TabsTrigger>
-            <TabsTrigger value="installed">
-              用户安装
-              <Badge variant="secondary" class="ml-1.5">1</Badge>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div class="mb-4">
-          <span class="text-sm font-medium text-gray-800 dark:text-gray-200">官方精选</span>
-          <span class="text-xs text-gray-400 dark:text-gray-500 ml-4 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">全部</span>
+        <!-- 分类过滤 -->
+        <div class="flex items-center gap-2 mb-4 flex-wrap">
+          <Badge
+              :variant="!skillsStore.selectedCategory ? 'default' : 'secondary'"
+              class="cursor-pointer"
+              @click="skillsStore.selectedCategory = null"
+          >
+            全部
+          </Badge>
+          <Badge
+              v-for="cat in skillsStore.categories"
+              :key="cat"
+              :variant="skillsStore.selectedCategory === cat ? 'default' : 'secondary'"
+              class="cursor-pointer"
+              @click="skillsStore.selectedCategory = skillsStore.selectedCategory === cat ? null : cat"
+          >
+            {{ cat }}
+          </Badge>
         </div>
 
         <!-- 技能卡片网格 / 空状态 -->
+        <div v-if="skillsStore.loading" class="flex items-center justify-center py-16">
+          <Loader2 :size="24" class="animate-spin text-gray-400"/>
+        </div>
         <EmptyState
-            v-if="skills.length === 0"
+            v-else-if="skillsStore.filteredSkills.length === 0"
             :icon="Sparkles"
             title="还没有技能"
-            description="探索技能广场，安装你需要的技能来扩展搭子的能力"
-            action-label="浏览技能广场"
-            :action-icon="Search"
-            @action="() => {}"
+            :description="skillsStore.searchQuery ? '未找到匹配的技能' : '创建你的第一个技能，扩展 Agent 能力'"
+            action-label="创建技能"
+            :action-icon="Plus"
+            @action="openCreateDialog"
         />
         <div v-else class="grid grid-cols-3 gap-4">
-          <div
-              v-for="skill in skills"
-              :key="skill.name"
-              class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-sm transition-shadow cursor-pointer"
-          >
-            <div class="flex items-start gap-3 mb-2">
-              <div
-                  class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                  :style="{ backgroundColor: skill.bgColor }"
-              >
-                <component :is="skill.icon" :size="20" class="text-gray-600 dark:text-gray-400"/>
-              </div>
-              <div class="min-w-0">
-                <h3 class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ skill.name }}</h3>
-                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2">{{ skill.description }}</p>
-              </div>
-            </div>
-          </div>
+          <SkillCard
+              v-for="skill in skillsStore.filteredSkills"
+              :key="skill.id"
+              :skill="skill"
+              @edit="openEditDialog(skill)"
+              @delete="handleDelete(skill)"
+              @toggle-enabled="skillsStore.toggleSkillEnabled(skill)"
+          />
         </div>
       </div>
     </ScrollArea>
+
+    <!-- 创建/编辑对话框 -->
+    <SkillFormDialog
+        :open="formDialogOpen"
+        :skill="editingSkill"
+        @close="formDialogOpen = false"
+        @saved="formDialogOpen = false"
+    />
+
+    <!-- 删除确认 -->
+    <AlertDialog v-model:open="deleteConfirmOpen">
+      <AlertDialogContent class="max-w-sm">
+        <AlertDialogTitle>确认删除</AlertDialogTitle>
+        <AlertDialogDescription>删除后无法恢复，确定要删除技能「{{ pendingDeleteSkill?.name }}」吗？</AlertDialogDescription>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction @click="confirmDelete">删除</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import {ref} from 'vue'
-import {BarChart3, CalendarDays, Download, FileEdit, Link, Palette, Presentation, Search, SearchCode, Sparkles} from 'lucide-vue-next'
+import {onMounted, ref} from 'vue'
+import {Loader2, Plus, Search, Sparkles, Upload} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Input} from '@/components/ui/input'
 import {Button} from '@/components/ui/button'
 import {Badge} from '@/components/ui/badge'
-import {Tabs, TabsList, TabsTrigger} from '@/components/ui/tabs'
+import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 import EmptyState from '@/components/ui/empty-state/EmptyState.vue'
+import SkillCard from '@/components/skills/SkillCard.vue'
+import SkillFormDialog from '@/components/skills/SkillFormDialog.vue'
+import {useSkillsStore} from '@/stores/skills'
+import type {Skill} from '@/types/skill'
 
-const mockSkills = [
-  {name: '深度研究', icon: SearchCode, bgColor: '#F3F4F6', description: '综合多来源搜索引擎和深度浏览器助手'},
-  {name: '技术图表生成', icon: BarChart3, bgColor: '#F3F4F6', description: '帮你编写名立意图、流程图和时序图'},
-  {name: 'UI 设计师', icon: Palette, bgColor: '#F3F4F6', description: 'Web UI 设计和原型专家'},
-  {name: '搭子演示文稿', icon: Presentation, bgColor: '#F3F4F6', description: '生成搭子风格演示文稿'},
-  {name: 'Notion 信息助手', icon: FileEdit, bgColor: '#F3F4F6', description: '解析整合文本数据生成 Notion 风格内容'},
-  {name: '定制周历生成器', icon: CalendarDays, bgColor: '#F3F4F6', description: '帮助生成定制化的周历'}
-]
+const skillsStore = useSkillsStore()
 
-const skills = ref(mockSkills)
+const formDialogOpen = ref(false)
+const editingSkill = ref<Skill | null>(null)
+const deleteConfirmOpen = ref(false)
+const pendingDeleteSkill = ref<Skill | null>(null)
+
+function openCreateDialog() {
+  editingSkill.value = null
+  formDialogOpen.value = true
+}
+
+function openEditDialog(skill: Skill) {
+  editingSkill.value = skill
+  formDialogOpen.value = true
+}
+
+function handleDelete(skill: Skill) {
+  pendingDeleteSkill.value = skill
+  deleteConfirmOpen.value = true
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteSkill.value) return
+  try {
+    await skillsStore.deleteSkill(pendingDeleteSkill.value.id)
+  } catch (e) {
+    console.error('删除技能失败', e)
+  }
+  deleteConfirmOpen.value = false
+  pendingDeleteSkill.value = null
+}
+
+async function handleImport() {
+  try {
+    const filePath = await window.electronAPI.dialog.openFile({
+      filters: [{name: 'JSON', extensions: ['json']}]
+    })
+    if (!filePath) return
+    const data = await window.electronAPI.fs.readFile(filePath)
+    const text = new TextDecoder().decode(data)
+    const imported = JSON.parse(text)
+    if (imported.id && imported.name && imported.description && imported.systemPrompt) {
+      await skillsStore.saveSkill(imported)
+    }
+  } catch (e) {
+    console.error('导入技能失败', e)
+  }
+}
+
+onMounted(() => {
+  skillsStore.fetchSkills()
+})
 </script>

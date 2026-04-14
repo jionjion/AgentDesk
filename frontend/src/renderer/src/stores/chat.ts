@@ -2,7 +2,7 @@ import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, SSEEventData} from '@/types/chat'
 import {createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
-import {createChatStream, getMessages, interruptChat} from '@/api/chat'
+import {createChatStream, getMessages, interruptChat, searchMessages} from '@/api/chat'
 import {uploadFile} from '@/api/file'
 import {exportToMarkdown} from '@/utils/exportMarkdown'
 

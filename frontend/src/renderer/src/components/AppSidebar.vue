@@ -277,7 +277,7 @@ watch(() => appStore.currentUser.avatar, () => {
 })
 
 const navItems = [
-  {path: '/skills', label: '技能', icon: Ticket, badge: '即将推出', disabled: true},
+  {path: '/skills', label: '技能', icon: Ticket},
   {path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: '即将推出', disabled: true}
 ]
 
