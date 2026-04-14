@@ -122,12 +122,18 @@ public class ChatController {
         handle.agent().stream(userMsg)
                 .doOnComplete(() -> onStreamComplete(sessionId, message, handle, emitter))
                 .doOnError(e -> {
-                    log.error("Agent error: {}", e.getMessage(), e);
+                    if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
+                        log.debug("Session {} Agent流处理中客户端已断开", sessionId);
+                    } else {
+                        log.error("Agent error: {}", e.getMessage(), e);
+                    }
                     try {
-                        sendErrorEvent(emitter, e.getMessage());
+                        if (!handle.hook().isClientDisconnected()) {
+                            sendErrorEvent(emitter, e.getMessage());
+                        }
                         emitter.completeWithError(e);
                     } catch (Exception ex) {
-                        log.warn("Error sending error event: {}", ex.getMessage());
+                        log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
                     }
                 })
                 .doFinally(signal -> agentPool.release(sessionId))
@@ -153,6 +159,7 @@ public class ChatController {
     private void configureSseCallbacks(SseEmitter emitter, String sessionId, AgentHandle handle) {
         emitter.onTimeout(() -> {
             log.warn("Session {} SSE timeout", sessionId);
+            handle.hook().markDisconnected();
             agentPool.release(sessionId);
         });
         emitter.onCompletion(() -> {
@@ -160,10 +167,29 @@ public class ChatController {
             handle.hook().setEmitter(null);
         });
         emitter.onError(e -> {
-            log.warn("Session {} SSE error: {}", sessionId, e.getMessage());
+            // 客户端断开连接是正常情况, 降级为 DEBUG
+            if (isClientDisconnect(e)) {
+                log.debug("Session {} 客户端断开连接", sessionId);
+            } else {
+                log.warn("Session {} SSE error: {}", sessionId, e.getMessage());
+            }
+            handle.hook().markDisconnected();
             agentPool.release(sessionId);
-            handle.hook().setEmitter(null);
         });
+    }
+
+    private boolean isClientDisconnect(Throwable e) {
+        Throwable cause = e;
+        while (cause != null) {
+            String msg = cause.getMessage();
+            if (msg != null && (msg.contains("Broken pipe")
+                    || msg.contains("disconnected client")
+                    || msg.contains("Connection reset"))) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private void onStreamComplete(String sessionId, String message, AgentHandle handle, SseEmitter emitter) {

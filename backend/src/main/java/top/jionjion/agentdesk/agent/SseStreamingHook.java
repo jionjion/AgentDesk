@@ -9,6 +9,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Mono;
 import top.jionjion.agentdesk.dto.ChatEventDto;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,10 +25,25 @@ public class SseStreamingHook implements Hook {
 
     private volatile SseEmitter emitter;
     private volatile String lastReply;
+    /** 标记客户端是否已断开, 避免重复写入已关闭的连接 */
+    private volatile boolean clientDisconnected;
 
     public void setEmitter(SseEmitter emitter) {
         this.emitter = emitter;
         this.lastReply = null;
+        this.clientDisconnected = false;
+    }
+
+    /**
+     * 标记客户端已断开连接
+     */
+    public void markDisconnected() {
+        this.clientDisconnected = true;
+        this.emitter = null;
+    }
+
+    public boolean isClientDisconnected() {
+        return clientDisconnected;
     }
 
     /**
@@ -123,6 +139,9 @@ public class SseStreamingHook implements Hook {
     }
 
     private void sendEvent(String eventName, ChatEventDto data) {
+        if (clientDisconnected) {
+            return;
+        }
         SseEmitter currentEmitter = this.emitter;
         if (currentEmitter == null) {
             return;
@@ -130,6 +149,14 @@ public class SseStreamingHook implements Hook {
         try {
             String json = objectMapper.writeValueAsString(data);
             currentEmitter.send(SseEmitter.event().name(eventName).data(json));
+        } catch (IOException e) {
+            // 客户端断开连接 (Broken pipe), 标记断开并静默处理
+            log.debug("客户端已断开连接, 停止SSE推送, 事件: {}", eventName);
+            markDisconnected();
+        } catch (IllegalStateException e) {
+            // Emitter 已完成或超时
+            log.debug("SSE Emitter 已关闭, 事件: {}, 原因: {}", eventName, e.getMessage());
+            markDisconnected();
         } catch (Exception e) {
             log.debug("Failed to send SSE event {}: {}", eventName, e.getMessage());
         }

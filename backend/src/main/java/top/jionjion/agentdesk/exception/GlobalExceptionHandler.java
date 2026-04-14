@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
@@ -125,10 +126,25 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * SSE/异步请求中客户端断开连接 — 静默处理, 不再尝试写响应体
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncDisconnect(AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        log.debug("客户端已断开连接: {} {}", request.getMethod(), request.getRequestURI());
+    }
+
+    /**
      * 兜底 — 所有未捕获的异常
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAll(Exception ex, HttpServletRequest request) {
+        // SSE 请求中的 IO 异常 (Broken pipe 等) 降级为 WARN, 不输出完整堆栈
+        String contentType = request.getHeader("Accept");
+        if (isSseRequest(contentType) && isBrokenPipe(ex)) {
+            log.debug("SSE客户端断开连接: {} {}", request.getMethod(), request.getRequestURI());
+            return ResponseEntity.noContent().build();
+        }
+
         log.error("未处理异常 at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         ErrorResponse body = new ErrorResponse(
                 500,
@@ -137,5 +153,22 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.internalServerError().body(body);
+    }
+
+    private boolean isSseRequest(String acceptHeader) {
+        return acceptHeader != null && acceptHeader.contains("text/event-stream");
+    }
+
+    private boolean isBrokenPipe(Throwable ex) {
+        Throwable cause = ex;
+        while (cause != null) {
+            if (cause instanceof java.io.IOException
+                    && cause.getMessage() != null
+                    && cause.getMessage().toLowerCase().contains("broken pipe")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 }

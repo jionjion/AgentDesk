@@ -46,7 +46,10 @@ public class TitleGenerationService {
      * @return 生成的标题 (不超过20字)
      */
     public String generateTitle(String userMessage) {
+        long startTime = System.currentTimeMillis();
         try {
+            log.debug("开始生成标题, 模型: qwen-turbo, 消息长度: {}", userMessage.length());
+
             Msg systemMsg = Msg.builder()
                     .role(MsgRole.SYSTEM)
                     .textContent("你是一个标题生成器。根据用户的问题，生成一个简短的会话标题（不超过15个字）。" +
@@ -76,14 +79,30 @@ public class TitleGenerationService {
             }
 
             String title = sb.toString().trim();
+            long elapsed = System.currentTimeMillis() - startTime;
             if (!title.isEmpty()) {
                 if (title.length() > 20) {
                     title = title.substring(0, 20);
                 }
+                log.debug("标题生成成功, 耗时: {}ms, 标题: {}", elapsed, title);
                 return title;
             }
+            log.warn("标题生成返回空内容, 模型: qwen-turbo, 耗时: {}ms", elapsed);
         } catch (Exception e) {
-            log.warn("生成标题失败: {}", e.getMessage());
+            long elapsed = System.currentTimeMillis() - startTime;
+            Throwable root = e;
+            while (root.getCause() != null) {
+                root = root.getCause();
+            }
+            if (root instanceof java.util.concurrent.TimeoutException
+                    || (root.getMessage() != null && root.getMessage().contains("timeout"))) {
+                log.warn("标题生成超时, 模型: qwen-turbo, 耗时: {}ms. 请检查模型服务可用性或网络连接", elapsed);
+            } else if (root instanceof java.net.ConnectException || root instanceof java.net.UnknownHostException) {
+                log.error("标题生成失败: 无法连接模型服务, 耗时: {}ms, 原因: {}", elapsed, root.getMessage());
+            } else {
+                log.warn("标题生成失败, 模型: qwen-turbo, 耗时: {}ms, 异常类型: {}, 原因: {}",
+                        elapsed, root.getClass().getSimpleName(), root.getMessage());
+            }
         }
         return null;
     }
