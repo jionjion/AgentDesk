@@ -136,3 +136,61 @@ COMMENT ON COLUMN agent_desk.user_settings.user_id IS '用户 ID, 一对一';
 COMMENT ON COLUMN agent_desk.user_settings.settings IS '设置内容, JSON 格式';
 
 CREATE INDEX IF NOT EXISTS idx_user_settings_user ON agent_desk.user_settings (user_id);
+
+-- 10. 模型定义表
+CREATE TABLE IF NOT EXISTS agent_desk.model_definitions
+(
+    id                 VARCHAR(64) PRIMARY KEY,
+    display_name       VARCHAR(128) NOT NULL,
+    group_name         VARCHAR(32)  NOT NULL,
+    input_modalities   JSONB        NOT NULL DEFAULT '["text"]',
+    supports_reasoning BOOLEAN      NOT NULL DEFAULT FALSE,
+    max_context_window INTEGER      NOT NULL DEFAULT 131072,
+    max_output_tokens  INTEGER      NOT NULL DEFAULT 8192,
+    description        VARCHAR(256),
+    sort_order         INTEGER      NOT NULL DEFAULT 0,
+    enabled            BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at         BIGINT       NOT NULL,
+    updated_at         BIGINT       NOT NULL
+);
+
+COMMENT ON TABLE agent_desk.model_definitions IS '可用模型定义表';
+COMMENT ON COLUMN agent_desk.model_definitions.id IS '模型ID, 即 DashScope API 的 model 参数';
+COMMENT ON COLUMN agent_desk.model_definitions.display_name IS '前端展示名称';
+COMMENT ON COLUMN agent_desk.model_definitions.group_name IS '分组名称, 如 旗舰模型、轻量快速';
+COMMENT ON COLUMN agent_desk.model_definitions.input_modalities IS '支持的输入模态, JSON数组';
+COMMENT ON COLUMN agent_desk.model_definitions.supports_reasoning IS '是否支持深度思考/推理';
+COMMENT ON COLUMN agent_desk.model_definitions.max_context_window IS '最大上下文窗口(token)';
+COMMENT ON COLUMN agent_desk.model_definitions.max_output_tokens IS '最大输出token数';
+COMMENT ON COLUMN agent_desk.model_definitions.description IS '简要说明';
+COMMENT ON COLUMN agent_desk.model_definitions.sort_order IS '排序权重, 越小越靠前';
+COMMENT ON COLUMN agent_desk.model_definitions.enabled IS '是否启用, 关闭后前端不显示';
+
+CREATE INDEX IF NOT EXISTS idx_model_definitions_enabled ON agent_desk.model_definitions (enabled, sort_order);
+
+-- 初始化模型数据
+INSERT INTO agent_desk.model_definitions (id, display_name, group_name, input_modalities, supports_reasoning, max_context_window, max_output_tokens, description, sort_order, enabled, created_at, updated_at)
+VALUES
+    -- 旗舰模型
+    ('qwen3.6-plus',  'Qwen3.6 Plus',  '旗舰模型', '["text","image","video"]', TRUE,  1000000, 65536, '最新旗舰，多模态推理', 100, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen3.5-plus',  'Qwen3.5 Plus',  '旗舰模型', '["text","image","video"]', TRUE,  1000000, 65536, '上代旗舰多模态',     101, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen3-max',     'Qwen3 Max',     '旗舰模型', '["text"]',                TRUE,  262144,  65536, '文本推理最强',       102, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen-plus',     'Qwen Plus',     '旗舰模型', '["text"]',                TRUE,  1000000, 32768, '高性价比',           103, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    -- 轻量快速
+    ('qwen3.5-flash', 'Qwen3.5 Flash', '轻量快速', '["text","image","video"]', TRUE,  1000000, 65536, '快速多模态',         200, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen-flash',    'Qwen Flash',    '轻量快速', '["text"]',                TRUE,  1000000, 32768, '极速文本',           201, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen-turbo',    'Qwen Turbo',    '轻量快速', '["text"]',                FALSE, 1000000, 8192,  '最快响应',           202, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    -- 代码专精
+    ('qwen3-coder-plus',  'Qwen3 Coder Plus',  '代码专精', '["text"]', FALSE, 1000000, 65536, '代码生成 Plus',  300, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen3-coder-flash', 'Qwen3 Coder Flash', '代码专精', '["text"]', FALSE, 1000000, 65536, '代码生成 Flash', 301, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    -- 视觉理解
+    ('qwen3-vl-plus',  'Qwen3 VL Plus',  '视觉理解', '["text","image","video"]', TRUE,  262144, 32768, '视觉理解 Plus',  400, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen3-vl-flash', 'Qwen3 VL Flash', '视觉理解', '["text","image","video"]', TRUE,  262144, 32768, '视觉理解 Flash', 401, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen-vl-max',    'Qwen VL Max',    '视觉理解', '["text","image","video"]', FALSE, 131072, 32768, '视觉旗舰',       402, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    -- 推理专精
+    ('qwq-plus',            'QwQ Plus',            '推理专精', '["text"]', TRUE,  131072,  8192,  '深度推理',   500, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen-deep-research',  'Qwen Deep Research',  '推理专精', '["text"]', FALSE, 1000000, 32768, '深度研究',   501, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    -- 全模态
+    ('qwen3.5-omni-plus',  'Qwen3.5 Omni Plus',  '全模态', '["text","image","video","audio"]', FALSE, 262144, 65536, '全模态 Plus',  600, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000),
+    ('qwen3.5-omni-flash', 'Qwen3.5 Omni Flash', '全模态', '["text","image","video","audio"]', FALSE, 262144, 65536, '全模态 Flash', 601, TRUE, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000)
+ON CONFLICT (id) DO NOTHING;
