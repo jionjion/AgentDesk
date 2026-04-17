@@ -18,11 +18,4 @@ export interface Channel {
 }
 
 export type {Skill, SkillFormData} from './skill'
-
-export interface ScheduledTask {
-    id: string
-    title: string
-    description: string
-    cron: string
-    enabled: boolean
-}
+export type {ScheduledTask, ScheduledTaskFormData, ScheduledTaskLog} from './scheduledTask'

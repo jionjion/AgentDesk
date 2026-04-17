@@ -126,3 +126,32 @@ html.dark *:hover::-webkit-scrollbar-thumb:hover {
 html ::-webkit-scrollbar-corner {
     background: transparent !important;
 }
+
+/* 修复 reka-ui (Select/Dialog) 打开时给 body 加 scroll-lock margin 导致整页重绘模糊的问题 */
+body[data-scroll-locked] {
+    margin-right: 0 !important;
+    overflow: auto !important;
+}
+
+/* 修复 Electron + Windows 高 DPI 下 Dialog / 下拉面板文字模糊。
+   reka-ui DialogContent 默认用 translate(-50%, -50%) 居中，奇数宽高会落到亚像素；
+   叠加子级 Popper 动画时会反复触发整层重绘，肉眼看就是"打开下拉后整块糊一下"。
+   解决：改用 margin auto 居中（不会产生亚像素 transform）。 */
+.dialog-centered {
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: auto !important;
+    transform: none;
+    /* 只在 open/closed 动画期间应用 zoom 动画类自己的 transform，
+       动画结束后 transform 应回到 none，此时位置由 margin auto 决定（整数像素）。 */
+}
+
+/* Dialog 打开/关闭动画期间允许 transform（由 animate-in/out 类注入），
+   动画结束后回到 transform: none。
+   reka-ui 动画是由 data-state 驱动的一次性动画，animation-fill-mode 默认 forwards 会保留末态，
+   用下面的规则覆盖动画结束态为 none，避免残留 transform 造成亚像素。 */
+.dialog-centered[data-state="open"] {
+    animation-fill-mode: none;
+}

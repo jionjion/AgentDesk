@@ -278,7 +278,7 @@ watch(() => appStore.currentUser.avatar, () => {
 
 const navItems = [
   {path: '/skills', label: '技能', icon: Ticket},
-  {path: '/scheduled-tasks', label: '定时任务', icon: Timer, badge: '即将推出', disabled: true}
+  {path: '/scheduled-tasks', label: '定时任务', icon: Timer}
 ]
 
 const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [
