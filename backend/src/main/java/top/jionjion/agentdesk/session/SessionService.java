@@ -83,6 +83,21 @@ public class SessionService {
     }
 
     /**
+     * 批量删除当前用户的会话
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteBatch(List<String> ids) {
+        Long userId = UserContext.getUserId();
+        for (String id : ids) {
+            sessionRepository.findByIdAndUserId(id, userId).ifPresent(m -> {
+                chatMessageRepository.deleteBySessionId(id);
+                sessionRepository.deleteById(id);
+                agentPool.remove(id);
+            });
+        }
+    }
+
+    /**
      * 更新当前用户的会话标题
      */
     public SessionResponse updateTitle(String id, String title) {

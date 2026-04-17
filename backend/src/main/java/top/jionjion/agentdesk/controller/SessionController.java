@@ -62,6 +62,15 @@ public class SessionController {
     }
 
     /**
+     * 批量删除会话
+     */
+    @DeleteMapping("/batch")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBatch(@RequestBody List<String> ids) {
+        sessionService.deleteBatch(ids);
+    }
+
+    /**
      * 更新会话标题
      */
     @PutMapping("/{id}")

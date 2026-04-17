@@ -115,7 +115,7 @@ public class SseStreamingHook implements Hook {
                     String reason = finalMsg != null && finalMsg.getGenerateReason() != null
                             ? finalMsg.getGenerateReason().name() : "MODEL_STOP";
                     lastReply = content;
-                    sendEvent("agent_complete", ChatEventDto.agentComplete(content, reason));
+                    sendEvent("agent_complete", ChatEventDto.agentComplete(content, reason, null));
                 }
 
                 case ErrorEvent e -> {
