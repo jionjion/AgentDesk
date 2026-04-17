@@ -65,4 +65,16 @@ public class OssService {
             throw new RuntimeException("读取 OSS 文件失败: " + key, e);
         }
     }
+
+    /**
+     * 从 OSS 读取文件内容为字节数组 (用于图片 Base64 编码等场景)
+     */
+    public byte[] readAsBytes(String key) {
+        OSSObject object = ossClient.getObject(ossProperties.getBucket(), key);
+        try (InputStream is = object.getObjectContent()) {
+            return is.readAllBytes();
+        } catch (IOException e) {
+            throw new RuntimeException("读取 OSS 文件失败: " + key, e);
+        }
+    }
 }

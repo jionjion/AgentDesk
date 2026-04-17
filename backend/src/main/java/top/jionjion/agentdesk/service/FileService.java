@@ -12,6 +12,7 @@ import top.jionjion.agentdesk.security.UserContext;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -91,6 +92,17 @@ public class FileService {
     public List<FileResponse> getByIds(List<Long> ids) {
         return fileRecordRepository.findByIdIn(ids)
                 .stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * 读取图片文件并返回 Base64 编码字符串 (备选方案: 当 OSS 预签名 URL 不可用时使用)
+     */
+    public String readImageAsBase64(Long fileId) {
+        Long userId = UserContext.getUserId();
+        FileRecord record = fileRecordRepository.findByIdAndUserId(fileId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文件不存在"));
+        byte[] bytes = ossService.readAsBytes(record.getOssKey());
+        return Base64.getEncoder().encodeToString(bytes);
     }
 
     private FileResponse toResponse(FileRecord r) {

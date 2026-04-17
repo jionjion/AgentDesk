@@ -1,7 +1,7 @@
 package top.jionjion.agentdesk.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -29,10 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -53,6 +50,9 @@ public class ChatController {
     private static final String FORMAT_KB = "%.1fKB";
     private static final String FORMAT_MB = "%.1fMB";
     private static final String UNIT_BYTE = "B";
+    private static final Set<String> IMAGE_CONTENT_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/gif", "image/webp"
+    );
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
@@ -117,16 +117,29 @@ public class ChatController {
                 : fileService.getByIds(parsedFileIds);
 
         // 拼接带文件信息的 prompt
-        String enrichedMessage = buildMessageWithFiles(message, files);
+        List<FileResponse> imageFiles = files.stream()
+                .filter(f -> isImageFile(f.contentType()))
+                .toList();
+        List<FileResponse> nonImageFiles = files.stream()
+                .filter(f -> !isImageFile(f.contentType()))
+                .toList();
 
         // 持久化用户消息 (含 fileIds)
         saveUserMessage(sessionId, message, parsedFileIds);
 
         configureSseCallbacks(emitter, sessionId, handle);
 
-        Msg userMsg = Msg.builder()
-                .textContent(enrichedMessage)
-                .build();
+        Msg userMsg;
+        if (imageFiles.isEmpty()) {
+            // 纯文本路径 (无图片附件)
+            String enrichedMessage = buildMessageWithFiles(message, nonImageFiles);
+            userMsg = Msg.builder()
+                    .textContent(enrichedMessage)
+                    .build();
+        } else {
+            // 多模态路径 (含图片附件)
+            userMsg = buildMultimodalMsg(message, imageFiles, nonImageFiles);
+        }
 
         handle.agent().stream(userMsg)
                 .doOnComplete(() -> onStreamComplete(sessionId, message, handle, emitter))
@@ -422,6 +435,38 @@ public class ChatController {
         sb.append("\n[用户消息]\n");
         sb.append(message);
         return sb.toString();
+    }
+
+    /**
+     * 判断是否为图片文件
+     */
+    private boolean isImageFile(String contentType) {
+        return contentType != null && IMAGE_CONTENT_TYPES.contains(contentType.toLowerCase());
+    }
+
+    /**
+     * 构建多模态消息 (含图片 ImageBlock)
+     */
+    private Msg buildMultimodalMsg(String message, List<FileResponse> imageFiles, List<FileResponse> nonImageFiles) {
+        List<ContentBlock> blocks = new ArrayList<>();
+
+        // 文本块: 用户消息 + 非图片文件描述
+        String textPart = buildMessageWithFiles(message, nonImageFiles);
+        blocks.add(TextBlock.builder().text(textPart).build());
+
+        // 图片块: 使用 OSS 预签名 URL
+        for (FileResponse img : imageFiles) {
+            blocks.add(ImageBlock.builder()
+                    .source(URLSource.builder()
+                            .url(img.downloadUrl())
+                            .build())
+                    .build());
+        }
+
+        return Msg.builder()
+                .role(MsgRole.USER)
+                .content(blocks)
+                .build();
     }
 
     private String formatSize(long bytes) {
