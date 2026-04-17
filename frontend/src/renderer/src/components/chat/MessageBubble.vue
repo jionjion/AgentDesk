@@ -21,10 +21,6 @@
           <!-- 展开的内容 -->
           <div v-if="!contentCollapsed" class="px-3 py-2 border-t border-gray-100 dark:border-gray-700">
             <div class="markdown-body text-xs overflow-hidden" v-html="renderedContent"/>
-            <span
-                v-if="(message as AssistantMessage).isStreaming"
-                class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
-            />
           </div>
         </div>
       </div>
@@ -124,10 +120,6 @@
                   {{ contentCollapsed ? '展开全文...' : '收起' }}
                 </button>
               </template>
-              <span
-                  v-if="(message as AssistantMessage).isStreaming"
-                  class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"
-              />
               <!-- 计划确认操作卡片 -->
               <div v-if="showPlanConfirm" class="mt-3 flex gap-2">
                 <button
@@ -287,6 +279,20 @@ function toggleToolCall(id: string) {
   expandedToolCalls.value = new Set(expandedToolCalls.value)
 }
 
+const CURSOR_HTML = '<span class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"></span>'
+
+/** 将光标注入到 HTML 最后一个块级闭合标签之前，使其与最后一行文字同行 */
+function injectCursor(html: string): string {
+  const blockCloseRe = /<\/(p|li|td|th|h[1-6]|div|pre|blockquote)>\s*$/i
+  const m = html.match(blockCloseRe)
+  if (m) {
+    const idx = html.lastIndexOf(m[0])
+    return html.slice(0, idx) + CURSOR_HTML + html.slice(idx)
+  }
+  // 没有块级标签则直接追加
+  return html + CURSOR_HTML
+}
+
 /**
  * 将原始 markdown 按 subtask_done / tool_call 标记分段
  * 每段后面附带对应的子任务卡片或工具调用数据
@@ -330,13 +336,27 @@ const contentSegments = computed<ContentSegment[]>(() => {
     segments.push({html: marked.parse(remaining) as string})
   }
 
+  // 流式输出时，将光标注入最后一个有 html 的段落
+  if ((props.message as AssistantMessage).isStreaming) {
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (segments[i].html) {
+        segments[i] = {...segments[i], html: injectCursor(segments[i].html!)}
+        break
+      }
+    }
+  }
+
   return segments
 })
 
 const renderedContent = computed(() => {
   const content = (props.message as AssistantMessage).content || ''
   const clean = content.replace(new RegExp(ANY_MARKER.source, 'g'), '')
-  return marked.parse(clean) as string
+  let html = marked.parse(clean) as string
+  if ((props.message as AssistantMessage).isStreaming) {
+    html = injectCursor(html)
+  }
+  return html
 })
 
 function handleCopyContent() {
