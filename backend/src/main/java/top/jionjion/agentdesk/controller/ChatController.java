@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.message.Msg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -17,11 +19,16 @@ import top.jionjion.agentdesk.dto.FileResponse;
 import top.jionjion.agentdesk.dto.SearchResultDto;
 import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
+import top.jionjion.agentdesk.repository.SessionRepository;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.FileService;
 import top.jionjion.agentdesk.service.TitleGenerationService;
 import top.jionjion.agentdesk.session.SessionService;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -49,15 +56,17 @@ public class ChatController {
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
+    private final SessionRepository sessionRepository;
     private final SessionService sessionService;
     private final FileService fileService;
     private final TitleGenerationService titleGenerationService;
 
     public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository,
-                          SessionService sessionService, FileService fileService,
-                          TitleGenerationService titleGenerationService) {
+                          SessionRepository sessionRepository, SessionService sessionService,
+                          FileService fileService, TitleGenerationService titleGenerationService) {
         this.agentPool = agentPool;
         this.chatMessageRepository = chatMessageRepository;
+        this.sessionRepository = sessionRepository;
         this.sessionService = sessionService;
         this.fileService = fileService;
         this.titleGenerationService = titleGenerationService;
@@ -196,7 +205,14 @@ public class ChatController {
         try {
             String reply = handle.hook().getLastReply();
             if (reply != null && !reply.isEmpty()) {
-                chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
+                ChatMessage saved = chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
+                // 发送 message_saved 事件, 携带数据库消息ID, 供前端更新本地ID
+                try {
+                    String json = OBJECT_MAPPER.writeValueAsString(Map.of("messageId", saved.getId()));
+                    emitter.send(SseEmitter.event().name("message_saved").data(json));
+                } catch (Exception ex) {
+                    log.debug("Failed to send message_saved event: {}", ex.getMessage());
+                }
             }
             agentPool.save(sessionId);
             sessionService.touch(sessionId);
@@ -218,6 +234,109 @@ public class ChatController {
                 }
             });
         }
+    }
+
+    /**
+     * 导出会话聊天记录为 Markdown 文件
+     */
+    @GetMapping("/export/{sessionId}")
+    public ResponseEntity<byte[]> exportMarkdown(@PathVariable String sessionId) {
+        validateSessionId(sessionId);
+        Long userId = UserContext.getUserId();
+
+        var session = sessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在"));
+
+        List<ChatMessage> messages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+
+        String markdown = buildExportMarkdown(session.getTitle(), messages);
+        byte[] content = markdown.getBytes(StandardCharsets.UTF_8);
+
+        String filename = session.getTitle().replaceAll("[^a-zA-Z0-9\\u4e00-\\u9fff_-]", "_") + ".md";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("text/markdown; charset=UTF-8"))
+                .body(content);
+    }
+
+    /**
+     * 重新生成 Assistant 的回复 (SSE 流式)
+     */
+    @RateLimit(maxRequests = 10, windowSeconds = 60, message = "对话请求过于频繁, 请稍后再试")
+    @GetMapping(value = "/regenerate", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter regenerate(@RequestParam String sessionId,
+                                 @RequestParam Long messageId) {
+        validateSessionId(sessionId);
+        if (!sessionService.belongsToUser(sessionId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
+        }
+
+        // 查找目标 assistant 消息
+        ChatMessage targetMsg = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
+        if (!targetMsg.getSessionId().equals(sessionId) || !"assistant".equals(targetMsg.getRole())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "只能重新生成助手消息");
+        }
+
+        // 查找触发该回复的用户消息（createdAt 在目标消息之前、最近的一条 user 消息）
+        List<ChatMessage> history = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        String userMessage = null;
+        for (int i = 0; i < history.size(); i++) {
+            if (history.get(i).getId().equals(messageId) && i > 0) {
+                // 往前找最近的 user 消息
+                for (int j = i - 1; j >= 0; j--) {
+                    if ("user".equals(history.get(j).getRole())) {
+                        userMessage = history.get(j).getContent();
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        if (userMessage == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未找到对应的用户消息");
+        }
+
+        if (!agentPool.tryAcquire(sessionId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
+        }
+
+        // 删除旧的 assistant 消息
+        chatMessageRepository.deleteById(messageId);
+
+        // 使 agent 失效并重建
+        agentPool.invalidate(sessionId);
+        AgentHandle handle = agentPool.getOrCreate(sessionId);
+        SseEmitter emitter = new SseEmitter(300_000L);
+        handle.hook().setEmitter(emitter);
+
+        configureSseCallbacks(emitter, sessionId, handle);
+
+        String finalUserMessage = userMessage;
+        Msg userMsg = Msg.builder().textContent(finalUserMessage).build();
+
+        handle.agent().stream(userMsg)
+                .doOnComplete(() -> onStreamComplete(sessionId, finalUserMessage, handle, emitter))
+                .doOnError(e -> {
+                    if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
+                        log.debug("Session {} Agent流处理中客户端已断开", sessionId);
+                    } else {
+                        log.error("Regenerate error: {}", e.getMessage(), e);
+                    }
+                    try {
+                        if (!handle.hook().isClientDisconnected()) {
+                            sendErrorEvent(emitter, e.getMessage());
+                        }
+                        emitter.completeWithError(e);
+                    } catch (Exception ex) {
+                        log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
+                    }
+                })
+                .doFinally(signal -> agentPool.release(sessionId))
+                .subscribe();
+
+        return emitter;
     }
 
     /**
@@ -313,5 +432,26 @@ public class ChatController {
             return String.format(FORMAT_KB, bytes / KB_DIVISOR);
         }
         return String.format(FORMAT_MB, bytes / (KB_DIVISOR * BYTES_PER_KB));
+    }
+
+    private static final DateTimeFormatter DATETIME_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
+    private String buildExportMarkdown(String title, List<ChatMessage> messages) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# ").append(title).append("\n\n");
+        sb.append("> 导出时间: ").append(DATETIME_FMT.format(Instant.now())).append("\n\n");
+
+        for (ChatMessage msg : messages) {
+            if (!"user".equals(msg.getRole()) && !"assistant".equals(msg.getRole())) {
+                continue;
+            }
+            sb.append("---\n\n");
+            String roleName = "user".equals(msg.getRole()) ? "用户" : "助手";
+            String time = DATETIME_FMT.format(Instant.ofEpochMilli(msg.getCreatedAt()));
+            sb.append("**").append(roleName).append("** (").append(time).append(")\n\n");
+            sb.append(msg.getContent() != null ? msg.getContent() : "").append("\n\n");
+        }
+        return sb.toString();
     }
 }

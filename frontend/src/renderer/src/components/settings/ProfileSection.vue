@@ -28,16 +28,23 @@
     <!-- 昵称 -->
     <div class="space-y-2">
       <Label>昵称</Label>
-      <Input v-model="form.nickname" placeholder="输入你的昵称"/>
+      <Input v-model="form.nickname" :placeholder="settingsStore.profile?.nickname || '输入你的昵称'"/>
     </div>
 
     <!-- 修改密码 -->
-    <div>
-      <Button variant="outline" @click="showPasswordDialog = true">
-        <KeyRound :size="16" class="mr-1"/>
-        修改密码
-      </Button>
+    <div class="space-y-2">
+      <Label>当前密码</Label>
+      <Input v-model="passwordForm.oldPassword" type="password" placeholder="请输入当前密码"/>
     </div>
+    <div class="space-y-2">
+      <Label>新密码</Label>
+      <Input v-model="passwordForm.newPassword" type="password" placeholder="至少 6 个字符"/>
+    </div>
+    <div class="space-y-2">
+      <Label>确认密码</Label>
+      <Input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码"/>
+    </div>
+    <p v-if="passwordError" class="text-sm text-red-500">{{ passwordError }}</p>
 
     <!-- 保存 -->
     <div class="flex justify-end">
@@ -45,20 +52,17 @@
         {{ saving ? '保存中...' : '保存' }}
       </Button>
     </div>
-
-    <ChangePasswordDialog v-model:open="showPasswordDialog"/>
   </div>
 </template>
 
 <script setup lang="ts">
 import {reactive, ref, watch} from 'vue'
-import {Camera as CameraIcon, KeyRound, Loader2, User as UserIcon} from 'lucide-vue-next'
+import {Camera as CameraIcon, Loader2, User as UserIcon} from 'lucide-vue-next'
 import {useSettingsStore} from '@/stores/settings'
 import {useAuthStore} from '@/stores/auth'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
-import ChangePasswordDialog from './ChangePasswordDialog.vue'
 
 const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
@@ -67,7 +71,12 @@ const form = reactive({
   nickname: '',
   avatar: ''
 })
-const showPasswordDialog = ref(false)
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+const passwordError = ref('')
 const saving = ref(false)
 const uploadingAvatar = ref(false)
 const avatarError = ref(false)
@@ -122,13 +131,40 @@ async function handleAvatarSelect(e: Event) {
 }
 
 async function handleSave() {
+  // 如果填写了密码字段，先校验并修改密码
+  const hasPassword = passwordForm.oldPassword || passwordForm.newPassword || passwordForm.confirmPassword
+  if (hasPassword) {
+    passwordError.value = ''
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      passwordError.value = '两次输入的密码不一致'
+      return
+    }
+    if (passwordForm.newPassword.length < 6) {
+      passwordError.value = '新密码至少 6 个字符'
+      return
+    }
+  }
+
   saving.value = true
   try {
+    if (hasPassword) {
+      await settingsStore.doChangePassword({
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword
+      })
+      passwordForm.oldPassword = ''
+      passwordForm.newPassword = ''
+      passwordForm.confirmPassword = ''
+      passwordError.value = ''
+    }
     await settingsStore.saveProfile(form)
-    // 同步到 auth store
     if (authStore.user) {
       authStore.user.nickname = form.nickname
       authStore.user.avatar = form.avatar
+    }
+  } catch (e: any) {
+    if (hasPassword) {
+      passwordError.value = e.response?.data?.message || '修改失败，请重试'
     }
   } finally {
     saving.value = false

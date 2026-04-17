@@ -1,7 +1,6 @@
 <template>
-  <ContextMenu>
-    <ContextMenuTrigger as-child>
-      <!-- 子任务执行输出：以卡片形式展示 -->
+  <div>
+    <!-- 子任务执行输出：以卡片形式展示 -->
       <div v-if="subtaskOutput && subtaskName && !isUser" ref="bubbleRef" class="my-1 mx-11">
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
           <!-- 卡片头部：子任务名 + 状态 -->
@@ -40,7 +39,7 @@
           {{ isUser ? '你' : 'AI' }}
         </div>
         <!-- 消息内容 -->
-        <div class="max-w-[75%] min-w-0">
+        <div class="max-w-[75%] min-w-0 group/bubble">
           <div
               class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
               :class="isUser
@@ -146,26 +145,37 @@
               </div>
             </div>
           </div>
+          <!-- 悬停工具栏 -->
+          <div
+              v-if="!isUser && !(message as AssistantMessage).isStreaming"
+              class="flex items-center gap-0.5 mt-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity"
+          >
+            <button
+                class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="复制"
+                @click="handleCopyContent"
+            >
+              <Copy :size="14"/>
+            </button>
+            <button
+                class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="重新生成"
+                @click="handleRegenerate"
+            >
+              <RefreshCw :size="14"/>
+            </button>
+            <button
+                class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-red-500 transition-colors"
+                title="删除"
+                @click="handleDelete"
+            >
+              <Trash2 :size="14"/>
+            </button>
+          </div>
         </div>
       </div>
-    </ContextMenuTrigger>
-    <ContextMenuContent class="w-36">
-      <ContextMenuItem class="cursor-pointer" @select="handleCopyContent">
-        <Copy :size="14"/>
-        <span>复制</span>
-      </ContextMenuItem>
-      <ContextMenuItem v-if="!isUser" class="cursor-pointer" @select="handleRegenerate">
-        <RefreshCw :size="14"/>
-        <span>重新生成</span>
-      </ContextMenuItem>
-      <ContextMenuSeparator/>
-      <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDelete">
-        <Trash2 :size="14"/>
-        <span>删除</span>
-      </ContextMenuItem>
-    </ContextMenuContent>
-  </ContextMenu>
 
+  </div>
   <!-- 删除确认对话框 -->
   <AlertDialog v-model:open="deleteConfirmOpen">
     <AlertDialogContent class="max-w-sm">
@@ -186,7 +196,6 @@ import hljs from 'highlight.js'
 import {CheckCircle2, ChevronRight, Copy, FileText, Loader2, RefreshCw, Settings2, Trash2} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
 import {useChatStore} from '@/stores/chat'
-import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger} from '@/components/ui/context-menu'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 
 const marked = new Marked()

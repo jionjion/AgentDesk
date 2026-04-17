@@ -21,6 +21,11 @@ export function deleteSession(id: string) {
     return request.delete(`/api/sessions/${id}`)
 }
 
+/** 批量删除会话 */
+export function batchDeleteSessions(ids: string[]) {
+    return request.delete('/api/sessions/batch', {data: ids})
+}
+
 /** 更新会话标题 */
 export function updateSessionTitle(id: string, title: string) {
     return request.put<ChatSession>(`/api/sessions/${id}`, {title})

@@ -1,6 +1,6 @@
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="w-[90vw] max-w-3xl min-w-[320px] p-0 gap-0">
+    <DialogContent class="w-[90vw] max-w-2xl min-w-[320px] max-h-[70vh] p-0 gap-0 flex flex-col">
       <!-- 搜索输入框 -->
       <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <Search :size="18" class="text-gray-400 flex-shrink-0"/>
@@ -22,27 +22,27 @@
       </div>
 
       <!-- 搜索结果 -->
-      <ScrollArea class="h-[50vh] min-h-[200px]">
-        <!-- 加载中 -->
-        <div v-if="loading" class="flex items-center justify-center py-8">
-          <Loader2 :size="20" class="animate-spin text-gray-400"/>
-          <span class="ml-2 text-sm text-gray-400">搜索中...</span>
-        </div>
+      <!-- 加载中 -->
+      <div v-if="loading" class="flex-1 flex items-center justify-center">
+        <Loader2 :size="20" class="animate-spin text-gray-400"/>
+        <span class="ml-2 text-sm text-gray-400">搜索中...</span>
+      </div>
 
-        <!-- 无结果 -->
-        <div v-else-if="keyword && !loading && results.length === 0 && searched" class="py-8 text-center">
-          <SearchX :size="32" class="mx-auto text-gray-300 dark:text-gray-600 mb-2"/>
-          <p class="text-sm text-gray-400">未找到相关消息</p>
-        </div>
+      <!-- 无结果 -->
+      <div v-else-if="keyword && !loading && results.length === 0 && searched" class="flex-1 flex flex-col items-center justify-center">
+        <SearchX :size="32" class="text-gray-300 dark:text-gray-600 mb-2"/>
+        <p class="text-sm text-gray-400">未找到相关消息</p>
+      </div>
 
-        <!-- 初始状态 -->
-        <div v-else-if="!keyword && results.length === 0" class="py-8 text-center">
-          <Search :size="32" class="mx-auto text-gray-300 dark:text-gray-600 mb-2"/>
-          <p class="text-sm text-gray-400">输入关键词搜索聊天记录</p>
-        </div>
+      <!-- 初始状态 -->
+      <div v-else-if="!keyword && results.length === 0" class="flex-1 flex flex-col items-center justify-center">
+        <Search :size="32" class="text-gray-300 dark:text-gray-600 mb-2"/>
+        <p class="text-sm text-gray-400">输入关键词搜索聊天记录</p>
+      </div>
 
-        <!-- 结果列表 (按会话分组) -->
-        <div v-else class="py-1">
+      <!-- 结果列表 (按会话分组) -->
+      <ScrollArea v-else class="flex-1 min-h-0">
+        <div class="py-1">
           <div v-for="group in groupedResults" :key="group.sessionId" class="mb-1">
             <div class="px-4 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 sticky top-0">
               {{ group.sessionTitle }}

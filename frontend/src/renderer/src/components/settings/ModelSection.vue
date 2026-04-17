@@ -56,7 +56,21 @@
 
     <!-- 系统提示词 -->
     <div class="space-y-2">
-      <Label>系统提示词</Label>
+      <div class="flex items-center justify-between">
+        <Label>系统提示词</Label>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="sm" class="h-6 px-2 text-xs text-gray-500">
+              选择模板
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-48">
+            <DropdownMenuItem v-for="tpl in promptTemplates" :key="tpl.label" @click="form.systemPrompt = tpl.content">
+              {{ tpl.label }}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <Textarea v-model="form.systemPrompt" :rows="4" placeholder="输入系统提示词（可选）"/>
     </div>
 
@@ -79,6 +93,7 @@ import {Slider} from '@/components/ui/slider'
 import {Switch} from '@/components/ui/switch'
 import {Textarea} from '@/components/ui/textarea'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
 
 const settingsStore = useSettingsStore()
 
@@ -93,6 +108,15 @@ const form = reactive<ModelSettings>({
 const saving = ref(false)
 
 const groupedModels = computed(() => settingsStore.groupedModels)
+
+const promptTemplates = [
+  {label: '翻译助手', content: '你是一个专业翻译。请将用户输入的内容翻译为目标语言，保持原文语义和风格，不要添加解释。如果用户未指定目标语言，默认翻译为中文。'},
+  {label: '代码审查', content: '你是一位资深软件工程师。请审查用户提供的代码，关注：潜在 Bug、性能问题、安全隐患、代码风格和最佳实践。给出具体的改进建议和修改示例。'},
+  {label: '写作润色', content: '你是一位专业编辑。请润色用户提供的文本，改善表达、修正语法、优化结构，保持原意不变。润色后请简要说明主要修改点。'},
+  {label: '知识问答', content: '你是一个知识渊博的助手。请准确、简洁地回答用户的问题。如果不确定答案，请如实说明，不要编造信息。'},
+  {label: '数据分析', content: '你是一位数据分析专家。请帮助用户分析数据、生成图表建议、编写数据处理代码、解读统计结果。注重数据的准确性和分析的严谨性。'},
+  {label: '清除', content: ''}
+]
 
 onMounted(() => {
   if (Object.keys(settingsStore.groupedModels).length === 0) {

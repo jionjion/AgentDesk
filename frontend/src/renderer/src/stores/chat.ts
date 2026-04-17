@@ -1,10 +1,9 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, SSEEventData} from '@/types/chat'
-import {createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
-import {createChatStream, getMessages, interruptChat, searchMessages} from '@/api/chat'
+import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
+import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, searchMessages} from '@/api/chat'
 import {uploadFile} from '@/api/file'
-import {exportToMarkdown} from '@/utils/exportMarkdown'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -181,6 +180,185 @@ export const useChatStore = defineStore('chat', () => {
         pendingAttachments.value = []
     }
 
+    /** 设置 SSE 事件监听 (sendMessage 和 regenerateMessage 共用) */
+    function setupSSEListeners(es: EventSource, sessionId: string, assistantMsgId: string) {
+        const getAssistantMsg = (): AssistantMessage | undefined => {
+            const msgs = messagesBySession.value[sessionId]
+            return msgs?.findLast(m => m.role === 'assistant') as AssistantMessage | undefined
+        }
+
+        es.addEventListener('text_chunk', (e: MessageEvent) => {
+            const data: SSEEventData = JSON.parse(e.data)
+            const msg = getAssistantMsg()
+            if (msg && data.content) {
+                msg.content += data.content
+            }
+        })
+
+        es.addEventListener('thinking_chunk', (e: MessageEvent) => {
+            const data: SSEEventData = JSON.parse(e.data)
+            const msgs = messagesBySession.value[sessionId]
+            if (!msgs) return
+            const lastThinking = msgs.findLast(m => m.role === 'thinking' && !m.isCollapsed)
+            if (lastThinking && lastThinking.role === 'thinking') {
+                lastThinking.content += data.content || ''
+            } else {
+                const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)
+                const thinkingMsg: ChatMessage = {
+                    id: generateId(),
+                    role: 'thinking',
+                    content: data.content || '',
+                    isCollapsed: false
+                }
+                if (assistantIdx >= 0) {
+                    msgs.splice(assistantIdx, 0, thinkingMsg)
+                } else {
+                    msgs.push(thinkingMsg)
+                }
+            }
+        })
+
+        es.addEventListener('tool_call_start', (e: MessageEvent) => {
+            const data: SSEEventData = JSON.parse(e.data)
+            const msgs = messagesBySession.value[sessionId]
+            if (!msgs) return
+
+            const planTool = isPlanTool(data.toolName || '')
+
+            if (data.toolName === 'finish_subtask') {
+                const currentAssistant = getAssistantMsg()
+                if (currentAssistant) {
+                    const idx = data.arguments?.subtask_idx ?? data.arguments?.subtask_index ?? ''
+                    currentAssistant.content += `\n<!-- subtask_done:${idx} -->\n`
+                }
+            }
+
+            const newMsg: ChatMessage = planTool
+                ? {
+                    id: generateId(),
+                    role: 'plan',
+                    toolName: data.toolName || '',
+                    arguments: data.arguments || {},
+                    result: undefined
+                }
+                : {
+                    id: generateId(),
+                    role: 'tool_call',
+                    toolName: data.toolName || '',
+                    toolId: data.toolId || '',
+                    arguments: data.arguments || {},
+                    status: 'calling'
+                }
+
+            if (!planTool) {
+                const currentAssistant = getAssistantMsg()
+                if (currentAssistant) {
+                    currentAssistant.content += `\n<!-- tool_call:${newMsg.id} -->\n`
+                }
+            }
+
+            const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)
+            if (assistantIdx >= 0) {
+                msgs.splice(assistantIdx, 0, newMsg)
+            } else {
+                msgs.push(newMsg)
+            }
+        })
+
+        es.addEventListener('tool_call_end', (e: MessageEvent) => {
+            const data: SSEEventData = JSON.parse(e.data)
+            const msgs = messagesBySession.value[sessionId]
+            if (!msgs) return
+
+            for (let i = msgs.length - 1; i >= 0; i--) {
+                const m = msgs[i]
+                if (m.role === 'tool_call' && m.toolName === data.toolName && m.status === 'calling') {
+                    m.result = data.result
+                    m.status = 'done'
+                    break
+                }
+                if (m.role === 'plan' && m.toolName === data.toolName && !m.result) {
+                    m.result = data.result
+                    break
+                }
+            }
+        })
+
+        es.addEventListener('reasoning_complete', (_e: MessageEvent) => {
+            const msgs = messagesBySession.value[sessionId]
+            if (!msgs) return
+            const lastThinking = msgs.findLast(m => m.role === 'thinking' && !m.isCollapsed)
+            if (lastThinking && lastThinking.role === 'thinking') {
+                lastThinking.isCollapsed = true
+            }
+        })
+
+        es.addEventListener('agent_complete', (_e: MessageEvent) => {
+            const msg = getAssistantMsg()
+            if (msg) {
+                msg.isStreaming = false
+            }
+            cleanup()
+
+            setTimeout(async () => {
+                try {
+                    const res = await getSession(sessionId)
+                    const session = sessions.value.find(s => s.id === sessionId)
+                    if (session && res.data.title && res.data.title !== '新对话') {
+                        session.title = res.data.title
+                    }
+                } catch { /* ignore */
+                }
+            }, 3000)
+        })
+
+        es.addEventListener('message_saved', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data)
+                if (data.messageId) {
+                    const msg = getAssistantMsg()
+                    if (msg) {
+                        msg.id = String(data.messageId)
+                    }
+                }
+            } catch { /* ignore */ }
+        })
+
+        es.addEventListener('error', (e: MessageEvent) => {
+            try {
+                const data: SSEEventData = JSON.parse(e.data)
+                console.error('Agent 错误:', data.error)
+                const msg = getAssistantMsg()
+                if (msg) {
+                    msg.content += `\n\n[错误: ${data.error}]`
+                    msg.isStreaming = false
+                }
+            } catch {
+                console.error('SSE 连接错误')
+            }
+            cleanup()
+        })
+
+        es.onerror = () => {
+            if (isStreaming.value) {
+                const msg = getAssistantMsg()
+                if (msg && msg.isStreaming) {
+                    msg.isStreaming = false
+                    if (!msg.content) {
+                        msg.content = '[连接中断]'
+                    }
+                }
+                cleanup()
+            }
+        }
+
+        function cleanup() {
+            isStreaming.value = false
+            es.close()
+            eventSource.value = null
+        }
+    }
+
     /** 发送消息 (核心) */
     async function sendMessage(content: string) {
         const hasAttachments = pendingAttachments.value.some(p => !p.uploading && p.id > 0)
@@ -229,181 +407,8 @@ export const useChatStore = defineStore('chat', () => {
         const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined)
         eventSource.value = es
 
-        // 辅助函数: 获取当前助手消息
-        const getAssistantMsg = (): AssistantMessage | undefined => {
-            const msgs = messagesBySession.value[sessionId!]
-            return msgs?.findLast(m => m.role === 'assistant') as AssistantMessage | undefined
-        }
-
-        // 5. 监听事件
-        es.addEventListener('text_chunk', (e: MessageEvent) => {
-            const data: SSEEventData = JSON.parse(e.data)
-            const msg = getAssistantMsg()
-            if (msg && data.content) {
-                msg.content += data.content
-            }
-        })
-
-        es.addEventListener('thinking_chunk', (e: MessageEvent) => {
-            const data: SSEEventData = JSON.parse(e.data)
-            const msgs = messagesBySession.value[sessionId!]
-            if (!msgs) return
-            // 找到最后一个 thinking 消息或创建新的
-            const lastThinking = msgs.findLast(m => m.role === 'thinking' && !m.isCollapsed)
-            if (lastThinking && lastThinking.role === 'thinking') {
-                lastThinking.content += data.content || ''
-            } else {
-                // 在助手消息之前插入 thinking
-                const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)
-                const thinkingMsg: ChatMessage = {
-                    id: generateId(),
-                    role: 'thinking',
-                    content: data.content || '',
-                    isCollapsed: false
-                }
-                if (assistantIdx >= 0) {
-                    msgs.splice(assistantIdx, 0, thinkingMsg)
-                } else {
-                    msgs.push(thinkingMsg)
-                }
-            }
-        })
-
-        es.addEventListener('tool_call_start', (e: MessageEvent) => {
-            const data: SSEEventData = JSON.parse(e.data)
-            const msgs = messagesBySession.value[sessionId!]
-            if (!msgs) return
-
-            const planTool = isPlanTool(data.toolName || '')
-
-            // finish_subtask：往 assistant 内容中注入分隔标记
-            if (data.toolName === 'finish_subtask') {
-                const currentAssistant = getAssistantMsg()
-                if (currentAssistant) {
-                    const idx = data.arguments?.subtask_idx ?? data.arguments?.subtask_index ?? ''
-                    currentAssistant.content += `\n<!-- subtask_done:${idx} -->\n`
-                }
-            }
-
-            const newMsg: ChatMessage = planTool
-                ? {
-                    id: generateId(),
-                    role: 'plan',
-                    toolName: data.toolName || '',
-                    arguments: data.arguments || {},
-                    result: undefined
-                }
-                : {
-                    id: generateId(),
-                    role: 'tool_call',
-                    toolName: data.toolName || '',
-                    toolId: data.toolId || '',
-                    arguments: data.arguments || {},
-                    status: 'calling'
-                }
-
-            // 非 plan 工具调用：往 assistant 内容注入标记
-            if (!planTool) {
-                const currentAssistant = getAssistantMsg()
-                if (currentAssistant) {
-                    currentAssistant.content += `\n<!-- tool_call:${newMsg.id} -->\n`
-                }
-            }
-
-            // 在助手消息之前插入
-            const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)
-            if (assistantIdx >= 0) {
-                msgs.splice(assistantIdx, 0, newMsg)
-            } else {
-                msgs.push(newMsg)
-            }
-        })
-
-        es.addEventListener('tool_call_end', (e: MessageEvent) => {
-            const data: SSEEventData = JSON.parse(e.data)
-            const msgs = messagesBySession.value[sessionId!]
-            if (!msgs) return
-
-            // 找到对应的 tool_call 或 plan 消息 (匹配 toolName, 从后往前找状态为 calling 的)
-            for (let i = msgs.length - 1; i >= 0; i--) {
-                const m = msgs[i]
-                if (m.role === 'tool_call' && m.toolName === data.toolName && m.status === 'calling') {
-                    m.result = data.result
-                    m.status = 'done'
-                    break
-                }
-                if (m.role === 'plan' && m.toolName === data.toolName && !m.result) {
-                    m.result = data.result
-                    break
-                }
-            }
-        })
-
-        es.addEventListener('reasoning_complete', (_e: MessageEvent) => {
-            // 折叠当前 thinking 块
-            const msgs = messagesBySession.value[sessionId!]
-            if (!msgs) return
-            const lastThinking = msgs.findLast(m => m.role === 'thinking' && !m.isCollapsed)
-            if (lastThinking && lastThinking.role === 'thinking') {
-                lastThinking.isCollapsed = true
-            }
-        })
-
-        es.addEventListener('agent_complete', (_e: MessageEvent) => {
-            const msg = getAssistantMsg()
-            if (msg) {
-                msg.isStreaming = false
-            }
-            cleanup()
-
-            // 延迟刷新会话标题 (后端异步生成标题)
-            setTimeout(async () => {
-                try {
-                    const res = await getSession(sessionId!)
-                    const session = sessions.value.find(s => s.id === sessionId)
-                    if (session && res.data.title && res.data.title !== '新对话') {
-                        session.title = res.data.title
-                    }
-                } catch { /* ignore */
-                }
-            }, 3000)
-        })
-
-        es.addEventListener('error', (e: MessageEvent) => {
-            try {
-                const data: SSEEventData = JSON.parse(e.data)
-                console.error('Agent 错误:', data.error)
-                const msg = getAssistantMsg()
-                if (msg) {
-                    msg.content += `\n\n[错误: ${data.error}]`
-                    msg.isStreaming = false
-                }
-            } catch {
-                // SSE 连接错误 (非 Agent 错误)
-                console.error('SSE 连接错误')
-            }
-            cleanup()
-        })
-
-        es.onerror = () => {
-            // EventSource 内部错误
-            if (isStreaming.value) {
-                const msg = getAssistantMsg()
-                if (msg && msg.isStreaming) {
-                    msg.isStreaming = false
-                    if (!msg.content) {
-                        msg.content = '[连接中断]'
-                    }
-                }
-                cleanup()
-            }
-        }
-
-        function cleanup() {
-            isStreaming.value = false
-            es.close()
-            eventSource.value = null
-        }
+        // 5. 设置监听
+        setupSSEListeners(es, sessionId, assistantMsgId)
     }
 
     /** 中断 Agent */
@@ -455,22 +460,14 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    /** 导出会话为 Markdown 文件 */
+    /** 导出会话为 Markdown 文件 (使用后端生成) */
     async function exportSession(sessionId: string) {
         try {
             const session = sessions.value.find(s => s.id === sessionId)
             if (!session) return
 
-            // 加载消息（不切换当前会话）
-            let messages = messagesBySession.value[sessionId]
-            if (!messages) {
-                const res = await getMessages(sessionId)
-                messages = res.data.map(mapBackendMessage)
-                messagesBySession.value[sessionId] = messages
-            }
-            if (messages.length === 0) return
-
-            const markdown = exportToMarkdown(session.title, messages)
+            const res = await exportChatMarkdown(sessionId)
+            const blob = res.data as Blob
 
             const filePath = await window.electronAPI.dialog.saveFile({
                 defaultPath: `${session.title}.md`,
@@ -478,38 +475,80 @@ export const useChatStore = defineStore('chat', () => {
             })
             if (!filePath) return
 
-            const data = new TextEncoder().encode(markdown)
-            await window.electronAPI.fs.writeFile(filePath, data)
+            const buffer = await blob.arrayBuffer()
+            await window.electronAPI.fs.writeFile(filePath, new Uint8Array(buffer))
         } catch (e) {
             console.error('导出会话失败', e)
         }
     }
 
-    /** 重新生成助手回复 (重发上一条用户消息) */
+    /** 重新生成助手回复 (使用后端 SSE) */
     async function regenerateMessage(messageId: string) {
         if (!currentSessionId.value || isStreaming.value) return
-        const msgs = messagesBySession.value[currentSessionId.value]
+        const sessionId = currentSessionId.value
+        const msgs = messagesBySession.value[sessionId]
         if (!msgs) return
 
         // 找到该助手消息的位置
         const assistantIdx = msgs.findIndex(m => m.id === messageId)
         if (assistantIdx < 0) return
 
-        // 向前找到最近的用户消息
-        let userContent = ''
-        for (let i = assistantIdx - 1; i >= 0; i--) {
-            if (msgs[i].role === 'user') {
-                userContent = (msgs[i] as { content: string }).content
-                break
-            }
-        }
-        if (!userContent) return
+        // 判断是否为后端已持久化的消息 (数字 ID)
+        const isPersistedMessage = /^\d+$/.test(messageId)
 
-        // 删除该助手消息及其后续的 thinking/tool_call/plan 消息
+        if (!isPersistedMessage) {
+            // 前端新生成的消息 (未持久化)，回退到重发用户消息
+            let userContent = ''
+            for (let i = assistantIdx - 1; i >= 0; i--) {
+                if (msgs[i].role === 'user') {
+                    userContent = (msgs[i] as { content: string }).content
+                    break
+                }
+            }
+            if (!userContent) return
+            msgs.splice(assistantIdx)
+            await sendMessage(userContent)
+            return
+        }
+
+        // 后端已持久化的消息，使用后端 regenerate SSE
         msgs.splice(assistantIdx)
 
-        // 重新发送
-        await sendMessage(userContent)
+        // 推入新的助手占位消息
+        const assistantMsgId = generateId()
+        msgs.push({
+            id: assistantMsgId,
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            isStreaming: true
+        })
+
+        // 创建 SSE 连接
+        isStreaming.value = true
+        const es = createRegenerateStream(sessionId, messageId)
+        eventSource.value = es
+
+        // 复用 SSE 监听逻辑
+        setupSSEListeners(es, sessionId, assistantMsgId)
+    }
+
+    /** 批量删除会话 */
+    async function batchRemoveSessions(ids: string[]) {
+        if (ids.length === 0) return
+        try {
+            await batchDeleteSessions(ids)
+            const idSet = new Set(ids)
+            sessions.value = sessions.value.filter(s => !idSet.has(s.id))
+            for (const id of ids) {
+                delete messagesBySession.value[id]
+            }
+            if (currentSessionId.value && idSet.has(currentSessionId.value)) {
+                currentSessionId.value = sessions.value.length > 0 ? sessions.value[0].id : null
+            }
+        } catch (e) {
+            console.error('批量删除会话失败', e)
+        }
     }
 
     return {
@@ -530,6 +569,7 @@ export const useChatStore = defineStore('chat', () => {
         createNewSession,
         switchSession,
         removeSession,
+        batchRemoveSessions,
         renameSession,
         sendMessage,
         interrupt,

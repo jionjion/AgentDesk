@@ -112,6 +112,7 @@
             </div>
           </div>
           <Textarea
+              ref="inputRef"
               v-model="inputText"
               :rows="2"
               :placeholder="chatStore.isStreaming ? '等待回复中...' : '描述任务，/ 调用技能与工具'"
@@ -131,7 +132,7 @@
               <Button variant="ghost" size="icon" class="h-8 w-8" @click="fileInputRef?.click()">
                 <Paperclip :size="16"/>
               </Button>
-              <SkillSelector/>
+              <SkillSelector @trigger="triggerSlashMenu"/>
             </div>
             <div class="flex items-center gap-2">
               <ModelSelector/>
@@ -360,6 +361,7 @@ function isSubtaskOutput(index: number): boolean {
 }
 
 const inputText = ref('')
+const inputRef = ref<InstanceType<typeof Textarea> | null>(null)
 const messageListRef = ref<HTMLElement>()
 const scrollAnchorRef = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -449,6 +451,15 @@ function handleSend() {
   if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
   chatStore.sendMessage(inputText.value)
   inputText.value = ''
+}
+
+function triggerSlashMenu() {
+  if (chatStore.isStreaming) return
+  inputText.value = '/'
+  nextTick(() => {
+    const el = inputRef.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | undefined
+    el?.focus()
+  })
 }
 
 // 自动滚动到底部

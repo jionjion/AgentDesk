@@ -55,6 +55,11 @@
         {{ saving ? '保存中...' : '保存' }}
       </Button>
     </div>
+
+    <!-- 版本信息 -->
+    <div v-if="appVersion" class="pt-4 border-t text-xs text-gray-400 dark:text-gray-500">
+      当前版本: v{{ appVersion }}
+    </div>
   </div>
 </template>
 
@@ -77,6 +82,7 @@ const form = reactive<AppSettings>({
 })
 const saving = ref(false)
 const closeAction = ref<'ask' | 'minimize' | 'quit'>('ask')
+const appVersion = ref('')
 
 const themeOptions = [
   {label: '跟随系统', value: 'auto'},
@@ -96,6 +102,9 @@ watch(closeAction, async (val) => {
 onMounted(async () => {
   const action = await window.electronAPI?.app.getCloseAction()
   if (action) closeAction.value = action
+
+  const version = await window.electronAPI?.app.getVersion()
+  if (version) appVersion.value = version
 })
 
 async function handleSave() {

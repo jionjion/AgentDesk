@@ -39,3 +39,21 @@ export function searchMessages(keyword: string) {
         params: {keyword}
     })
 }
+
+/**
+ * 导出会话为 Markdown (后端生成)
+ */
+export function exportChatMarkdown(sessionId: string) {
+    return request.get(`/api/chat/export/${sessionId}`, {
+        responseType: 'blob'
+    })
+}
+
+/**
+ * 创建重新生成的 SSE 流连接
+ */
+export function createRegenerateStream(sessionId: string, messageId: string): EventSource {
+    const token = localStorage.getItem('auth_token') || ''
+    const url = `${BASE_URL}/api/chat/regenerate?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}&token=${encodeURIComponent(token)}`
+    return new EventSource(url)
+}

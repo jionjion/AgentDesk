@@ -3,10 +3,13 @@
     <!-- 新任务按钮 -->
     <div class="px-3 pt-3 pb-1">
       <button
-          class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md w-full"
+          class="flex items-center gap-2 px-2 py-1.5 text-sm rounded-md w-full"
+          :class="isNewTaskActive
+            ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
+            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
           @click="handleNewSession"
       >
-        <Plus :size="16" class="text-violet-600"/>
+        <Plus :size="16" :class="isNewTaskActive ? 'text-violet-600' : 'text-gray-400 dark:text-gray-500'"/>
         <span>新任务</span>
       </button>
     </div>
@@ -30,7 +33,7 @@
             class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md"
             :class="[isActive(item.path) ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800']"
         >
-          <component :is="item.icon" :size="16"/>
+          <component :is="item.icon" :size="16" :class="isActive(item.path) ? 'text-violet-600 dark:text-violet-400' : ''"/>
           <span>{{ item.label }}</span>
           <Badge v-if="item.badge" variant="secondary" class="ml-auto text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
             {{ item.badge }}
@@ -40,18 +43,53 @@
     </nav>
 
     <!-- 任务列表 -->
-    <div class="flex-1 overflow-hidden mt-2">
-      <div class="px-3 mb-1 flex items-center justify-between">
-        <span class="text-xs text-gray-400 dark:text-gray-500">任务</span>
-        <button
-            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            @click="showFilter = !showFilter"
-        >
-          <Search :size="12"/>
-        </button>
-      </div>
-      <div v-if="showFilter" class="px-3 mb-1">
-        <div class="flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
+    <div class="flex-1 overflow-hidden mt-2 pt-2">
+      <div class="mx-3 mb-2 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"/>
+      <div class="px-3 mb-1 flex items-center justify-between h-6">
+        <template v-if="!showFilter && !batchMode">
+          <span class="text-xs text-gray-400 dark:text-gray-500">任务</span>
+          <div class="flex items-center gap-1">
+            <button
+                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                @click="showFilter = true"
+            >
+              <Search :size="12"/>
+            </button>
+            <button
+                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                @click="enterBatchMode"
+                title="批量管理"
+            >
+              <ListChecks :size="12"/>
+            </button>
+          </div>
+        </template>
+        <template v-else-if="batchMode">
+          <span class="text-xs text-gray-400 dark:text-gray-500">已选 {{ selectedSessionIds.size }} 项</span>
+          <div class="flex items-center gap-1">
+            <button
+                class="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                @click="toggleSelectAll"
+            >
+              {{ selectedSessionIds.size === filteredSessions.length ? '取消全选' : '全选' }}
+            </button>
+            <button
+                class="text-gray-400 hover:text-red-500 transition-colors disabled:opacity-30"
+                :disabled="selectedSessionIds.size === 0"
+                @click="handleBatchDelete"
+                title="删除选中"
+            >
+              <Trash2 :size="12"/>
+            </button>
+            <button
+                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                @click="exitBatchMode"
+            >
+              <X :size="12"/>
+            </button>
+          </div>
+        </template>
+        <div v-else class="flex items-center gap-1 flex-1 h-full px-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
           <Search :size="12" class="text-gray-400 flex-shrink-0"/>
           <input
               ref="filterInputRef"
@@ -59,11 +97,11 @@
               type="text"
               placeholder="过滤会话..."
               class="flex-1 bg-transparent border-none outline-none text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400"
+              @keydown.escape="showFilter = false"
           />
           <button
-              v-if="filterKeyword"
               class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              @click="filterKeyword = ''"
+              @click="showFilter = false"
           >
             <X :size="12"/>
           </button>
@@ -71,6 +109,29 @@
       </div>
       <ScrollArea class="h-full">
         <div class="px-2 space-y-0.5">
+          <!-- 批量模式 -->
+          <template v-if="batchMode">
+            <div
+                v-for="session in filteredSessions"
+                :key="session.id"
+                class="flex items-center gap-1.5 px-2 py-1.5 text-sm rounded cursor-pointer truncate hover:bg-gray-100 dark:hover:bg-gray-800"
+                :class="selectedSessionIds.has(session.id) ? 'bg-violet-50 dark:bg-violet-900/20' : ''"
+                @click="toggleSessionSelect(session.id)"
+            >
+              <div
+                  class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                  :class="selectedSessionIds.has(session.id)
+                    ? 'bg-violet-500 border-violet-500'
+                    : 'border-gray-300 dark:border-gray-600'"
+              >
+                <Check v-if="selectedSessionIds.has(session.id)" :size="9" class="text-white"/>
+              </div>
+              <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500"/>
+              <span class="flex-1 truncate text-gray-600 dark:text-gray-400">{{ session.title }}</span>
+            </div>
+          </template>
+          <!-- 正常模式 -->
+          <template v-else>
           <ContextMenu v-for="session in filteredSessions" :key="session.id">
             <ContextMenuTrigger as-child>
               <div
@@ -104,6 +165,7 @@
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
+          </template>
           <div v-if="filteredSessions.length === 0" class="px-2 py-4 text-center">
             <span class="text-xs text-gray-400">{{ filterKeyword ? '无匹配会话' : '暂无会话' }}</span>
           </div>
@@ -119,7 +181,7 @@
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ appStore.currentUser.name }}</div>
-        <div class="text-xs text-violet-500">{{ appStore.currentUser.plan }}</div>
+
       </div>
       <Popover>
         <PopoverTrigger as-child>
@@ -199,7 +261,11 @@
     <AlertDialog v-model:open="deleteConfirmOpen">
       <AlertDialogContent class="max-w-sm">
         <AlertDialogTitle>确认删除</AlertDialogTitle>
-        <AlertDialogDescription>删除后无法恢复，确定要删除该会话吗？</AlertDialogDescription>
+        <AlertDialogDescription>
+          {{ pendingDeleteIds.length > 0
+            ? `确定要删除选中的 ${pendingDeleteIds.length} 个会话吗？删除后无法恢复。`
+            : '删除后无法恢复，确定要删除该会话吗？' }}
+        </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
           <AlertDialogAction @click="confirmDeleteSession">删除</AlertDialogAction>
@@ -233,7 +299,7 @@ import {useRoute, useRouter} from 'vue-router'
 import type {ThemeMode} from '@/stores/app'
 import {useAppStore} from '@/stores/app'
 import {useChatStore} from '@/stores/chat'
-import {BookOpen, Check, ChevronRight, Download, Edit3, FileText, Info, LogOut, Monitor, Moon, Palette, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Sun, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
+import {BookOpen, Check, ChevronRight, Download, Edit3, FileText, Info, ListChecks, LogOut, Monitor, Moon, Palette, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Sun, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -250,6 +316,7 @@ const chatStore = useChatStore()
 
 const deleteConfirmOpen = ref(false)
 const pendingDeleteId = ref<string | null>(null)
+const pendingDeleteIds = ref<string[]>([])
 const renameDialogOpen = ref(false)
 const renameSessionId = ref<string | null>(null)
 const renameTitle = ref('')
@@ -257,6 +324,8 @@ const showFilter = ref(false)
 const filterKeyword = ref('')
 const filterInputRef = ref<HTMLInputElement>()
 const avatarError = ref(false)
+const batchMode = ref(false)
+const selectedSessionIds = ref(new Set<string>())
 
 const filteredSessions = computed(() => {
   const kw = filterKeyword.value.trim().toLowerCase()
@@ -291,9 +360,47 @@ function isActive(path: string): boolean {
   return route.path === path
 }
 
+const isNewTaskActive = computed(() => {
+  return route.path === '/chat' && !chatStore.currentSessionId
+})
+
 function handleNewSession() {
   chatStore.currentSessionId = null
   router.push('/chat')
+}
+
+function enterBatchMode() {
+  batchMode.value = true
+  selectedSessionIds.value = new Set()
+}
+
+function exitBatchMode() {
+  batchMode.value = false
+  selectedSessionIds.value = new Set()
+}
+
+function toggleSessionSelect(id: string) {
+  const set = new Set(selectedSessionIds.value)
+  if (set.has(id)) {
+    set.delete(id)
+  } else {
+    set.add(id)
+  }
+  selectedSessionIds.value = set
+}
+
+function toggleSelectAll() {
+  if (selectedSessionIds.value.size === filteredSessions.value.length) {
+    selectedSessionIds.value = new Set()
+  } else {
+    selectedSessionIds.value = new Set(filteredSessions.value.map(s => s.id))
+  }
+}
+
+async function handleBatchDelete() {
+  if (selectedSessionIds.value.size === 0) return
+  pendingDeleteIds.value = [...selectedSessionIds.value]
+  deleteConfirmOpen.value = true
 }
 
 function handleSwitchSession(id: string) {
@@ -307,9 +414,25 @@ async function handleDeleteSession(id: string) {
 }
 
 async function confirmDeleteSession() {
+  deleteConfirmOpen.value = false
+
+  // 批量删除
+  if (pendingDeleteIds.value.length > 0) {
+    const ids = pendingDeleteIds.value
+    pendingDeleteIds.value = []
+    await chatStore.batchRemoveSessions(ids)
+    exitBatchMode()
+    if (chatStore.currentSessionId) {
+      router.push(`/chat/${chatStore.currentSessionId}`)
+    } else {
+      router.push('/chat')
+    }
+    return
+  }
+
+  // 单个删除
   if (!pendingDeleteId.value) return
   const id = pendingDeleteId.value
-  deleteConfirmOpen.value = false
   pendingDeleteId.value = null
   await chatStore.removeSession(id)
   if (chatStore.currentSessionId) {

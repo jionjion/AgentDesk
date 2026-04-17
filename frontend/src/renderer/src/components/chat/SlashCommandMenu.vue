@@ -4,7 +4,7 @@
       class="absolute bottom-full mb-1 left-0 right-0 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 shadow-lg z-20 overflow-hidden"
   >
     <div class="px-2.5 py-1.5 border-b border-gray-100 dark:border-gray-700">
-      <span class="text-[11px] text-gray-400">选择技能</span>
+      <span class="text-[11px] text-gray-400">选择技能 (已启用的再次选择可关闭)</span>
     </div>
     <div class="max-h-52 overflow-y-auto py-0.5">
       <div
@@ -15,8 +15,9 @@
           @click="selectSkill(skill)"
           @mouseenter="$emit('update:selectedIndex', idx)"
       >
-        <Zap :size="12" class="shrink-0 text-amber-500"/>
+        <Zap :size="12" class="shrink-0" :class="skill.enabled ? 'text-violet-500' : 'text-amber-500'"/>
         <span class="text-xs text-gray-800 dark:text-gray-200 shrink-0">/{{ skill.name }}</span>
+        <span v-if="skill.enabled" class="text-[10px] text-violet-500 shrink-0">已启用</span>
         <span class="text-[11px] text-gray-400 truncate">{{ skill.description }}</span>
         <kbd v-if="idx === selectedIndex" class="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded shrink-0 ml-auto">Enter</kbd>
       </div>

@@ -5,9 +5,6 @@
   >
     <!-- 左侧操作区 -->
     <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">
-      <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggleMenu')">
-        <Menu :size="18"/>
-      </Button>
       <Button variant="ghost" size="icon" class="h-8 w-8" @click="appStore.toggleSidebar()">
         <ChevronsLeft v-if="!appStore.sidebarCollapsed" :size="16"/>
         <ChevronsRight v-else :size="16"/>
@@ -62,7 +59,7 @@
 <script setup lang="ts">
 import {ref} from 'vue'
 import {useAppStore} from '@/stores/app'
-import {ChevronsLeft, ChevronsRight, CircleHelp, Maximize2, Menu, Minus, Search, X} from 'lucide-vue-next'
+import {ChevronsLeft, ChevronsRight, CircleHelp, Maximize2, Minus, Search, X} from 'lucide-vue-next'
 import {Button} from '@/components/ui/button'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import SearchDialog from '@/components/SearchDialog.vue'
@@ -74,7 +71,6 @@ const appVersion = __APP_VERSION__
 const buildDate = __BUILD_DATE__
 
 const appStore = useAppStore()
-const emit = defineEmits<{ toggleMenu: [] }>()
 const searchOpen = ref(false)
 
 function handleMinimize() {

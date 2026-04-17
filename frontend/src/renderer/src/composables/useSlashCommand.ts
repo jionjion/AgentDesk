@@ -18,15 +18,19 @@ export function useSlashCommand(inputText: Ref<string>) {
         return query.toLowerCase()
     })
 
-    /** 匹配的技能列表（仅未启用的，已启用的无需再激活） */
+    /** 匹配的技能列表（已启用排前面） */
     const filteredSkills = computed<Skill[]>(() => {
         if (slashQuery.value === null) return []
         const q = slashQuery.value
-        const candidates = skillsStore.skills.filter(s => !s.enabled)
-        if (!q) return candidates.slice(0, 8)
-        return candidates
-            .filter(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
-            .slice(0, 8)
+        let candidates = [...skillsStore.skills]
+        if (q) {
+            candidates = candidates.filter(s =>
+                s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)
+            )
+        }
+        // 已启用的排前面
+        candidates.sort((a, b) => (a.enabled === b.enabled ? 0 : a.enabled ? -1 : 1))
+        return candidates.slice(0, 8)
     })
 
     // 监听查询变化，控制菜单显隐
