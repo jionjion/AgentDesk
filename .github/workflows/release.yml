@@ -45,6 +45,12 @@ jobs:
           shell: bash
           command: cd frontend && npm ci
 
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          npm version $VERSION --no-git-tag-version
+
       - name: Type check
         run: npm run typecheck
 
