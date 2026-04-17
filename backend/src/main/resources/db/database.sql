@@ -289,3 +289,56 @@ VALUES
 请用中文回答，使用结构化的格式呈现分析结果。',
      5, '["FileTools"]', TRUE, NULL, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000, EXTRACT(EPOCH FROM NOW())::BIGINT * 1000)
 ON CONFLICT (id) DO NOTHING;
+
+-- 13. 定时任务表
+CREATE TABLE IF NOT EXISTS agent_desk.scheduled_tasks
+(
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT       NOT NULL REFERENCES agent_desk.users (id),
+    name            VARCHAR(128) NOT NULL,
+    description     VARCHAR(512),
+    prompt          TEXT         NOT NULL,
+    cron_expression VARCHAR(64)  NOT NULL,
+    schedule_label  VARCHAR(64),
+    skill_id        VARCHAR(64),
+    enabled         BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at      BIGINT       NOT NULL,
+    updated_at      BIGINT       NOT NULL
+);
+
+COMMENT ON TABLE agent_desk.scheduled_tasks IS '定时任务表';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.user_id IS '所属用户ID';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.name IS '任务名称';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.description IS '任务描述';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.prompt IS '发送给 Agent 的提示词';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.cron_expression IS 'Spring 6字段 cron 表达式';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.schedule_label IS '人类可读的调度描述, 如 每天 09:30';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.skill_id IS '可选关联技能ID';
+COMMENT ON COLUMN agent_desk.scheduled_tasks.enabled IS '是否启用';
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_user ON agent_desk.scheduled_tasks (user_id);
+
+-- 14. 定时任务执行记录表
+CREATE TABLE IF NOT EXISTS agent_desk.scheduled_task_logs
+(
+    id         BIGSERIAL PRIMARY KEY,
+    task_id    BIGINT      NOT NULL REFERENCES agent_desk.scheduled_tasks (id) ON DELETE CASCADE,
+    user_id    BIGINT      NOT NULL REFERENCES agent_desk.users (id),
+    status     VARCHAR(16) NOT NULL,
+    result     TEXT,
+    duration   BIGINT      NOT NULL DEFAULT 0,
+    started_at BIGINT      NOT NULL,
+    ended_at   BIGINT
+);
+
+COMMENT ON TABLE agent_desk.scheduled_task_logs IS '定时任务执行记录';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.task_id IS '所属定时任务ID';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.user_id IS '所属用户ID';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.status IS '执行状态: SUCCESS / FAILED / RUNNING';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.result IS 'Agent 回复内容或错误信息';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.duration IS '执行耗时(毫秒)';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.started_at IS '开始时间戳(毫秒)';
+COMMENT ON COLUMN agent_desk.scheduled_task_logs.ended_at IS '结束时间戳(毫秒)';
+
+CREATE INDEX IF NOT EXISTS idx_task_logs_task ON agent_desk.scheduled_task_logs (task_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_task_logs_user ON agent_desk.scheduled_task_logs (user_id, started_at DESC);
