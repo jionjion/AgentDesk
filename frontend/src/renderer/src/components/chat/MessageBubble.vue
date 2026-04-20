@@ -35,21 +35,22 @@
           {{ isUser ? '你' : 'AI' }}
         </div>
         <!-- 消息内容 -->
-        <div class="max-w-[75%] min-w-0 group/bubble">
+        <div class="max-w-[75%] min-w-0 group/bubble" :class="isUser ? 'text-right' : ''">
           <div
-              class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words"
+              class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words text-left"
               :class="isUser
               ? 'bg-violet-500 text-white rounded-br-md'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
           >
             <div v-if="isUser">
               {{ (message as UserMessage).content }}
-              <div v-if="(message as UserMessage).attachments?.length"
-                   class="flex flex-wrap gap-1.5 mt-2">
-                <div v-for="att in (message as UserMessage).attachments" :key="att.id"
+              <!-- 非图片附件保留在气泡内 -->
+              <div v-if="fileAttachments.length" class="flex flex-wrap gap-1.5 mt-2">
+                <div v-for="att in fileAttachments" :key="att.id"
                      class="flex items-center gap-1 bg-white/20 rounded px-2 py-1 text-xs">
                   <FileText :size="12"/>
                   <span class="truncate max-w-[120px]">{{ att.name }}</span>
+                  <span class="text-white/60 text-[10px]">{{ formatFileSize(att.size) }}</span>
                 </div>
               </div>
             </div>
@@ -137,6 +138,16 @@
               </div>
             </div>
           </div>
+          <!-- 图片附件（气泡外部） -->
+          <div v-if="isUser && imageAttachments.length"
+               v-viewer="{toolbar: true, navbar: false, title: false, transition: false}"
+               class="flex flex-wrap gap-1.5 mt-1.5"
+               :class="isUser ? 'justify-end' : 'justify-start'">
+            <img v-for="att in imageAttachments" :key="att.id"
+                 :src="att.url" :alt="att.name"
+                 class="max-w-[180px] max-h-[180px] rounded-xl object-cover cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] transition-all"
+            />
+          </div>
           <!-- 悬停工具栏 -->
           <div
               v-if="!isUser && !(message as AssistantMessage).isStreaming"
@@ -185,9 +196,11 @@
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {Marked} from 'marked'
 import hljs from 'highlight.js'
+import {api as viewerApi} from 'v-viewer'
 import {CheckCircle2, ChevronRight, Copy, FileText, Loader2, RefreshCw, Settings2, Trash2} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
 import {useChatStore} from '@/stores/chat'
+import {isImageType, formatFileSize} from '@/utils/file'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 
 const marked = new Marked()
@@ -240,6 +253,19 @@ const showPlanConfirm = computed(() => {
 
 const planActionTaken = ref(false)
 const expandedFinishCards = ref(new Set<number>())
+
+// 附件分组
+const imageAttachments = computed(() => {
+    if (!isUser.value) return []
+    const atts = (props.message as UserMessage).attachments || []
+    return atts.filter(a => isImageType(a.contentType) && a.url)
+})
+
+const fileAttachments = computed(() => {
+    if (!isUser.value) return []
+    const atts = (props.message as UserMessage).attachments || []
+    return atts.filter(a => !isImageType(a.contentType))
+})
 
 function toggleFinishCard(idx: number) {
   if (expandedFinishCards.value.has(idx)) {
@@ -382,27 +408,38 @@ function confirmDelete() {
   chatStore.deleteMessage(props.message.id)
 }
 
-// 事件委托处理复制按钮点击
+// 事件委托处理复制按钮点击 + markdown 图片点击
 const bubbleRef = ref<HTMLElement>()
 
-function handleCopyClick(e: Event) {
-  const target = (e.target as HTMLElement).closest('.code-copy-btn') as HTMLButtonElement | null
-  if (!target) return
-  const code = target.getAttribute('data-code')
-      ?.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-  if (!code) return
-  navigator.clipboard.writeText(code)
-  target.textContent = '已复制'
-  setTimeout(() => {
-    target.textContent = '复制'
-  }, 2000)
+function handleBubbleClick(e: Event) {
+  const target = e.target as HTMLElement
+
+  // 复制按钮
+  const copyBtn = target.closest('.code-copy-btn') as HTMLButtonElement | null
+  if (copyBtn) {
+    const code = copyBtn.getAttribute('data-code')
+        ?.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    if (!code) return
+    navigator.clipboard.writeText(code)
+    copyBtn.textContent = '已复制'
+    setTimeout(() => {
+      copyBtn.textContent = '复制'
+    }, 2000)
+    return
+  }
+
+  // markdown 中的图片点击放大
+  if (target.tagName === 'IMG' && target.closest('.markdown-body')) {
+    const src = (target as HTMLImageElement).src
+    viewerApi({images: [src], options: {toolbar: true, navbar: false, title: false, transition: false}})
+  }
 }
 
 onMounted(() => {
-  bubbleRef.value?.addEventListener('click', handleCopyClick)
+  bubbleRef.value?.addEventListener('click', handleBubbleClick)
 })
 
 onBeforeUnmount(() => {
-  bubbleRef.value?.removeEventListener('click', handleCopyClick)
+  bubbleRef.value?.removeEventListener('click', handleBubbleClick)
 })
 </script>

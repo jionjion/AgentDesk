@@ -6,7 +6,7 @@ export interface FileResponse {
     contentType: string
     size: number
     sessionId: string | null
-    url: string
+    downloadUrl: string
     createdAt: number
 }
 
@@ -18,7 +18,8 @@ export function uploadFile(file: File, sessionId?: string) {
         formData.append('sessionId', sessionId)
     }
     return request.post<FileResponse>('/api/files/upload', formData, {
-        headers: {'Content-Type': 'multipart/form-data'}
+        headers: {'Content-Type': 'multipart/form-data'},
+        timeout: 60000
     })
 }
 
