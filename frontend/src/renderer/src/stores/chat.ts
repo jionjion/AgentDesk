@@ -3,9 +3,18 @@ import {computed, ref} from 'vue'
 import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, SSEEventData} from '@/types/chat'
 import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, searchMessages} from '@/api/chat'
-import {uploadFile} from '@/api/file'
+import {uploadFile, getSessionFiles} from '@/api/file'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
+/** 将后端返回的 url 补全为绝对路径 */
+function resolveFileUrl(url?: string): string {
+    if (!url) return ''
+    if (url.startsWith('http://') || url.startsWith('https://')) return url
+    return API_BASE + (url.startsWith('/') ? '' : '/') + url
+}
 
 /** 判断工具名是否属于计划/子任务管理类 */
 function isPlanTool(toolName: string): boolean {
@@ -25,6 +34,9 @@ interface PendingFile {
     size: number
     contentType: string
     uploading: boolean
+    failed: boolean
+    localPreviewUrl?: string
+    url?: string
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -39,6 +51,8 @@ export const useChatStore = defineStore('chat', () => {
 
     const pendingAttachments = ref<PendingFile[]>([])
 
+    /** 当前对话是否触发了长期记忆召回 */
+    const memoryRecalled = ref(false)
     // === Computed ===
     const currentSession = computed(() =>
         sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -77,9 +91,16 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     /** 将后端消息映射为前端消息类型 */
-    function mapBackendMessage(msg: BackendChatMessage): ChatMessage {
+    function mapBackendMessage(msg: BackendChatMessage, fileMap?: Map<number, Attachment>): ChatMessage {
         if (msg.role === 'user') {
-            return {id: String(msg.id), role: 'user', content: msg.content, timestamp: msg.createdAt}
+            let attachments: Attachment[] | undefined
+            if (msg.fileIds?.length && fileMap) {
+                attachments = msg.fileIds
+                    .map(id => fileMap.get(id))
+                    .filter((a): a is Attachment => !!a)
+                if (attachments.length === 0) attachments = undefined
+            }
+            return {id: String(msg.id), role: 'user', content: msg.content, timestamp: msg.createdAt, attachments}
         }
         if (msg.role === 'tool') {
             return {
@@ -111,7 +132,26 @@ export const useChatStore = defineStore('chat', () => {
             // 已有缓存则直接使用
             if (messagesBySession.value[id]) return
             const res = await getMessages(id)
-            messagesBySession.value[id] = res.data.map(mapBackendMessage)
+
+            // 如果消息中有文件附件，加载文件详情
+            const hasFiles = res.data.some(m => m.fileIds && m.fileIds.length > 0)
+            let fileMap: Map<number, Attachment> | undefined
+            if (hasFiles) {
+                try {
+                    const filesRes = await getSessionFiles(id)
+                    fileMap = new Map(filesRes.data.map(f => [f.id, {
+                        id: f.id,
+                        name: f.originalName,
+                        size: f.size,
+                        contentType: f.contentType,
+                        url: resolveFileUrl(f.downloadUrl)
+                    }]))
+                } catch {
+                    // 文件加载失败不影响消息展示
+                }
+            }
+
+            messagesBySession.value[id] = res.data.map(m => mapBackendMessage(m, fileMap))
         } catch (e) {
             console.error('加载历史消息失败', e)
             if (!messagesBySession.value[id]) {
@@ -156,27 +196,36 @@ export const useChatStore = defineStore('chat', () => {
             name: file.name,
             size: file.size,
             contentType: file.type,
-            uploading: true
+            uploading: true,
+            failed: false,
+            localPreviewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
         }
         pendingAttachments.value.push(pending)
 
         try {
             const res = await uploadFile(file, currentSessionId.value || undefined)
             pending.id = res.data.id
+            pending.url = resolveFileUrl(res.data.downloadUrl)
             pending.uploading = false
         } catch (e) {
-            pendingAttachments.value = pendingAttachments.value.filter(p => p !== pending)
+            pending.uploading = false
+            pending.failed = true
             console.error('文件上传失败', e)
         }
     }
 
-    /** 移除附件 */
-    function removeAttachment(fileId: number) {
-        pendingAttachments.value = pendingAttachments.value.filter(p => p.id !== fileId)
+    /** 移除附件（按索引） */
+    function removeAttachment(index: number) {
+        const file = pendingAttachments.value[index]
+        if (file?.localPreviewUrl) URL.revokeObjectURL(file.localPreviewUrl)
+        pendingAttachments.value.splice(index, 1)
     }
 
     /** 清空附件 */
     function clearAttachments() {
+        pendingAttachments.value.forEach(p => {
+            if (p.localPreviewUrl) URL.revokeObjectURL(p.localPreviewUrl)
+        })
         pendingAttachments.value = []
     }
 
@@ -324,6 +373,10 @@ export const useChatStore = defineStore('chat', () => {
             } catch { /* ignore */ }
         })
 
+        es.addEventListener('memory_recalled', (_e: MessageEvent) => {
+            memoryRecalled.value = true
+        })
+
         es.addEventListener('error', (e: MessageEvent) => {
             try {
                 const data: SSEEventData = JSON.parse(e.data)
@@ -354,6 +407,7 @@ export const useChatStore = defineStore('chat', () => {
 
         function cleanup() {
             isStreaming.value = false
+            memoryRecalled.value = false
             es.close()
             eventSource.value = null
         }
@@ -370,7 +424,7 @@ export const useChatStore = defineStore('chat', () => {
             .map(p => p.id)
         const attachments: Attachment[] = pendingAttachments.value
             .filter(p => !p.uploading && p.id > 0)
-            .map(p => ({id: p.id, name: p.name, size: p.size, contentType: p.contentType}))
+            .map(p => ({id: p.id, name: p.name, size: p.size, contentType: p.contentType, url: p.url}))
         clearAttachments()
 
         const messageContent = content.trim() || '请查看我上传的文件'
@@ -558,6 +612,7 @@ export const useChatStore = defineStore('chat', () => {
         messagesBySession,
         isStreaming,
         isLoadingSession,
+        memoryRecalled,
         pendingAttachments,
         pinnedSessionIds,
         // computed

@@ -16,6 +16,7 @@ export interface Attachment {
     name: string
     size: number
     contentType: string
+    url?: string
 }
 
 /** 用户消息 */

@@ -33,7 +33,7 @@
     </div>
 
     <!-- 消息列表 -->
-    <div v-else ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4">
+    <div v-else ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4" @scroll="onMessageListScroll">
       <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
         <template v-for="(msg, idx) in chatStore.currentMessages" :key="msg.id">
           <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
@@ -78,6 +78,9 @@
         <!-- 技能状态栏（输入框上方） -->
         <SkillStatusBar/>
 
+        <!-- 长期记忆提示（输入框上方） -->
+        <MemoryIndicator/>
+
         <!-- 任务状态栏（输入框上方） -->
         <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState"/>
 
@@ -99,17 +102,42 @@
           <!-- 附件预览区 -->
           <div v-if="chatStore.pendingAttachments.length > 0"
                class="flex flex-wrap gap-2 mb-2 px-1">
-            <div v-for="file in chatStore.pendingAttachments" :key="file.name"
-                 class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm dark:text-gray-200">
-              <FileText :size="14"/>
-              <span class="truncate max-w-[150px]">{{ file.name }}</span>
-              <span class="text-gray-400 dark:text-gray-500 text-xs">{{ formatSize(file.size) }}</span>
-              <Loader2 v-if="file.uploading" :size="14" class="animate-spin"/>
-              <button v-else @click="chatStore.removeAttachment(file.id)"
-                      class="text-gray-400 hover:text-red-500">
-                <X :size="14"/>
-              </button>
-            </div>
+            <template v-for="(file, idx) in chatStore.pendingAttachments" :key="idx">
+              <!-- 图片缩略图 -->
+              <div v-if="isImageType(file.contentType) && file.localPreviewUrl"
+                   class="relative group w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0"
+                   :class="file.failed ? 'ring-2 ring-red-400' : ''">
+                <img :src="file.localPreviewUrl" :alt="file.name"
+                     class="w-full h-full object-cover"
+                     :class="file.failed ? 'opacity-40' : ''"/>
+                <!-- 上传中 -->
+                <Loader2 v-if="file.uploading" :size="16"
+                         class="absolute inset-0 m-auto animate-spin text-white drop-shadow"/>
+                <!-- 上传失败 -->
+                <div v-else-if="file.failed" class="absolute inset-0 flex items-center justify-center">
+                  <AlertCircle :size="18" class="text-red-500 drop-shadow"/>
+                </div>
+                <!-- 关闭按钮（上传中/失败/成功都能点） -->
+                <button @click="chatStore.removeAttachment(idx)"
+                        class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X :size="10"/>
+                </button>
+              </div>
+              <!-- 非图片文件卡片 -->
+              <div v-else
+                   class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm dark:text-gray-200"
+                   :class="file.failed ? 'ring-1 ring-red-400' : ''">
+                <FileText :size="14" :class="file.failed ? 'text-red-400' : ''"/>
+                <span class="truncate max-w-[150px]">{{ file.name }}</span>
+                <span class="text-gray-400 dark:text-gray-500 text-xs">{{ formatFileSize(file.size) }}</span>
+                <Loader2 v-if="file.uploading" :size="14" class="animate-spin"/>
+                <AlertCircle v-else-if="file.failed" :size="14" class="text-red-400"/>
+                <button @click="chatStore.removeAttachment(idx)"
+                        class="text-gray-400 hover:text-red-500">
+                  <X :size="14"/>
+                </button>
+              </div>
+            </template>
           </div>
           <Textarea
               ref="inputRef"
@@ -166,7 +194,7 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
-import {ArrowUp, BarChart3, Camera, FileText, FolderOpen, Loader2, Paintbrush, Paperclip, Square, X} from 'lucide-vue-next'
+import {AlertCircle, ArrowUp, BarChart3, Camera, FileText, FolderOpen, Loader2, Paintbrush, Paperclip, Square, X} from 'lucide-vue-next'
 import {useChatStore} from '@/stores/chat'
 import {useSettingsStore} from '@/stores/settings'
 import {Button} from '@/components/ui/button'
@@ -178,9 +206,11 @@ import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
 import SkillSelector from '@/components/chat/SkillSelector.vue'
 import SkillStatusBar from '@/components/chat/SkillStatusBar.vue'
+import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
+import {isImageType, formatFileSize} from '@/utils/file'
 import type {PlanMessage, ToolCallMessage} from '@/types/chat'
 
 const chatStore = useChatStore()
@@ -366,6 +396,16 @@ const messageListRef = ref<HTMLElement>()
 const scrollAnchorRef = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+// 是否吸附在底部（用户滚动位置距底部 <= 阈值时视为吸附）
+const isStickToBottom = ref(true)
+const STICK_THRESHOLD = 80 // px
+
+function onMessageListScroll() {
+  const el = messageListRef.value
+  if (!el) return
+  isStickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD
+}
+
 const {showMenu: slashMenuOpen, selectedIndex: slashSelectedIndex, filteredSkills: slashFilteredSkills, selectSkill: slashSelectSkill, handleKeydown: slashHandleKeydown} = useSlashCommand(inputText)
 
 function handleFileSelect(e: Event) {
@@ -378,12 +418,6 @@ function handleFileSelect(e: Event) {
     chatStore.addAttachment(file)
   }
   input.value = ''
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 const featureCards = [
@@ -449,6 +483,7 @@ function handleKeydown(e: KeyboardEvent) {
 function handleSend() {
   const hasAttachments = chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)
   if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
+  isStickToBottom.value = true
   chatStore.sendMessage(inputText.value)
   inputText.value = ''
 }
@@ -462,13 +497,15 @@ function triggerSlashMenu() {
   })
 }
 
-// 自动滚动到底部
+// 自动滚动到底部（仅当用户处于底部吸附状态时）
 watch(
     () => chatStore.currentMessages,
     () => {
-      nextTick(() => {
-        scrollAnchorRef.value?.scrollIntoView({behavior: 'smooth'})
-      })
+      if (isStickToBottom.value) {
+        nextTick(() => {
+          scrollAnchorRef.value?.scrollIntoView({behavior: 'smooth'})
+        })
+      }
     },
     {deep: true}
 )
