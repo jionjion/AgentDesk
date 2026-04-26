@@ -135,6 +135,7 @@
           <ProfileSection v-if="activeSection === 'profile'"/>
           <AppSection v-else-if="activeSection === 'preferences'"/>
           <PrivacySection v-else-if="activeSection === 'privacy'"/>
+          <MemorySection v-else-if="activeSection === 'memory'"/>
           <div v-else class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
             <div class="text-gray-400 dark:text-gray-500 text-sm">开发中...</div>
           </div>
@@ -151,8 +152,9 @@ import TitleBar from '@/components/TitleBar.vue'
 import ProfileSection from '@/components/settings/ProfileSection.vue'
 import AppSection from '@/components/settings/AppSection.vue'
 import PrivacySection from '@/components/settings/PrivacySection.vue'
+import MemorySection from '@/components/settings/MemorySection.vue'
 import {useSettingsStore} from '@/stores/settings'
-import {ArrowLeft, Box, Cpu, FlaskConical, Link, RefreshCw, Shield, SlidersHorizontal, Sparkles, User} from 'lucide-vue-next'
+import {ArrowLeft, Box, Brain, Cpu, FlaskConical, Link, RefreshCw, Shield, SlidersHorizontal, Sparkles, User} from 'lucide-vue-next'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()
@@ -179,6 +181,7 @@ const extensionItems = [
 ]
 
 const advancedItems = [
+  {key: 'memory', label: '长期记忆', icon: Brain},
   {key: 'sandbox', label: '虚拟机沙盒', icon: Box}
 ]
 
@@ -193,6 +196,7 @@ const sectionMeta: Record<string, { label: string; description: string }> = {
   privacy: {label: '隐私', description: '管理数据收集与隐私偏好。'},
   connectors: {label: '连接器', description: '管理外部服务连接。'},
   mcp: {label: 'MCP 服务', description: '配置 MCP 服务器连接。'},
+  memory: {label: '长期记忆', description: '管理 AI 助手的跨会话记忆。'},
   sandbox: {label: '虚拟机沙盒', description: '配置安全沙盒环境。'},
   experimental: {label: '实验特性', description: '启用或关闭实验性功能。'},
   update: {label: '更新应用', description: '检查并安装应用更新。'},

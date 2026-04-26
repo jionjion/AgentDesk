@@ -64,8 +64,9 @@ public class SettingsService {
         UserSettings entity = userSettingsRepository.findByUserId(userId).orElse(null);
         ModelSettingsDto model = (entity != null) ? parseModel(entity.getSettings()) : ModelSettingsDto.defaults();
         AppSettingsDto app = (entity != null) ? parseApp(entity.getSettings()) : AppSettingsDto.defaults();
+        MemorySettingsDto memory = (entity != null) ? parseMemory(entity.getSettings()) : MemorySettingsDto.defaults();
 
-        return new SettingsResponse(profile, model, app);
+        return new SettingsResponse(profile, model, app, memory);
     }
 
     /**
@@ -205,6 +206,32 @@ public class SettingsService {
     }
 
     /**
+     * 获取指定用户的记忆配置
+     */
+    public MemorySettingsDto getMemorySettings(Long userId) {
+        return userSettingsRepository.findByUserId(userId)
+                .map(entity -> parseMemory(entity.getSettings()))
+                .orElse(MemorySettingsDto.defaults());
+    }
+
+    /**
+     * 修改记忆配置
+     */
+    @Transactional
+    public MemorySettingsDto updateMemorySettings(MemorySettingsDto dto) {
+        Long userId = UserContext.getUserId();
+        UserSettings entity = getOrCreateSettings(userId);
+
+        ObjectNode root = parseSettingsJson(entity.getSettings());
+        root.set("memory", MAPPER.valueToTree(dto));
+        entity.setSettings(toJson(root));
+        entity.setUpdatedAt(System.currentTimeMillis());
+        userSettingsRepository.save(entity);
+
+        return dto;
+    }
+
+    /**
      * 获取指定用户的模型配置 (供 AgentFactory 调用)
      */
     public ModelSettingsDto getModelSettings(Long userId) {
@@ -329,6 +356,18 @@ public class SettingsService {
         } catch (JsonProcessingException ignored) {
         }
         return AppSettingsDto.defaults();
+    }
+
+    private MemorySettingsDto parseMemory(String json) {
+        try {
+            JsonNode root = MAPPER.readTree(json);
+            JsonNode memoryNode = root.get("memory");
+            if (memoryNode != null) {
+                return MAPPER.treeToValue(memoryNode, MemorySettingsDto.class);
+            }
+        } catch (JsonProcessingException ignored) {
+        }
+        return MemorySettingsDto.defaults();
     }
 
     private String toJson(Object obj) {

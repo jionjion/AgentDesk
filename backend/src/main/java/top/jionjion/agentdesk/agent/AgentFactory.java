@@ -2,11 +2,16 @@ package top.jionjion.agentdesk.agent;
 
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.memory.InMemoryMemory;
+import io.agentscope.core.memory.LongTermMemoryMode;
+import io.agentscope.core.memory.mem0.Mem0ApiType;
+import io.agentscope.core.memory.mem0.Mem0LongTermMemory;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.tool.Toolkit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import top.jionjion.agentdesk.dto.MemorySettingsDto;
 import top.jionjion.agentdesk.dto.ModelSettingsDto;
 import top.jionjion.agentdesk.entity.Skill;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
@@ -51,17 +56,23 @@ public class AgentFactory {
     private final OssService ossService;
     private final SettingsService settingsService;
     private final SkillService skillService;
+    private final String mem0BaseUrl;
+    private final String mem0ApiKey;
 
     public AgentFactory(ChatModelFactory chatModelFactory,
                         FileRecordRepository fileRecordRepository,
                         OssService ossService,
                         SettingsService settingsService,
-                        SkillService skillService) {
+                        SkillService skillService,
+                        @Value("${agentdesk.mem0.base-url}") String mem0BaseUrl,
+                        @Value("${agentdesk.mem0.api-key:}") String mem0ApiKey) {
         this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
         this.settingsService = settingsService;
         this.skillService = skillService;
+        this.mem0BaseUrl = mem0BaseUrl.endsWith("/") ? mem0BaseUrl.substring(0, mem0BaseUrl.length() - 1) : mem0BaseUrl;
+        this.mem0ApiKey = (mem0ApiKey == null || mem0ApiKey.isBlank()) ? null : mem0ApiKey;
     }
 
     /**
@@ -80,15 +91,18 @@ public class AgentFactory {
 
         // 读取用户模型配置 + API Key
         ModelSettingsDto ms = ModelSettingsDto.defaults();
+        MemorySettingsDto memSettings = MemorySettingsDto.defaults();
         String userApiKey = null;
         String sysPrompt;
         List<Skill> enabledSkills = List.of();
+        Long userId = null;
 
         if (UserContext.isAuthenticated()) {
-            Long userId = UserContext.getUserId();
+            userId = UserContext.getUserId();
             ms = settingsService.getModelSettings(userId);
             userApiKey = settingsService.getDashScopeApiKey(userId);
             enabledSkills = skillService.getEnabledSkills(userId);
+            memSettings = settingsService.getMemorySettings(userId);
         }
 
         // 通过工厂创建模型（自动 fallback 到系统默认 Key）
@@ -107,7 +121,7 @@ public class AgentFactory {
         }
 
         // 构建 ReActAgent
-        ReActAgent agent = ReActAgent.builder()
+        ReActAgent.Builder builder = ReActAgent.builder()
                 .name("assistant-" + sessionId)
                 .sysPrompt(sysPrompt)
                 .model(model)
@@ -115,10 +129,32 @@ public class AgentFactory {
                 .memory(memory)
                 .enablePlan()
                 .hook(hook)
-                .maxIters(10)
-                .build();
+                .maxIters(10);
 
-        return new AgentHandle(agent, hook);
+        // 如果启用了长期记忆, 注入 Mem0LongTermMemory
+        boolean ltmEnabled = false;
+        if (memSettings.enabled() != null && memSettings.enabled() && userId != null) {
+            try {
+                Mem0LongTermMemory.Builder ltmBuilder = Mem0LongTermMemory.builder()
+                        .agentName("assistant")
+                        .userId(String.valueOf(userId))
+                        .apiBaseUrl(mem0BaseUrl)
+                        .apiType(Mem0ApiType.SELF_HOSTED);
+                if (mem0ApiKey != null) {
+                    ltmBuilder.apiKey(mem0ApiKey);
+                }
+                builder.longTermMemory(ltmBuilder.build())
+                       .longTermMemoryMode(LongTermMemoryMode.STATIC_CONTROL);
+                ltmEnabled = true;
+                log.info("已为会话 {} 启用长期记忆 (Mem0: {})", sessionId, mem0BaseUrl);
+            } catch (Exception e) {
+                log.warn("初始化长期记忆失败, 将跳过: {}", e.getMessage());
+            }
+        }
+
+        ReActAgent agent = builder.build();
+
+        return new AgentHandle(agent, hook, ltmEnabled);
     }
 
     /**

@@ -5,5 +5,6 @@ package top.jionjion.agentdesk.dto;
  *
  * @author Jion
  */
-public record SettingsResponse(ProfileDto profile, ModelSettingsDto model, AppSettingsDto app) {
+public record SettingsResponse(ProfileDto profile, ModelSettingsDto model, AppSettingsDto app,
+                               MemorySettingsDto memory) {
 }

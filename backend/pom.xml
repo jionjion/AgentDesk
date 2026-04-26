@@ -87,6 +87,13 @@
             <version>3.18.4</version>
         </dependency>
 
+        <!-- Mem0 Long-term Memory (需要 OkHttp) -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+
         <!-- Actuator 健康检查 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

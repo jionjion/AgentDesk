@@ -1,3 +1,5 @@
+import type {MemorySettings} from './memory'
+
 /** 个人资料 */
 export interface ProfileInfo {
     id: number
@@ -41,4 +43,5 @@ export interface SettingsResponse {
     profile: ProfileInfo
     model: ModelSettings
     app: AppSettings
+    memory: MemorySettings
 }

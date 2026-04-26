@@ -12,6 +12,7 @@ spring:
       max-request-size: 25MB
   # JPA 配置
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: none
     properties:
@@ -42,3 +43,7 @@ agentdesk:
   # JWT 配置
   jwt:
     expiration: 86400000
+  # Mem0 长期记忆服务
+  mem0:
+    base-url: ${MEM0_API_BASE_URL:http://localhost:18090}
+    api-key: ${MEM0_API_KEY:}

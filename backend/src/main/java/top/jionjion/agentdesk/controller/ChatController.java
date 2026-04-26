@@ -129,6 +129,11 @@ public class ChatController {
 
         configureSseCallbacks(emitter, sessionId, handle);
 
+        // 通知前端长期记忆已启用
+        if (handle.longTermMemoryEnabled()) {
+            sendMemoryRecalledEvent(emitter);
+        }
+
         Msg userMsg;
         if (imageFiles.isEmpty()) {
             // 纯文本路径 (无图片附件)
@@ -326,6 +331,11 @@ public class ChatController {
 
         configureSseCallbacks(emitter, sessionId, handle);
 
+        // 通知前端长期记忆已启用
+        if (handle.longTermMemoryEnabled()) {
+            sendMemoryRecalledEvent(emitter);
+        }
+
         String finalUserMessage = userMessage;
         Msg userMsg = Msg.builder().textContent(finalUserMessage).build();
 
@@ -390,11 +400,23 @@ public class ChatController {
     }
 
     /**
+     * 通知前端长期记忆已启用, 框架将自动召回相关记忆
+     */
+    private void sendMemoryRecalledEvent(SseEmitter emitter) {
+        try {
+            String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.memoryRecalled(0));
+            emitter.send(SseEmitter.event().name("memory_recalled").data(json));
+        } catch (Exception e) {
+            log.debug("Failed to send memory_recalled event: {}", e.getMessage());
+        }
+    }
+
+    /**
      * 向客户端发送错误事件
      */
-    private void sendErrorEvent(SseEmitter emitter, String message) {
+    private void sendErrorEvent(SseEmitter emitter, String errorMessage) {
         try {
-            String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.error(message != null ? message : "unknown error"));
+            String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.error(errorMessage != null ? errorMessage : "unknown error"));
             emitter.send(SseEmitter.event().name("error").data(json));
         } catch (Exception e) {
             log.debug("Failed to send error event: {}", e.getMessage());

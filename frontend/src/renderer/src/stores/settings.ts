@@ -1,9 +1,11 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import {changePassword, getSettings, updateAppSettings, updateModelSettings, updateProfile, uploadAvatar} from '@/api/settings'
+import {updateMemorySettings as apiUpdateMemorySettings} from '@/api/memory'
 import {getGroupedModels} from '@/api/models'
 import {useAppStore} from './app'
 import type {AppSettings, ChangePasswordRequest, ModelSettings, ProfileInfo, UpdateProfileRequest} from '@/types/settings'
+import type {MemorySettings} from '@/types/memory'
 import type {ModelDefinition} from '@/types/model'
 
 /** 模型配置默认值 */
@@ -56,10 +58,16 @@ const DEFAULT_APP: AppSettings = {
     fontSize: 14
 }
 
+/** 长期记忆默认值 */
+const DEFAULT_MEMORY: MemorySettings = {
+    enabled: false
+}
+
 export const useSettingsStore = defineStore('settings', () => {
     const profile = ref<ProfileInfo | null>(null)
     const model = ref<ModelSettings>({...DEFAULT_MODEL})
     const app = ref<AppSettings>({...DEFAULT_APP})
+    const memory = ref<MemorySettings>({...DEFAULT_MEMORY})
     const loaded = ref(false)
 
     /** 模型列表（按分组），初始使用内置列表 */
@@ -83,6 +91,7 @@ export const useSettingsStore = defineStore('settings', () => {
         profile.value = res.data.profile
         model.value = res.data.model
         app.value = res.data.app
+        memory.value = res.data.memory ?? {...DEFAULT_MEMORY}
         loaded.value = true
 
         // 应用主题和字体
@@ -157,12 +166,18 @@ export const useSettingsStore = defineStore('settings', () => {
         applyFontSize(res.data.fontSize)
     }
 
+    /** 修改长期记忆配置 */
+    async function saveMemorySettings(data: MemorySettings) {
+        const res = await apiUpdateMemorySettings(data)
+        memory.value = res.data
+    }
+
     return {
-        profile, model, app, loaded,
+        profile, model, app, memory, loaded,
         groupedModels, modelList, currentModelDef,
         fetchSettings, fetchModels,
         saveProfile, doChangePassword, doUploadAvatar,
-        saveModelSettings, switchModel, saveAppSettings
+        saveModelSettings, switchModel, saveAppSettings, saveMemorySettings
     }
 })
 

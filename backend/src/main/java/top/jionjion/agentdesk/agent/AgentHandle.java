@@ -7,5 +7,5 @@ import io.agentscope.core.ReActAgent;
  *
  * @author Jion
  */
-public record AgentHandle(ReActAgent agent, SseStreamingHook hook) {
+public record AgentHandle(ReActAgent agent, SseStreamingHook hook, boolean longTermMemoryEnabled) {
 }
