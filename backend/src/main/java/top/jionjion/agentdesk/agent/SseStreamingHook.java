@@ -27,11 +27,20 @@ public class SseStreamingHook implements Hook {
     private volatile String lastReply;
     /** 标记客户端是否已断开, 避免重复写入已关闭的连接 */
     private volatile boolean clientDisconnected;
+    /** 是否启用了长期记忆 (由外部设置) */
+    private volatile boolean longTermMemoryEnabled;
 
     public void setEmitter(SseEmitter emitter) {
         this.emitter = emitter;
         this.lastReply = null;
         this.clientDisconnected = false;
+    }
+
+    /**
+     * 设置是否启用了长期记忆
+     */
+    public void setLongTermMemoryEnabled(boolean enabled) {
+        this.longTermMemoryEnabled = enabled;
     }
 
     /**
@@ -107,6 +116,13 @@ public class SseStreamingHook implements Hook {
                                 .reduce("", (a, b) -> a + b);
                     }
                     sendEvent("tool_call_end", ChatEventDto.toolCallEnd(toolName, toolId, resultText));
+
+                    // AGENT_CONTROL 模式: Agent 主动调用 retrieveFromMemory 时通知前端
+                    if (longTermMemoryEnabled && "retrieveFromMemory".equals(toolName)
+                            && !resultText.contains("No relevant memories found")
+                            && !resultText.contains("No keywords provided")) {
+                        sendEvent("memory_recalled", ChatEventDto.memoryRecalled(1));
+                    }
                 }
 
                 case PostCallEvent e -> {

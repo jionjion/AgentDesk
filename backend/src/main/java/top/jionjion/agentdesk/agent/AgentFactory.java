@@ -144,7 +144,7 @@ public class AgentFactory {
                     ltmBuilder.apiKey(mem0ApiKey);
                 }
                 builder.longTermMemory(ltmBuilder.build())
-                       .longTermMemoryMode(LongTermMemoryMode.STATIC_CONTROL);
+                       .longTermMemoryMode(LongTermMemoryMode.AGENT_CONTROL);
                 ltmEnabled = true;
                 log.info("已为会话 {} 启用长期记忆 (Mem0: {})", sessionId, mem0BaseUrl);
             } catch (Exception e) {

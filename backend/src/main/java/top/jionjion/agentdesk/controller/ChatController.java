@@ -129,9 +129,9 @@ public class ChatController {
 
         configureSseCallbacks(emitter, sessionId, handle);
 
-        // 通知前端长期记忆已启用
+        // 通知 Hook 长期记忆已启用, 由 Hook 在实际召回时发送事件
         if (handle.longTermMemoryEnabled()) {
-            sendMemoryRecalledEvent(emitter);
+            handle.hook().setLongTermMemoryEnabled(true);
         }
 
         Msg userMsg;
@@ -331,9 +331,9 @@ public class ChatController {
 
         configureSseCallbacks(emitter, sessionId, handle);
 
-        // 通知前端长期记忆已启用
+        // 通知 Hook 长期记忆已启用, 由 Hook 在实际召回时发送事件
         if (handle.longTermMemoryEnabled()) {
-            sendMemoryRecalledEvent(emitter);
+            handle.hook().setLongTermMemoryEnabled(true);
         }
 
         String finalUserMessage = userMessage;
@@ -397,18 +397,6 @@ public class ChatController {
         AgentHandle handle = agentPool.getOrCreate(sessionId);
         handle.agent().interrupt();
         return Map.of("status", "interrupted");
-    }
-
-    /**
-     * 通知前端长期记忆已启用, 框架将自动召回相关记忆
-     */
-    private void sendMemoryRecalledEvent(SseEmitter emitter) {
-        try {
-            String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.memoryRecalled(0));
-            emitter.send(SseEmitter.event().name("memory_recalled").data(json));
-        } catch (Exception e) {
-            log.debug("Failed to send memory_recalled event: {}", e.getMessage());
-        }
     }
 
     /**

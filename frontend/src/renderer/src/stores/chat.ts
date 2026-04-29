@@ -51,8 +51,8 @@ export const useChatStore = defineStore('chat', () => {
 
     const pendingAttachments = ref<PendingFile[]>([])
 
-    /** 当前对话是否触发了长期记忆召回 */
-    const memoryRecalled = ref(false)
+    /** 当前对话长期记忆召回数量 (0 表示未召回) */
+    const memoryRecalledCount = ref(0)
     // === Computed ===
     const currentSession = computed(() =>
         sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -373,8 +373,13 @@ export const useChatStore = defineStore('chat', () => {
             } catch { /* ignore */ }
         })
 
-        es.addEventListener('memory_recalled', (_e: MessageEvent) => {
-            memoryRecalled.value = true
+        es.addEventListener('memory_recalled', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data)
+                memoryRecalledCount.value = data.memoryCount || 1
+            } catch {
+                memoryRecalledCount.value = 1
+            }
         })
 
         es.addEventListener('error', (e: MessageEvent) => {
@@ -407,7 +412,7 @@ export const useChatStore = defineStore('chat', () => {
 
         function cleanup() {
             isStreaming.value = false
-            memoryRecalled.value = false
+            memoryRecalledCount.value = 0
             es.close()
             eventSource.value = null
         }
@@ -612,7 +617,7 @@ export const useChatStore = defineStore('chat', () => {
         messagesBySession,
         isStreaming,
         isLoadingSession,
-        memoryRecalled,
+        memoryRecalledCount,
         pendingAttachments,
         pinnedSessionIds,
         // computed
