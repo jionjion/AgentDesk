@@ -49,7 +49,12 @@ jobs:
         shell: bash
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          npm version $VERSION --no-git-tag-version
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" = "$VERSION" ]; then
+            echo "Version already $VERSION, skip."
+          else
+            npm version $VERSION --no-git-tag-version
+          fi
 
       - name: Type check
         run: npm run typecheck
