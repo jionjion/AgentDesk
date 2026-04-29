@@ -345,7 +345,7 @@ watch(() => appStore.currentUser.avatar, () => {
   avatarError.value = false
 })
 
-const navItems = [
+const navItems: { path: string; label: string; icon: typeof Ticket; disabled?: boolean; badge?: string }[] = [
   {path: '/skills', label: '技能', icon: Ticket},
   {path: '/scheduled-tasks', label: '定时任务', icon: Timer}
 ]

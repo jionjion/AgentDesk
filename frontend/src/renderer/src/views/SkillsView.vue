@@ -143,11 +143,9 @@ async function confirmDelete() {
 
 async function handleImport() {
   try {
-    const filePath = await window.electronAPI.dialog.openFile({
-      filters: [{name: 'JSON', extensions: ['json']}]
-    })
-    if (!filePath) return
-    const data = await window.electronAPI.fs.readFile(filePath)
+    const filePaths = await window.electronAPI.dialog.openFile()
+    if (!filePaths || filePaths.length === 0) return
+    const data = await window.electronAPI.fs.readFile(filePaths[0])
     const text = new TextDecoder().decode(data)
     const imported = JSON.parse(text)
     if (imported.id && imported.name && imported.description && imported.systemPrompt) {

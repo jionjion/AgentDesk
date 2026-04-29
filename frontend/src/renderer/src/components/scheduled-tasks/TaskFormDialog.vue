@@ -303,11 +303,6 @@ function handlePresetChange(value: string | number) {
   }
 }
 
-function selectPreset(preset: typeof presets[0]) {
-  selectedPreset.value = preset.label
-  updateCron()
-}
-
 function updateCron() {
   const h = scheduleHour.value
   const m = scheduleMinute.value

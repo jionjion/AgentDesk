@@ -2,7 +2,7 @@ import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, SSEEventData} from '@/types/chat'
 import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
-import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, searchMessages} from '@/api/chat'
+import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat} from '@/api/chat'
 import {uploadFile, getSessionFiles} from '@/api/file'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
