@@ -24,13 +24,17 @@ public class ModelController {
         this.modelRegistryService = modelRegistryService;
     }
 
-    /** 获取所有可用模型 */
+    /**
+     * 获取所有可用模型
+     */
     @GetMapping
     public List<ModelDefinition> listModels() {
         return modelRegistryService.listModels();
     }
 
-    /** 按分组获取模型列表 */
+    /**
+     * 按分组获取模型列表
+     */
     @GetMapping("/grouped")
     public Map<String, List<ModelDefinition>> listGrouped() {
         return modelRegistryService.listGrouped();

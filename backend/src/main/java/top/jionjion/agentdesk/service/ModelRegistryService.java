@@ -25,7 +25,9 @@ public class ModelRegistryService {
         this.modelDefinitionRepository = modelDefinitionRepository;
     }
 
-    /** 返回全部启用的模型（按 sort_order 排序） */
+    /**
+     * 返回全部启用的模型（按 sort_order 排序）
+     */
     public List<ModelDefinition> listModels() {
         return modelDefinitionRepository.findByEnabledTrueOrderBySortOrderAsc()
                 .stream()
@@ -43,21 +45,27 @@ public class ModelRegistryService {
                 .collect(Collectors.groupingBy(ModelDefinition::group, LinkedHashMap::new, Collectors.toList()));
     }
 
-    /** 根据 ID 查找模型定义 */
+    /**
+     * 根据 ID 查找模型定义
+     */
     public Optional<ModelDefinition> findById(String id) {
         return modelDefinitionRepository.findById(id)
                 .filter(ModelDefinitionEntity::isEnabled)
                 .map(this::toDto);
     }
 
-    /** 检查模型 ID 是否合法（存在且启用） */
+    /**
+     * 检查模型 ID 是否合法（存在且启用）
+     */
     public boolean isValidModelId(String id) {
         return modelDefinitionRepository.findById(id)
                 .map(ModelDefinitionEntity::isEnabled)
                 .orElse(false);
     }
 
-    /** Entity → DTO 转换 */
+    /**
+     * Entity → DTO 转换
+     */
     private ModelDefinition toDto(ModelDefinitionEntity entity) {
         return new ModelDefinition(
                 entity.getId(),

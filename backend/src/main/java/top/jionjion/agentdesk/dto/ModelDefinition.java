@@ -24,4 +24,5 @@ public record ModelDefinition(
         int maxContextWindow,
         int maxOutputTokens,
         String description
-) {}
+) {
+}

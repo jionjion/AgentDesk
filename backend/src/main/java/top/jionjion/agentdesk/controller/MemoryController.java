@@ -91,7 +91,7 @@ public class MemoryController {
      */
     @PutMapping("/{memoryId}")
     public Map<String, String> updateMemory(@PathVariable String memoryId,
-                                             @RequestBody AddMemoryRequest request) {
+                                            @RequestBody AddMemoryRequest request) {
         if (request.content() == null || request.content().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "记忆内容不能为空");
         }

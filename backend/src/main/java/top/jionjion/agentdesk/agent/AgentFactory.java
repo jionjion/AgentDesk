@@ -37,15 +37,15 @@ public class AgentFactory {
 
     private static final String SYS_PROMPT_TEMPLATE = """
             你是一个名为 Assistant 的智能助手协调者。你可以直接回答简单问题，也可以将复杂任务委派给专业的子助手。
-
+            
             %s
-
+            
             当用户上传了文件时，消息中会包含文件的元信息 (文件名、大小、类型、fileId)。
             对于文件相关任务，请将 fileId 传递给相应的子助手。
-
+            
             你也可以直接使用 get_current_time、calculate、read_file 等工具处理简单任务。
             不要猜测文件内容，请先调用 read_file 获取实际内容。
-
+            
             请用中文回答。
             """;
 
@@ -144,7 +144,7 @@ public class AgentFactory {
                     ltmBuilder.apiKey(mem0ApiKey);
                 }
                 builder.longTermMemory(ltmBuilder.build())
-                       .longTermMemoryMode(LongTermMemoryMode.AGENT_CONTROL);
+                        .longTermMemoryMode(LongTermMemoryMode.AGENT_CONTROL);
                 ltmEnabled = true;
                 log.info("已为会话 {} 启用长期记忆 (Mem0: {})", sessionId, mem0BaseUrl);
             } catch (Exception e) {
