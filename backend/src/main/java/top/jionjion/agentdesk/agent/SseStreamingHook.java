@@ -3,6 +3,8 @@ package top.jionjion.agentdesk.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.hook.*;
 import io.agentscope.core.message.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -24,23 +26,30 @@ public class SseStreamingHook implements Hook {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private volatile SseEmitter emitter;
+
+    /**
+     * 获取最近一次 Agent 回复的完整文本
+     */
+    @Getter
     private volatile String lastReply;
-    /** 标记客户端是否已断开, 避免重复写入已关闭的连接 */
+
+    /**
+     * 标记客户端是否已断开, 避免重复写入已关闭的连接
+     */
+    @Getter
     private volatile boolean clientDisconnected;
-    /** 是否启用了长期记忆 (由外部设置) */
+
+    /**
+     * 是否启用了长期记忆 (由外部设置)
+     * 设置是否启用了长期记忆
+     */
+    @Setter
     private volatile boolean longTermMemoryEnabled;
 
     public void setEmitter(SseEmitter emitter) {
         this.emitter = emitter;
         this.lastReply = null;
         this.clientDisconnected = false;
-    }
-
-    /**
-     * 设置是否启用了长期记忆
-     */
-    public void setLongTermMemoryEnabled(boolean enabled) {
-        this.longTermMemoryEnabled = enabled;
     }
 
     /**
@@ -51,22 +60,11 @@ public class SseStreamingHook implements Hook {
         this.emitter = null;
     }
 
-    public boolean isClientDisconnected() {
-        return clientDisconnected;
-    }
-
-    /**
-     * 获取最近一次 Agent 回复的完整文本
-     */
-    public String getLastReply() {
-        return lastReply;
-    }
-
     @Override
     public <T extends HookEvent> Mono<T> onEvent(T event) {
         try {
             switch (event) {
-                case PreCallEvent e -> sendEvent("agent_start", ChatEventDto.agentStart());
+                case PreCallEvent _ -> sendEvent("agent_start", ChatEventDto.agentStart());
 
                 case ReasoningChunkEvent e -> {
                     Msg chunk = e.getIncrementalChunk();
@@ -147,11 +145,6 @@ public class SseStreamingHook implements Hook {
             log.warn("Failed to send SSE event: {}", ex.getMessage());
         }
         return Mono.just(event);
-    }
-
-    @Override
-    public int priority() {
-        return 100;
     }
 
     private void sendEvent(String eventName, ChatEventDto data) {

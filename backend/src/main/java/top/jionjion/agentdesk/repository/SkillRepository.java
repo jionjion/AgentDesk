@@ -12,10 +12,6 @@ import java.util.List;
  */
 public interface SkillRepository extends JpaRepository<Skill, String> {
 
-    List<Skill> findByBuiltinTrue();
-
-    List<Skill> findByUserId(Long userId);
-
     List<Skill> findByBuiltinTrueOrUserId(Long userId);
 
     boolean existsByIdAndBuiltinTrue(String id);

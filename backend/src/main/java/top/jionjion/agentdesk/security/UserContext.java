@@ -47,11 +47,4 @@ public final class UserContext {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getPrincipal() instanceof UserPrincipal;
     }
-
-    /**
-     * 获取当前用户 ID, 未认证时返回 null (适用于可选认证场景)
-     */
-    public static Long getUserIdOrNull() {
-        return isAuthenticated() ? getPrincipal().id() : null;
-    }
 }

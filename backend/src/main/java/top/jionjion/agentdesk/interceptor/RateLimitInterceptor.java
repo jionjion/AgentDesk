@@ -3,6 +3,7 @@ package top.jionjion.agentdesk.interceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,7 +32,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final ConcurrentHashMap<String, Deque<Long>> requestRecords = new ConcurrentHashMap<>();
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
@@ -52,7 +53,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         long now = System.currentTimeMillis();
         long windowStart = now - rateLimit.windowSeconds() * 1000L;
 
-        Deque<Long> timestamps = requestRecords.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
+        Deque<Long> timestamps = requestRecords.computeIfAbsent(key, _ -> new ConcurrentLinkedDeque<>());
 
         // 清除窗口外的过期记录
         while (!timestamps.isEmpty() && timestamps.peekFirst() < windowStart) {

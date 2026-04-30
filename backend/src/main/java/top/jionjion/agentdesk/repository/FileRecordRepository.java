@@ -14,14 +14,6 @@ import java.util.Optional;
 public interface FileRecordRepository extends JpaRepository<FileRecord, Long> {
 
     /**
-     * 根据会话ID查询文件记录, 按创建时间升序排列
-     *
-     * @param sessionId 会话ID
-     * @return 文件记录列表
-     */
-    List<FileRecord> findBySessionIdOrderByCreatedAtAsc(String sessionId);
-
-    /**
      * 根据ID列表批量查询文件记录
      *
      * @param ids 文件ID列表

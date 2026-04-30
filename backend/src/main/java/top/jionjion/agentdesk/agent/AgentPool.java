@@ -118,7 +118,7 @@ public class AgentPool {
      * 尝试获取会话锁（防止并发调用同一 Agent）
      */
     public boolean tryAcquire(String sessionId) {
-        AtomicBoolean flag = busyFlags.computeIfAbsent(sessionId, id -> new AtomicBoolean(false));
+        AtomicBoolean flag = busyFlags.computeIfAbsent(sessionId, _ -> new AtomicBoolean(false));
         return flag.compareAndSet(false, true);
     }
 

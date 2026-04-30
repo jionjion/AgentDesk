@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -99,7 +100,7 @@ public class ChatController {
     /**
      * 流式对话接口, 通过SSE推送Agent的回复事件
      */
-    @RateLimit(maxRequests = 10, windowSeconds = 60, message = "对话请求过于频繁, 请稍后再试")
+    @RateLimit(maxRequests = 10, windowSeconds = 70, message = "对话请求过于频繁, 请稍后再试")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
                                  @RequestParam String message,
@@ -173,7 +174,7 @@ public class ChatController {
                         log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
                     }
                 })
-                .doFinally(signal -> agentPool.release(sessionId))
+                .doFinally(_ -> agentPool.release(sessionId))
                 .subscribe();
 
         return emitter;
@@ -291,7 +292,7 @@ public class ChatController {
     /**
      * 重新生成 Assistant 的回复 (SSE 流式)
      */
-    @RateLimit(maxRequests = 10, windowSeconds = 60, message = "对话请求过于频繁, 请稍后再试")
+    @RateLimit(maxRequests = 10, windowSeconds = 70, message = "对话请求过于频繁, 请稍后再试")
     @GetMapping(value = "/regenerate", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter regenerate(@RequestParam String sessionId,
                                  @RequestParam Long messageId) {
@@ -309,22 +310,7 @@ public class ChatController {
 
         // 查找触发该回复的用户消息（createdAt 在目标消息之前、最近的一条 user 消息）
         List<ChatMessage> history = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-        String userMessage = null;
-        for (int i = 0; i < history.size(); i++) {
-            if (history.get(i).getId().equals(messageId) && i > 0) {
-                // 往前找最近的 user 消息
-                for (int j = i - 1; j >= 0; j--) {
-                    if ("user".equals(history.get(j).getRole())) {
-                        userMessage = history.get(j).getContent();
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-        if (userMessage == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未找到对应的用户消息");
-        }
+        String userMessage = getUserMessage(messageId, history);
 
         if (!agentPool.tryAcquire(sessionId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
@@ -346,11 +332,10 @@ public class ChatController {
             handle.hook().setLongTermMemoryEnabled(true);
         }
 
-        String finalUserMessage = userMessage;
-        Msg userMsg = Msg.builder().textContent(finalUserMessage).build();
+        Msg userMsg = Msg.builder().textContent(userMessage).build();
 
         handle.agent().stream(userMsg)
-                .doOnComplete(() -> onStreamComplete(sessionId, finalUserMessage, handle, emitter))
+                .doOnComplete(() -> onStreamComplete(sessionId, userMessage, handle, emitter))
                 .doOnError(e -> {
                     if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
                         log.debug("Session {} Agent流处理中客户端已断开", sessionId);
@@ -366,10 +351,31 @@ public class ChatController {
                         log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
                     }
                 })
-                .doFinally(signal -> agentPool.release(sessionId))
+                .doFinally(_ -> agentPool.release(sessionId))
                 .subscribe();
 
         return emitter;
+    }
+
+    @NonNull
+    private static String getUserMessage(Long messageId, List<ChatMessage> history) {
+        String userMessage = null;
+        for (int i = 0; i < history.size(); i++) {
+            if (history.get(i).getId().equals(messageId) && i > 0) {
+                // 往前找最近的 user 消息
+                for (int j = i - 1; j >= 0; j--) {
+                    if ("user".equals(history.get(j).getRole())) {
+                        userMessage = history.get(j).getContent();
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        if (userMessage == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未找到对应的用户消息");
+        }
+        return userMessage;
     }
 
     /**

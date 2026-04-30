@@ -41,8 +41,8 @@ public class StartupRunner implements ApplicationRunner {
                           应用 '{}' 启动成功!
                           环境:        {}
                           数据库:      {}
-                          本地访问:    http://localhost:{}{}
-                          外部访问:    http://{}:{}{}
+                          本地访问:    https://localhost:{}{}
+                          外部访问:    https://{}:{}{}
                         ----------------------------------------------------------""",
                 appName, profiles, datasourceUrl, port, contextPath, host, port, contextPath);
     }

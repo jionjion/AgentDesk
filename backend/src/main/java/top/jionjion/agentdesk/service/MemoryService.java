@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
+import okhttp3.Request.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,7 +51,7 @@ public class MemoryService {
     public List<MemoryItemDto> listMemories(Long userId) {
         String url = mem0BaseUrl + "/memories?user_id=" + userId;
 
-        Request.Builder reqBuilder = new Request.Builder().url(url).get();
+        Builder reqBuilder = new Builder().url(url).get();
         addApiKey(reqBuilder);
 
         try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
@@ -81,7 +82,7 @@ public class MemoryService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "序列化失败");
         }
 
-        Request.Builder reqBuilder = new Request.Builder()
+        Builder reqBuilder = new Builder()
                 .url(url)
                 .post(RequestBody.create(json, JSON_TYPE));
         addApiKey(reqBuilder);
@@ -103,7 +104,7 @@ public class MemoryService {
     public void deleteMemory(Long userId, String memoryId) {
         String url = mem0BaseUrl + "/memories/" + memoryId;
 
-        Request.Builder reqBuilder = new Request.Builder().url(url).delete();
+        Builder reqBuilder = new Builder().url(url).delete();
         addApiKey(reqBuilder);
 
         try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
@@ -130,7 +131,7 @@ public class MemoryService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "序列化失败");
         }
 
-        Request.Builder reqBuilder = new Request.Builder()
+        Builder reqBuilder = new Builder()
                 .url(url)
                 .put(RequestBody.create(json, JSON_TYPE));
         addApiKey(reqBuilder);
@@ -152,7 +153,7 @@ public class MemoryService {
     public void deleteAllMemories(Long userId) {
         String url = mem0BaseUrl + "/memories?user_id=" + userId;
 
-        Request.Builder reqBuilder = new Request.Builder().url(url).delete();
+        Builder reqBuilder = new Builder().url(url).delete();
         addApiKey(reqBuilder);
 
         try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
@@ -168,7 +169,7 @@ public class MemoryService {
 
     // ==================== 内部方法 ====================
 
-    private void addApiKey(Request.Builder builder) {
+    private void addApiKey(Builder builder) {
         if (mem0ApiKey != null) {
             builder.addHeader("Authorization", "Bearer " + mem0ApiKey);
         }

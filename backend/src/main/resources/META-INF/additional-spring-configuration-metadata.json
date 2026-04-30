@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "agentscope.agent.name",
+      "type": "java.lang.String",
+      "description": "智能体对话时的名称."
+    },
+    {
+      "name": "agentdesk.storage",
+      "type": "java.lang.String",
+      "description": "存储的方式本地存储/数据库存储."
+    }
+  ]
+}

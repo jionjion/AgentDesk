@@ -15,7 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class OssProperties {
 
     /**
-     * OSS 服务 Endpoint, 如 https://oss-cn-shanghai.aliyuncs.com
+     * OSS 服务 Endpoint, 如 <a href="https://oss-cn-shanghai.aliyuncs.com">...</a>
      */
     private String endpoint;
 

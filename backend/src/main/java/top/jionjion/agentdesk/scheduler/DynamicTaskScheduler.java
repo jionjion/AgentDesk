@@ -63,8 +63,12 @@ public class DynamicTaskScheduler {
                     () -> taskExecutor.execute(task.getId(), task.getUserId()),
                     trigger
             );
-            scheduledFutures.put(task.getId(), future);
-            log.info("已注册定时任务: id={}, name={}, cron={}", task.getId(), task.getName(), task.getCronExpression());
+            if (future != null) {
+                scheduledFutures.put(task.getId(), future);
+                log.info("已注册定时任务: id={}, name={}, cron={}", task.getId(), task.getName(), task.getCronExpression());
+            } else {
+                log.info("定时任务为空");
+            }
         } catch (IllegalArgumentException e) {
             log.error("定时任务 cron 表达式无效: id={}, cron={}, error={}", task.getId(), task.getCronExpression(), e.getMessage());
         }
