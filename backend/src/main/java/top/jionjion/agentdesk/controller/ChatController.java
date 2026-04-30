@@ -30,6 +30,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 /**
@@ -53,6 +55,14 @@ public class ChatController {
     private static final Set<String> IMAGE_CONTENT_TYPES = Set.of(
             "image/jpeg", "image/png", "image/gif", "image/webp"
     );
+    /**
+     * 标题生成专用线程池, 避免阻塞 ForkJoinPool.commonPool 导致线程饥饿
+     */
+    private static final ExecutorService TITLE_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "title-gen");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
@@ -241,7 +251,7 @@ public class ChatController {
 
         // 首次对话时异步生成标题 (emitter 已关闭, 不再通过 SSE 推送)
         if (sessionService.hasDefaultTitle(sessionId)) {
-            java.util.concurrent.CompletableFuture.runAsync(() -> {
+            TITLE_EXECUTOR.execute(() -> {
                 try {
                     String generatedTitle = titleGenerationService.generateTitle(message);
                     if (generatedTitle != null && !generatedTitle.isEmpty()) {

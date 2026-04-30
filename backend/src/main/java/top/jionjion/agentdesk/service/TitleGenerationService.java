@@ -6,12 +6,15 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.model.ExecutionConfig;
+import io.agentscope.core.model.GenerateOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import top.jionjion.agentdesk.agent.ChatModelFactory;
 import top.jionjion.agentdesk.dto.ModelSettingsDto;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
@@ -25,7 +28,13 @@ public class TitleGenerationService {
 
     private static final Logger log = LoggerFactory.getLogger(TitleGenerationService.class);
 
+    /**
+     * 标题生成超时时间（30秒），避免模型服务不可用时长时间阻塞
+     */
+    private static final Duration TITLE_TIMEOUT = Duration.ofSeconds(30);
+
     private final DashScopeChatModel model;
+    private final GenerateOptions titleOptions;
 
     public TitleGenerationService(ChatModelFactory chatModelFactory) {
         // 标题生成始终使用 qwen-turbo（轻量快速、低成本）
@@ -33,6 +42,12 @@ public class TitleGenerationService {
                 "qwen-turbo", 0.3, 50, 0.9, false, ""
         );
         this.model = chatModelFactory.create(titleSettings);
+        this.titleOptions = GenerateOptions.builder()
+                .executionConfig(ExecutionConfig.builder()
+                        .timeout(TITLE_TIMEOUT)
+                        .maxAttempts(1)
+                        .build())
+                .build();
     }
 
     /**
@@ -56,10 +71,10 @@ public class TitleGenerationService {
                     .textContent(userMessage)
                     .build();
 
-            // 使用 stream 接口收集完整响应
+            // 使用 stream 接口收集完整响应, 传入 titleOptions 以应用 30 秒超时
             StringBuilder sb = new StringBuilder();
             List<ChatResponse> responses = model.stream(
-                    List.of(systemMsg, userMsg), Collections.emptyList(), null
+                    List.of(systemMsg, userMsg), Collections.emptyList(), titleOptions
             ).collectList().block();
 
             if (responses != null) {
