@@ -55,9 +55,11 @@ export default tseslint.config(
                 }
             ],
             'vue/html-indent': 'off',
+            'vue/require-default-prop': 'off',
+            'vue/html-closing-bracket-spacing': 'off',
 
             // TypeScript 规则调整
-            '@typescript-eslint/no-explicit-any': 'warn',
+            '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': [
                 'warn',
                 {argsIgnorePattern: '^_', varsIgnorePattern: '^_'}

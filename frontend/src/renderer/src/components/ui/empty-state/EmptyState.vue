@@ -10,7 +10,7 @@
     <p class="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs mb-6">{{ description }}</p>
     <!-- 操作按钮 -->
     <Button v-if="actionLabel" variant="outline" @click="$emit('action')">
-      <component v-if="actionIcon" :is="actionIcon" :size="16" class="mr-1.5"/>
+      <component :is="actionIcon" v-if="actionIcon" :size="16" class="mr-1.5"/>
       {{ actionLabel }}
     </Button>
   </div>

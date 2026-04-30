@@ -1,12 +1,7 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {Skill, SkillFormData} from '@/types/skill'
-import {
-    deleteSkill as apiDeleteSkill,
-    getSkills,
-    setSkillEnabled as apiSetSkillEnabled,
-    syncSkill as apiSyncSkill
-} from '@/api/skills'
+import {deleteSkill as apiDeleteSkill, getSkills, setSkillEnabled as apiSetSkillEnabled, syncSkill as apiSyncSkill} from '@/api/skills'
 
 export const useSkillsStore = defineStore('skills', () => {
     // === State ===

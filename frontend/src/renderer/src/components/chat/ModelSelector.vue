@@ -23,8 +23,10 @@
             <AudioLines v-if="m.inputModalities.includes('audio')" :size="14" class="shrink-0 text-emerald-500 opacity-70" title="语音"/>
           </div>
         </template>
-        <div v-if="Object.keys(settingsStore.groupedModels).length === 0"
-             class="px-3 py-4 text-xs text-gray-400 text-center">
+        <div
+            v-if="Object.keys(settingsStore.groupedModels).length === 0"
+            class="px-3 py-4 text-xs text-gray-400 text-center"
+        >
           加载中...
         </div>
       </div>

@@ -12,7 +12,7 @@
       </p>
 
       <!-- 表单 -->
-      <form class="w-full max-w-sm space-y-4" @submit.prevent="handleSubmit" novalidate>
+      <form class="w-full max-w-sm space-y-4" novalidate @submit.prevent="handleSubmit">
         <div>
           <input
               v-model="form.username"

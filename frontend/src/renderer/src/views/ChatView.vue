@@ -39,8 +39,10 @@
           <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
           <template v-else-if="msg.role === 'tool_call'"/>
           <template v-else-if="msg.role === 'plan'"/>
-          <MessageBubble v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
-                         :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"/>
+          <MessageBubble
+              v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
+              :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
+          />
         </template>
         <div ref="scrollAnchorRef"/>
       </div>
@@ -95,45 +97,61 @@
               @update:selected-index="slashSelectedIndex = $event"
           />
           <!-- 隐藏的文件选择器 -->
-          <input ref="fileInputRef" type="file" multiple
-                 accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh,.png,.jpg,.jpeg,.gif,.webp"
-                 class="hidden"
-                 @change="handleFileSelect"/>
+          <input
+              ref="fileInputRef" type="file" multiple
+              accept=".txt,.md,.csv,.json,.xml,.log,.java,.py,.js,.ts,.html,.css,.yaml,.yml,.sql,.sh,.png,.jpg,.jpeg,.gif,.webp"
+              class="hidden"
+              @change="handleFileSelect"
+          />
           <!-- 附件预览区 -->
-          <div v-if="chatStore.pendingAttachments.length > 0"
-               class="flex flex-wrap gap-2 mb-2 px-1">
+          <div
+              v-if="chatStore.pendingAttachments.length > 0"
+              class="flex flex-wrap gap-2 mb-2 px-1"
+          >
             <template v-for="(file, idx) in chatStore.pendingAttachments" :key="idx">
               <!-- 图片缩略图 -->
-              <div v-if="isImageType(file.contentType) && file.localPreviewUrl"
-                   class="relative group w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0"
-                   :class="file.failed ? 'ring-2 ring-red-400' : ''">
-                <img :src="file.localPreviewUrl" :alt="file.name"
-                     class="w-full h-full object-cover"
-                     :class="file.failed ? 'opacity-40' : ''"/>
+              <div
+                  v-if="isImageType(file.contentType) && file.localPreviewUrl"
+                  class="relative group w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0"
+                  :class="file.failed ? 'ring-2 ring-red-400' : ''"
+              >
+                <img
+                    :src="file.localPreviewUrl" :alt="file.name"
+                    class="w-full h-full object-cover"
+                    :class="file.failed ? 'opacity-40' : ''"
+                />
                 <!-- 上传中 -->
-                <Loader2 v-if="file.uploading" :size="16"
-                         class="absolute inset-0 m-auto animate-spin text-white drop-shadow"/>
+                <Loader2
+                    v-if="file.uploading" :size="16"
+                    class="absolute inset-0 m-auto animate-spin text-white drop-shadow"
+                />
                 <!-- 上传失败 -->
                 <div v-else-if="file.failed" class="absolute inset-0 flex items-center justify-center">
                   <AlertCircle :size="18" class="text-red-500 drop-shadow"/>
                 </div>
                 <!-- 关闭按钮（上传中/失败/成功都能点） -->
-                <button @click="chatStore.removeAttachment(idx)"
-                        class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                    class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    @click="chatStore.removeAttachment(idx)"
+                >
                   <X :size="10"/>
                 </button>
               </div>
               <!-- 非图片文件卡片 -->
-              <div v-else
-                   class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm dark:text-gray-200"
-                   :class="file.failed ? 'ring-1 ring-red-400' : ''">
+              <div
+                  v-else
+                  class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 text-sm dark:text-gray-200"
+                  :class="file.failed ? 'ring-1 ring-red-400' : ''"
+              >
                 <FileText :size="14" :class="file.failed ? 'text-red-400' : ''"/>
                 <span class="truncate max-w-[150px]">{{ file.name }}</span>
                 <span class="text-gray-400 dark:text-gray-500 text-xs">{{ formatFileSize(file.size) }}</span>
                 <Loader2 v-if="file.uploading" :size="14" class="animate-spin"/>
                 <AlertCircle v-else-if="file.failed" :size="14" class="text-red-400"/>
-                <button @click="chatStore.removeAttachment(idx)"
-                        class="text-gray-400 hover:text-red-500">
+                <button
+                    class="text-gray-400 hover:text-red-500"
+                    @click="chatStore.removeAttachment(idx)"
+                >
                   <X :size="14"/>
                 </button>
               </div>
@@ -210,7 +228,7 @@ import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
-import {isImageType, formatFileSize} from '@/utils/file'
+import {formatFileSize, isImageType} from '@/utils/file'
 import type {PlanMessage, ToolCallMessage} from '@/types/chat'
 
 const chatStore = useChatStore()

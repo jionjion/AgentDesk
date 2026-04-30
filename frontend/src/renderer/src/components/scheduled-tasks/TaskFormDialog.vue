@@ -93,8 +93,8 @@
               <input
                   type="time"
                   :value="`${scheduleHour}:${scheduleMinute}`"
-                  @input="onTimeChange(($event.target as HTMLInputElement).value)"
                   class="flex h-10 w-[110px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  @input="onTimeChange(($event.target as HTMLInputElement).value)"
               />
             </div>
             <div v-if="selectedPreset === '每周'" class="flex-1 space-y-1">
@@ -225,7 +225,9 @@ function handleOpenChange(val: boolean) {
 const SKILL_NONE = '__none__'
 const skillIdSelect = computed({
   get: () => form.value.skillId || SKILL_NONE,
-  set: (v: string) => { form.value.skillId = v === SKILL_NONE ? '' : v }
+  set: (v: string) => {
+    form.value.skillId = v === SKILL_NONE ? '' : v
+  }
 })
 
 // 自定义 Cron 方块输入
@@ -345,15 +347,24 @@ watch(() => props.open, (val) => {
     if (label.startsWith('每天')) {
       selectedPreset.value = '每天'
       const timeMatch = label.match(/(\d{2}):(\d{2})/)
-      if (timeMatch) { scheduleHour.value = timeMatch[1]; scheduleMinute.value = timeMatch[2] }
+      if (timeMatch) {
+        scheduleHour.value = timeMatch[1];
+        scheduleMinute.value = timeMatch[2]
+      }
     } else if (label.startsWith('工作日')) {
       selectedPreset.value = '工作日'
       const timeMatch = label.match(/(\d{2}):(\d{2})/)
-      if (timeMatch) { scheduleHour.value = timeMatch[1]; scheduleMinute.value = timeMatch[2] }
+      if (timeMatch) {
+        scheduleHour.value = timeMatch[1];
+        scheduleMinute.value = timeMatch[2]
+      }
     } else if (label.startsWith('每周') || label.startsWith('每周')) {
       selectedPreset.value = '每周'
       const timeMatch = label.match(/(\d{2}):(\d{2})/)
-      if (timeMatch) { scheduleHour.value = timeMatch[1]; scheduleMinute.value = timeMatch[2] }
+      if (timeMatch) {
+        scheduleHour.value = timeMatch[1];
+        scheduleMinute.value = timeMatch[2]
+      }
       // 尝试恢复星期
       for (const [key, val] of Object.entries(weekDayLabels)) {
         if (label.includes(val)) {

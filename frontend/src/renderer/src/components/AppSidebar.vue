@@ -57,8 +57,8 @@
             </button>
             <button
                 class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                @click="enterBatchMode"
                 title="批量管理"
+                @click="enterBatchMode"
             >
               <ListChecks :size="12"/>
             </button>
@@ -76,8 +76,8 @@
             <button
                 class="text-gray-400 hover:text-red-500 transition-colors disabled:opacity-30"
                 :disabled="selectedSessionIds.size === 0"
-                @click="handleBatchDelete"
                 title="删除选中"
+                @click="handleBatchDelete"
             >
               <Trash2 :size="12"/>
             </button>
@@ -132,39 +132,39 @@
           </template>
           <!-- 正常模式 -->
           <template v-else>
-          <ContextMenu v-for="session in filteredSessions" :key="session.id">
-            <ContextMenuTrigger as-child>
-              <div
-                  class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
-                  :class="chatStore.currentSessionId === session.id
+            <ContextMenu v-for="session in filteredSessions" :key="session.id">
+              <ContextMenuTrigger as-child>
+                <div
+                    class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
+                    :class="chatStore.currentSessionId === session.id
                   ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
-                  @click="handleSwitchSession(session.id)"
-              >
-                <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500"/>
-                <span class="flex-1 truncate">{{ session.title }}</span>
-              </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent class="w-40">
-              <ContextMenuItem class="cursor-pointer" @select="handleRenameSession(session.id, session.title)">
-                <Edit3 :size="14"/>
-                <span>重命名</span>
-              </ContextMenuItem>
-              <ContextMenuItem class="cursor-pointer" @select="chatStore.togglePin(session.id)">
-                <component :is="chatStore.isPinned(session.id) ? PinOff : Pin" :size="14"/>
-                <span>{{ chatStore.isPinned(session.id) ? '取消置顶' : '置顶' }}</span>
-              </ContextMenuItem>
-              <ContextMenuItem class="cursor-pointer" @select="chatStore.exportSession(session.id)">
-                <Download :size="14"/>
-                <span>导出</span>
-              </ContextMenuItem>
-              <ContextMenuSeparator/>
-              <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(session.id)">
-                <Trash2 :size="14"/>
-                <span>删除</span>
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
+                    @click="handleSwitchSession(session.id)"
+                >
+                  <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500"/>
+                  <span class="flex-1 truncate">{{ session.title }}</span>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent class="w-40">
+                <ContextMenuItem class="cursor-pointer" @select="handleRenameSession(session.id, session.title)">
+                  <Edit3 :size="14"/>
+                  <span>重命名</span>
+                </ContextMenuItem>
+                <ContextMenuItem class="cursor-pointer" @select="chatStore.togglePin(session.id)">
+                  <component :is="chatStore.isPinned(session.id) ? PinOff : Pin" :size="14"/>
+                  <span>{{ chatStore.isPinned(session.id) ? '取消置顶' : '置顶' }}</span>
+                </ContextMenuItem>
+                <ContextMenuItem class="cursor-pointer" @select="chatStore.exportSession(session.id)">
+                  <Download :size="14"/>
+                  <span>导出</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator/>
+                <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(session.id)">
+                  <Trash2 :size="14"/>
+                  <span>删除</span>
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           </template>
           <div v-if="filteredSessions.length === 0" class="px-2 py-4 text-center">
             <span class="text-xs text-gray-400">{{ filterKeyword ? '无匹配会话' : '暂无会话' }}</span>
@@ -181,7 +181,6 @@
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ appStore.currentUser.name }}</div>
-
       </div>
       <Popover>
         <PopoverTrigger as-child>
@@ -262,9 +261,11 @@
       <AlertDialogContent class="max-w-sm">
         <AlertDialogTitle>确认删除</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ pendingDeleteIds.length > 0
-            ? `确定要删除选中的 ${pendingDeleteIds.length} 个会话吗？删除后无法恢复。`
-            : '删除后无法恢复，确定要删除该会话吗？' }}
+          {{
+            pendingDeleteIds.length > 0
+                ? `确定要删除选中的 ${pendingDeleteIds.length} 个会话吗？删除后无法恢复。`
+                : '删除后无法恢复，确定要删除该会话吗？'
+          }}
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>

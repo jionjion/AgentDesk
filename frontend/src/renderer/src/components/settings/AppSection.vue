@@ -20,15 +20,15 @@
       <Label>关闭窗口时</Label>
       <RadioGroup v-model="closeAction" class="space-y-1">
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="ask" id="close-ask"/>
+          <RadioGroupItem id="close-ask" value="ask"/>
           <Label for="close-ask" class="font-normal cursor-pointer">每次询问</Label>
         </div>
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="minimize" id="close-minimize"/>
+          <RadioGroupItem id="close-minimize" value="minimize"/>
           <Label for="close-minimize" class="font-normal cursor-pointer">最小化到系统托盘</Label>
         </div>
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="quit" id="close-quit"/>
+          <RadioGroupItem id="close-quit" value="quit"/>
           <Label for="close-quit" class="font-normal cursor-pointer">直接退出</Label>
         </div>
       </RadioGroup>
@@ -39,11 +39,11 @@
       <Label>发送快捷键</Label>
       <RadioGroup v-model="form.sendKey" class="flex gap-4">
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="Enter" id="send-enter"/>
+          <RadioGroupItem id="send-enter" value="Enter"/>
           <Label for="send-enter" class="font-normal cursor-pointer">Enter</Label>
         </div>
         <div class="flex items-center gap-2">
-          <RadioGroupItem value="Ctrl+Enter" id="send-ctrl-enter"/>
+          <RadioGroupItem id="send-ctrl-enter" value="Ctrl+Enter"/>
           <Label for="send-ctrl-enter" class="font-normal cursor-pointer">Ctrl+Enter</Label>
         </div>
       </RadioGroup>

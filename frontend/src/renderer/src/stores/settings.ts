@@ -45,8 +45,26 @@ const BUILTIN_MODELS: Record<string, ModelDefinition[]> = {
         {id: 'qwen-deep-research', displayName: 'Qwen Deep Research', group: '推理专精', inputModalities: ['text'], supportsReasoning: false, maxContextWindow: 1000000, maxOutputTokens: 32768, description: '深度研究'}
     ],
     '全模态': [
-        {id: 'qwen3.5-omni-plus', displayName: 'Qwen3.5 Omni Plus', group: '全模态', inputModalities: ['text', 'image', 'video', 'audio'], supportsReasoning: false, maxContextWindow: 262144, maxOutputTokens: 65536, description: '全模态 Plus'},
-        {id: 'qwen3.5-omni-flash', displayName: 'Qwen3.5 Omni Flash', group: '全模态', inputModalities: ['text', 'image', 'video', 'audio'], supportsReasoning: false, maxContextWindow: 262144, maxOutputTokens: 65536, description: '全模态 Flash'}
+        {
+            id: 'qwen3.5-omni-plus',
+            displayName: 'Qwen3.5 Omni Plus',
+            group: '全模态',
+            inputModalities: ['text', 'image', 'video', 'audio'],
+            supportsReasoning: false,
+            maxContextWindow: 262144,
+            maxOutputTokens: 65536,
+            description: '全模态 Plus'
+        },
+        {
+            id: 'qwen3.5-omni-flash',
+            displayName: 'Qwen3.5 Omni Flash',
+            group: '全模态',
+            inputModalities: ['text', 'image', 'video', 'audio'],
+            supportsReasoning: false,
+            maxContextWindow: 262144,
+            maxOutputTokens: 65536,
+            description: '全模态 Flash'
+        }
     ]
 }
 

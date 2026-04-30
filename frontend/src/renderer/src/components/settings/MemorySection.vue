@@ -23,8 +23,8 @@
               @keydown.enter="handleAddMemory"
           />
           <Button size="sm" :disabled="!newMemoryContent.trim() || addingMemory" @click="handleAddMemory">
-            <Plus :size="16" v-if="!addingMemory"/>
-            <Loader2 :size="16" class="animate-spin" v-else/>
+            <Plus v-if="!addingMemory" :size="16"/>
+            <Loader2 v-else :size="16" class="animate-spin"/>
           </Button>
         </div>
       </div>
@@ -145,15 +145,7 @@ import {Button} from '@/components/ui/button'
 import {Label} from '@/components/ui/label'
 import {Input} from '@/components/ui/input'
 import {Switch} from '@/components/ui/switch'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog'
+import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 import {Brain, Loader2, Pencil, Plus, RefreshCw, Trash2, X} from 'lucide-vue-next'
 
 const settingsStore = useSettingsStore()
@@ -209,7 +201,8 @@ async function onToggleEnabled(_val: boolean) {
     } else {
       memories.value = []
     }
-  } catch { /* handled by interceptor */ }
+  } catch { /* handled by interceptor */
+  }
 }
 
 async function loadMemories() {
@@ -241,7 +234,8 @@ async function handleDeleteMemory(memoryId: string) {
   try {
     await deleteMemory(memoryId)
     memories.value = memories.value.filter(m => m.id !== memoryId)
-  } catch { /* toast handled by interceptor */ }
+  } catch { /* toast handled by interceptor */
+  }
 }
 
 /** 开始编辑一条记忆 */
@@ -278,7 +272,8 @@ async function handleClearAll() {
   try {
     await deleteAllMemories()
     memories.value = []
-  } catch { /* toast handled by interceptor */ }
+  } catch { /* toast handled by interceptor */
+  }
   confirmClearAll.value = false
 }
 </script>
