@@ -60,6 +60,7 @@ import {reactive, ref, watch} from 'vue'
 import {Camera as CameraIcon, Loader2, User as UserIcon} from 'lucide-vue-next'
 import {useSettingsStore} from '@/stores/settings'
 import {useAuthStore} from '@/stores/auth'
+import {cacheAvatar} from '@/utils/avatar-cache'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -117,9 +118,10 @@ async function handleAvatarSelect(e: Event) {
   try {
     const profileData = await settingsStore.doUploadAvatar(file)
     form.avatar = profileData.avatar
-    // 同步到 auth store
+    // 缓存到 localStorage 并同步到 auth store
+    const cached = await cacheAvatar(profileData.avatar)
     if (authStore.user) {
-      authStore.user.avatar = profileData.avatar
+      authStore.user.avatar = cached || profileData.avatar
     }
   } catch {
     // 上传失败，清除预览
@@ -160,7 +162,10 @@ async function handleSave() {
     await settingsStore.saveProfile(form)
     if (authStore.user) {
       authStore.user.nickname = form.nickname
-      authStore.user.avatar = form.avatar
+      if (form.avatar) {
+        const cached = await cacheAvatar(form.avatar)
+        authStore.user.avatar = cached || form.avatar
+      }
     }
   } catch (e: any) {
     if (hasPassword) {

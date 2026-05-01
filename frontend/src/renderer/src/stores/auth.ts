@@ -3,6 +3,7 @@ import {computed, ref} from 'vue'
 import {getMe, login, register} from '@/api/auth'
 import type {LoginRequest, RegisterRequest, UserInfo} from '@/types/auth'
 import router from '@/router'
+import {cacheAvatar, clearAvatarCache, getCachedAvatar} from '@/utils/avatar-cache'
 
 const TOKEN_KEY = 'auth_token'
 
@@ -17,11 +18,13 @@ export const useAuthStore = defineStore('auth', () => {
         const res = await login(data)
         token.value = res.data.token
         localStorage.setItem(TOKEN_KEY, res.data.token)
+        const avatarUrl = res.data.avatar || ''
+        const cachedAvatar = avatarUrl ? await cacheAvatar(avatarUrl) : ''
         user.value = {
             id: res.data.id,
             username: res.data.username,
             nickname: res.data.nickname,
-            avatar: res.data.avatar
+            avatar: cachedAvatar || avatarUrl
         }
     }
 
@@ -30,11 +33,13 @@ export const useAuthStore = defineStore('auth', () => {
         const res = await register(data)
         token.value = res.data.token
         localStorage.setItem(TOKEN_KEY, res.data.token)
+        const avatarUrl = res.data.avatar || ''
+        const cachedAvatar = avatarUrl ? await cacheAvatar(avatarUrl) : ''
         user.value = {
             id: res.data.id,
             username: res.data.username,
             nickname: res.data.nickname,
-            avatar: res.data.avatar || ''
+            avatar: cachedAvatar || avatarUrl
         }
     }
 
@@ -43,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = ''
         user.value = null
         localStorage.removeItem(TOKEN_KEY)
+        clearAvatarCache()
         router.push('/login')
     }
 
@@ -51,7 +57,19 @@ export const useAuthStore = defineStore('auth', () => {
         if (!token.value) return
         try {
             const res = await getMe()
+            const avatarUrl = res.data.avatar || ''
+            // 优先使用本地缓存，后台异步更新
+            const cached = getCachedAvatar()
+            res.data.avatar = cached || avatarUrl
             user.value = res.data
+            // 异步缓存最新头像
+            if (avatarUrl) {
+                cacheAvatar(avatarUrl).then(base64 => {
+                    if (user.value && base64) {
+                        user.value.avatar = base64
+                    }
+                })
+            }
         } catch {
             doLogout()
         }

@@ -29,10 +29,12 @@
     <div v-else ref="bubbleRef" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
       <!-- 头像 -->
       <div
-          class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
+          class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm overflow-hidden"
           :class="isUser ? 'bg-violet-200 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'"
       >
-        {{ isUser ? '你' : 'AI' }}
+        <img v-if="isUser && userAvatar && !avatarError" :src="userAvatar" alt="头像" class="w-full h-full object-cover" @error="avatarError = true"/>
+        <img v-else-if="!isUser" :src="aiIcon" alt="AI" class="w-full h-full object-cover"/>
+        <template v-else>你</template>
       </div>
       <!-- 消息内容 -->
       <div class="max-w-[75%] min-w-0 group/bubble" :class="isUser ? 'text-right' : ''">
@@ -204,6 +206,8 @@ import {api as viewerApi} from 'v-viewer'
 import {CheckCircle2, ChevronRight, Copy, FileText, Loader2, RefreshCw, Settings2, Trash2} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
 import {useChatStore} from '@/stores/chat'
+import {useAppStore} from '@/stores/app'
+import aiIcon from '@/assets/icon_255.png'
 import {formatFileSize, isImageType} from '@/utils/file'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 
@@ -236,8 +240,11 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const appStore = useAppStore()
 
 const isUser = computed(() => props.message.role === 'user')
+const userAvatar = computed(() => appStore.currentUser.avatar)
+const avatarError = ref(false)
 
 const contentCollapsed = ref(!!props.subtaskOutput)
 const shouldCollapse = computed(() => {
