@@ -31,7 +31,11 @@ const electronAPI = {
         },
         offShowCloseDialog: (): void => {
             ipcRenderer.removeAllListeners('show-close-dialog')
-        }
+        },
+        getAutoLaunch: (): Promise<boolean> =>
+            ipcRenderer.invoke('app:getAutoLaunch'),
+        setAutoLaunch: (enabled: boolean): Promise<void> =>
+            ipcRenderer.invoke('app:setAutoLaunch', enabled)
     },
     window: {
         minimize: (): void => ipcRenderer.send('window:minimize'),

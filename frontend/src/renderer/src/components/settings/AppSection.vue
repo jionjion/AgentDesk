@@ -34,6 +34,12 @@
       </RadioGroup>
     </div>
 
+    <!-- 开机自启 -->
+    <div class="flex items-center justify-between">
+      <Label for="auto-launch" class="cursor-pointer">开机自动启动</Label>
+      <Switch id="auto-launch" :checked="autoLaunch" @update:checked="onAutoLaunchChange"/>
+    </div>
+
     <!-- 发送键 -->
     <div class="space-y-2">
       <Label>发送快捷键</Label>
@@ -49,13 +55,6 @@
       </RadioGroup>
     </div>
 
-    <!-- 保存 -->
-    <div class="flex justify-end">
-      <Button :disabled="saving" @click="handleSave">
-        {{ saving ? '保存中...' : '保存' }}
-      </Button>
-    </div>
-
     <!-- 版本信息 -->
     <div v-if="appVersion" class="pt-4 border-t text-xs text-gray-400 dark:text-gray-500">
       当前版本: v{{ appVersion }}
@@ -67,10 +66,10 @@
 import {onMounted, reactive, ref, watch} from 'vue'
 import {useSettingsStore} from '@/stores/settings'
 import type {AppSettings} from '@/types/settings'
-import {Button} from '@/components/ui/button'
 import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group'
+import {Switch} from '@/components/ui/switch'
 
 const settingsStore = useSettingsStore()
 
@@ -80,8 +79,8 @@ const form = reactive<AppSettings>({
   sendKey: 'Enter',
   fontSize: 14
 })
-const saving = ref(false)
 const closeAction = ref<'ask' | 'minimize' | 'quit'>('ask')
+const autoLaunch = ref(false)
 const appVersion = ref('')
 
 const themeOptions = [
@@ -99,20 +98,28 @@ watch(closeAction, async (val) => {
   await window.electronAPI?.app.setCloseAction(val)
 })
 
+// 主题、发送键等修改后自动保存到后端
+let initialized = false
+watch(() => ({...form}), async () => {
+  if (!initialized) return
+  await settingsStore.saveAppSettings(form)
+}, {deep: true})
+
 onMounted(async () => {
   const action = await window.electronAPI?.app.getCloseAction()
   if (action) closeAction.value = action
 
+  const launched = await window.electronAPI?.app.getAutoLaunch()
+  if (launched !== undefined) autoLaunch.value = launched
+
   const version = await window.electronAPI?.app.getVersion()
   if (version) appVersion.value = version
+
+  initialized = true
 })
 
-async function handleSave() {
-  saving.value = true
-  try {
-    await settingsStore.saveAppSettings(form)
-  } finally {
-    saving.value = false
-  }
+async function onAutoLaunchChange(val: boolean) {
+  autoLaunch.value = val
+  await window.electronAPI?.app.setAutoLaunch(val)
 }
 </script>

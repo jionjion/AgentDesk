@@ -39,6 +39,19 @@ function setCloseAction(action: CloseAction): void {
     writeLocalSettings(s)
 }
 
+// ── 开机自启 ─────────────────────────────────────
+function getAutoLaunch(): boolean {
+    const s = readLocalSettings()
+    return (s.autoLaunch as boolean) ?? false
+}
+
+function setAutoLaunch(enabled: boolean): void {
+    const s = readLocalSettings()
+    s.autoLaunch = enabled
+    writeLocalSettings(s)
+    app.setLoginItemSettings({openAtLogin: enabled})
+}
+
 // ── 应用图标 ─────────────────────────────────────
 function getAppIcon(): Electron.NativeImage {
     const iconPath = is.dev
@@ -163,6 +176,12 @@ function createWindow(): void {
         setCloseAction(action)
     })
 
+    ipcMain.handle('app:getAutoLaunch', () => getAutoLaunch())
+
+    ipcMain.handle('app:setAutoLaunch', (_event, enabled: boolean) => {
+        setAutoLaunch(enabled)
+    })
+
     ipcMain.on('app:confirmClose', (_event, choice: 'quit' | 'minimize') => {
         if (choice === 'minimize') {
             mainWindow?.hide()
@@ -240,6 +259,9 @@ app.whenReady().then(() => {
     app.on('browser-window-created', (_, window) => {
         optimizer.watchWindowShortcuts(window)
     })
+
+    // 同步开机自启状态
+    app.setLoginItemSettings({openAtLogin: getAutoLaunch()})
 
     registerIpcHandlers()
     createWindow()
