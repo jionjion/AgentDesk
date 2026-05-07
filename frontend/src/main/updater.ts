@@ -6,6 +6,9 @@ export function initUpdater(mainWindow: BrowserWindow): void {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
+  // 强制走 stable channel，忽略本地版本号中的 prerelease 标识（如 -preview）
+  autoUpdater.channel = 'latest'
+
   // 开发模式下强制使用 dev-app-update.yml 配置，否则会跳过更新检查
   if (!app.isPackaged) {
     autoUpdater.updateConfigPath = join(process.cwd(), 'dev-app-update.yml')
