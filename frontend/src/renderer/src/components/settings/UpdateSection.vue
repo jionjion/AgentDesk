@@ -70,7 +70,6 @@
         v-if="status === 'idle' || status === 'up-to-date' || status === 'error'"
         variant="outline"
         size="sm"
-        :disabled="status === 'checking'"
         @click="checkForUpdate"
       >
         <RefreshCw class="h-4 w-4 mr-1"/>
