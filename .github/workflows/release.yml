@@ -69,12 +69,16 @@ jobs:
           max_attempts: 3
           shell: bash
           command: cd frontend && npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: frontend/dist/*.exe
+          path: |
+            frontend/dist/*.exe
+            frontend/dist/latest.yml
 
       - name: Get release notes
         id: release_notes
@@ -94,7 +98,9 @@ jobs:
         if: steps.release_notes.outputs.found == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: frontend/dist/*.exe
+          files: |
+            frontend/dist/*.exe
+            frontend/dist/latest.yml
           body_path: ${{ steps.release_notes.outputs.file }}
           draft: false
           prerelease: false
@@ -103,7 +109,9 @@ jobs:
         if: steps.release_notes.outputs.found != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: frontend/dist/*.exe
+          files: |
+            frontend/dist/*.exe
+            frontend/dist/latest.yml
           generate_release_notes: true
           draft: false
           prerelease: false

@@ -136,6 +136,7 @@
           <AppSection v-else-if="activeSection === 'preferences'"/>
           <PrivacySection v-else-if="activeSection === 'privacy'"/>
           <MemorySection v-else-if="activeSection === 'memory'"/>
+          <UpdateSection v-else-if="activeSection === 'update'"/>
           <div v-else class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
             <div class="text-gray-400 dark:text-gray-500 text-sm">开发中...</div>
           </div>
@@ -153,6 +154,7 @@ import ProfileSection from '@/components/settings/ProfileSection.vue'
 import AppSection from '@/components/settings/AppSection.vue'
 import PrivacySection from '@/components/settings/PrivacySection.vue'
 import MemorySection from '@/components/settings/MemorySection.vue'
+import UpdateSection from '@/components/settings/UpdateSection.vue'
 import {useSettingsStore} from '@/stores/settings'
 import {ArrowLeft, Box, Brain, Cpu, FlaskConical, Link, RefreshCw, Shield, SlidersHorizontal, Sparkles, User} from 'lucide-vue-next'
 

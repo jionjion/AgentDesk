@@ -3,6 +3,7 @@ import {join} from 'path'
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs'
 import {electronApp, is, optimizer} from '@electron-toolkit/utils'
 import {registerIpcHandlers} from './ipc'
+import {initUpdater} from './updater'
 
 type CloseAction = 'ask' | 'minimize' | 'quit'
 
@@ -265,6 +266,7 @@ app.whenReady().then(() => {
 
     registerIpcHandlers()
     createWindow()
+    initUpdater(mainWindow!)
     createTray()
 
     app.on('activate', () => {

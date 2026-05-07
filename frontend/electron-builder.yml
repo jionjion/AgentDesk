@@ -1,5 +1,9 @@
 appId: top.jionjion.agentdesk
 productName: AgentDesk
+publish:
+  provider: github
+  owner: jionjion
+  repo: AgentDesk
 directories:
   buildResources: resources
   output: dist

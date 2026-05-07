@@ -1,2 +1,33 @@
+# 默认自动检测文本文件并统一换行符
+* text=auto eol=lf
+
+# Shell 脚本始终 LF
+*.sh text eol=lf
 /mvnw text eol=lf
+
+# Windows 批处理始终 CRLF
 *.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 前端源码 LF
+*.ts text eol=lf
+*.vue text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+
+# Java 源码 LF
+*.java text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+
+# 二进制文件不做转换
+*.png binary
+*.jpg binary
+*.ico binary
+*.exe binary
+*.jar binary

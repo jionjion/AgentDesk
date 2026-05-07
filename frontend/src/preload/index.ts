@@ -41,6 +41,37 @@ const electronAPI = {
         minimize: (): void => ipcRenderer.send('window:minimize'),
         maximize: (): void => ipcRenderer.send('window:maximize'),
         close: (): void => ipcRenderer.send('window:close')
+    },
+    updater: {
+        check: (): Promise<unknown> => ipcRenderer.invoke('updater:check'),
+        download: (): Promise<unknown> => ipcRenderer.invoke('updater:download'),
+        install: (): void => { ipcRenderer.invoke('updater:install') },
+        onChecking: (callback: () => void): void => {
+            ipcRenderer.on('updater:checking', callback)
+        },
+        onAvailable: (callback: (_event: unknown, info: { version: string; releaseDate: string; releaseNotes: string }) => void): void => {
+            ipcRenderer.on('updater:available', callback)
+        },
+        onNotAvailable: (callback: () => void): void => {
+            ipcRenderer.on('updater:not-available', callback)
+        },
+        onProgress: (callback: (_event: unknown, progress: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => void): void => {
+            ipcRenderer.on('updater:progress', callback)
+        },
+        onDownloaded: (callback: () => void): void => {
+            ipcRenderer.on('updater:downloaded', callback)
+        },
+        onError: (callback: (_event: unknown, message: string) => void): void => {
+            ipcRenderer.on('updater:error', callback)
+        },
+        removeAllListeners: (): void => {
+            ipcRenderer.removeAllListeners('updater:checking')
+            ipcRenderer.removeAllListeners('updater:available')
+            ipcRenderer.removeAllListeners('updater:not-available')
+            ipcRenderer.removeAllListeners('updater:progress')
+            ipcRenderer.removeAllListeners('updater:downloaded')
+            ipcRenderer.removeAllListeners('updater:error')
+        }
     }
 }
 
