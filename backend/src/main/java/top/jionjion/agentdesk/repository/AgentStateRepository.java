@@ -3,8 +3,8 @@ package top.jionjion.agentdesk.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.transaction.annotation.Transactional;
-import top.jionjion.agentdesk.session.AgentState;
-import top.jionjion.agentdesk.session.AgentStateId;
+import top.jionjion.agentdesk.entity.AgentState;
+import top.jionjion.agentdesk.entity.AgentStateId;
 
 import java.util.List;
 import java.util.Optional;

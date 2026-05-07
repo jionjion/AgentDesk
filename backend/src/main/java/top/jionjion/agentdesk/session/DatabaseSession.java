@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import top.jionjion.agentdesk.entity.AgentState;
 import top.jionjion.agentdesk.repository.AgentStateRepository;
 
 import java.util.HashSet;

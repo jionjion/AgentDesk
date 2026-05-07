@@ -1,7 +1,7 @@
 package top.jionjion.agentdesk.service;
 
 import org.springframework.stereotype.Service;
-import top.jionjion.agentdesk.dto.ModelDefinition;
+import top.jionjion.agentdesk.dto.model.ModelDefinition;
 import top.jionjion.agentdesk.entity.ModelDefinitionEntity;
 import top.jionjion.agentdesk.repository.ModelDefinitionRepository;
 

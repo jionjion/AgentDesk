@@ -30,3 +30,4 @@ nsis:
   createDesktopShortcut: always
   oneClick: false
   allowToChangeInstallationDirectory: true
+  disableWebInstaller: true

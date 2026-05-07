@@ -78,6 +78,7 @@ jobs:
           name: windows-installer
           path: |
             frontend/dist/*.exe
+            frontend/dist/*.blockmap
             frontend/dist/latest.yml
 
       - name: Get release notes
@@ -100,6 +101,7 @@ jobs:
         with:
           files: |
             frontend/dist/*.exe
+            frontend/dist/*.blockmap
             frontend/dist/latest.yml
           body_path: ${{ steps.release_notes.outputs.file }}
           draft: false
@@ -111,6 +113,7 @@ jobs:
         with:
           files: |
             frontend/dist/*.exe
+            frontend/dist/*.blockmap
             frontend/dist/latest.yml
           generate_release_notes: true
           draft: false

@@ -2,7 +2,7 @@ package top.jionjion.agentdesk.repository;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
-import top.jionjion.agentdesk.session.SessionMetadata;
+import top.jionjion.agentdesk.entity.SessionMetadata;
 
 import java.util.List;
 import java.util.Optional;

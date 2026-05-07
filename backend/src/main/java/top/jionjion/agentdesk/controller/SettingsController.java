@@ -4,8 +4,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import top.jionjion.agentdesk.agent.AgentPool;
-import top.jionjion.agentdesk.dto.*;
+import top.jionjion.agentdesk.agent.core.AgentPool;
+import top.jionjion.agentdesk.dto.auth.ChangePasswordRequest;
+import top.jionjion.agentdesk.dto.auth.ProfileDto;
+import top.jionjion.agentdesk.dto.auth.UpdateProfileRequest;
+import top.jionjion.agentdesk.dto.settings.AppSettingsDto;
+import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
+import top.jionjion.agentdesk.dto.settings.SettingsResponse;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.SettingsService;
 

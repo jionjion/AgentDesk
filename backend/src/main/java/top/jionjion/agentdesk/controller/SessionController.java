@@ -3,9 +3,9 @@ package top.jionjion.agentdesk.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import top.jionjion.agentdesk.dto.SessionCreateRequest;
-import top.jionjion.agentdesk.dto.SessionResponse;
-import top.jionjion.agentdesk.session.SessionService;
+import top.jionjion.agentdesk.dto.session.SessionCreateRequest;
+import top.jionjion.agentdesk.dto.session.SessionResponse;
+import top.jionjion.agentdesk.service.SessionService;
 
 import java.util.List;
 

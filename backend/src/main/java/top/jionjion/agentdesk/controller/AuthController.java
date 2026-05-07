@@ -1,9 +1,9 @@
 package top.jionjion.agentdesk.controller;
 
 import org.springframework.web.bind.annotation.*;
-import top.jionjion.agentdesk.dto.AuthResponse;
-import top.jionjion.agentdesk.dto.LoginRequest;
-import top.jionjion.agentdesk.dto.RegisterRequest;
+import top.jionjion.agentdesk.dto.auth.AuthResponse;
+import top.jionjion.agentdesk.dto.auth.LoginRequest;
+import top.jionjion.agentdesk.dto.auth.RegisterRequest;
 import top.jionjion.agentdesk.service.AuthService;
 
 /**

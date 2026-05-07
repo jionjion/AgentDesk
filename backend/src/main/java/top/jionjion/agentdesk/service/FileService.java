@@ -4,7 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import top.jionjion.agentdesk.dto.FileResponse;
+import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.entity.FileRecord;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
 import top.jionjion.agentdesk.security.UserContext;

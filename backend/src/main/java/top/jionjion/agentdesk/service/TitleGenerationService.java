@@ -11,8 +11,8 @@ import io.agentscope.core.model.GenerateOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import top.jionjion.agentdesk.agent.ChatModelFactory;
-import top.jionjion.agentdesk.dto.ModelSettingsDto;
+import top.jionjion.agentdesk.agent.core.ChatModelFactory;
+import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
 
 import java.time.Duration;
 import java.util.Collections;

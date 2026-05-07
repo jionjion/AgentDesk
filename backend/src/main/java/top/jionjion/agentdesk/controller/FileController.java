@@ -3,7 +3,7 @@ package top.jionjion.agentdesk.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import top.jionjion.agentdesk.dto.FileResponse;
+import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.service.FileService;
 
 import java.util.List;

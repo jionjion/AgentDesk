@@ -1,10 +1,10 @@
 package top.jionjion.agentdesk.controller;
 
 import org.springframework.web.bind.annotation.*;
-import top.jionjion.agentdesk.dto.ScheduledTaskEnabledRequest;
-import top.jionjion.agentdesk.dto.ScheduledTaskLogResponse;
-import top.jionjion.agentdesk.dto.ScheduledTaskRequest;
-import top.jionjion.agentdesk.dto.ScheduledTaskResponse;
+import top.jionjion.agentdesk.dto.task.ScheduledTaskEnabledRequest;
+import top.jionjion.agentdesk.dto.task.ScheduledTaskLogResponse;
+import top.jionjion.agentdesk.dto.task.ScheduledTaskRequest;
+import top.jionjion.agentdesk.dto.task.ScheduledTaskResponse;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.ScheduledTaskService;
 

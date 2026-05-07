@@ -1,10 +1,10 @@
 package top.jionjion.agentdesk.controller;
 
 import org.springframework.web.bind.annotation.*;
-import top.jionjion.agentdesk.agent.AgentPool;
-import top.jionjion.agentdesk.dto.SkillDefinitionDto;
-import top.jionjion.agentdesk.dto.SkillEnabledRequest;
-import top.jionjion.agentdesk.dto.SkillResponseDto;
+import top.jionjion.agentdesk.agent.core.AgentPool;
+import top.jionjion.agentdesk.dto.skill.SkillDefinitionDto;
+import top.jionjion.agentdesk.dto.skill.SkillEnabledRequest;
+import top.jionjion.agentdesk.dto.skill.SkillResponseDto;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.SkillService;
 

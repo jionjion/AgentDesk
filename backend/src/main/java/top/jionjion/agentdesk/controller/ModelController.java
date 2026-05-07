@@ -3,7 +3,7 @@ package top.jionjion.agentdesk.controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import top.jionjion.agentdesk.dto.ModelDefinition;
+import top.jionjion.agentdesk.dto.model.ModelDefinition;
 import top.jionjion.agentdesk.service.ModelRegistryService;
 
 import java.util.List;
