@@ -8,7 +8,7 @@ export function initUpdater(mainWindow: BrowserWindow): void {
 
   // 开发模式下强制使用 dev-app-update.yml 配置，否则会跳过更新检查
   if (!app.isPackaged) {
-    autoUpdater.updateConfigPath = join(app.getAppPath(), 'dev-app-update.yml')
+    autoUpdater.updateConfigPath = join(process.cwd(), 'dev-app-update.yml')
     autoUpdater.forceDevUpdateConfig = true
   }
 

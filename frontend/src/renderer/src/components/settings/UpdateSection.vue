@@ -1,105 +1,103 @@
 <template>
   <div class="space-y-6">
-    <!-- 当前版本 -->
-    <div class="space-y-1">
-      <Label class="text-sm text-muted-foreground">当前版本</Label>
-      <p class="text-base font-medium">v{{ currentVersion || '...' }}</p>
-    </div>
+    <!-- 版本信息卡片 -->
+    <div class="rounded-lg border bg-card p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="space-y-0.5">
+          <p class="text-sm text-muted-foreground">当前版本</p>
+          <p class="text-lg font-semibold tracking-tight">v{{ currentVersion || '...' }}</p>
+        </div>
+        <Button
+          v-if="status === 'idle' || status === 'up-to-date' || status === 'error'"
+          variant="outline"
+          size="sm"
+          @click="checkForUpdate"
+        >
+          <RefreshCw class="h-3.5 w-3.5 mr-1.5"/>
+          检查更新
+        </Button>
+      </div>
 
-    <!-- 状态信息 -->
-    <div class="space-y-3">
       <!-- 检查中 -->
-      <div v-if="status === 'checking'" class="flex items-center gap-2 text-sm text-muted-foreground">
+      <div v-if="status === 'checking'" class="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
         <RefreshCw class="h-4 w-4 animate-spin"/>
         <span>正在检查更新...</span>
       </div>
 
-      <!-- 有新版本 -->
-      <div v-else-if="status === 'available'" class="space-y-2">
-        <div class="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-          <ArrowUpCircle class="h-4 w-4"/>
-          <span>发现新版本: v{{ updateInfo.version }}</span>
-        </div>
-        <p v-if="updateInfo.releaseDate" class="text-xs text-muted-foreground">
-          发布时间: {{ formatDate(updateInfo.releaseDate) }}
-        </p>
-      </div>
-
       <!-- 已是最新 -->
-      <div v-else-if="status === 'up-to-date'" class="flex items-center gap-2 text-sm text-muted-foreground">
+      <div v-else-if="status === 'up-to-date'" class="flex items-center gap-2 text-sm pt-2 border-t">
         <CheckCircle class="h-4 w-4 text-green-500"/>
-        <span>已是最新版本</span>
-      </div>
-
-      <!-- 下载中 -->
-      <div v-else-if="status === 'downloading'" class="space-y-2">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <Download class="h-4 w-4 animate-bounce"/>
-          <span>正在下载更新... {{ progress.percent }}%</span>
-        </div>
-        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-          <div
-            class="bg-blue-500 h-2 rounded-full transition-all duration-300"
-            :style="{ width: progress.percent + '%' }"
-          />
-        </div>
-        <p class="text-xs text-muted-foreground">
-          {{ formatBytes(progress.transferred) }} / {{ formatBytes(progress.total) }}
-        </p>
-      </div>
-
-      <!-- 下载完成 -->
-      <div v-else-if="status === 'downloaded'" class="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-        <CheckCircle class="h-4 w-4"/>
-        <span>更新已下载，重启后生效</span>
+        <span class="text-muted-foreground">已是最新版本</span>
       </div>
 
       <!-- 错误 -->
-      <div v-else-if="status === 'error'" class="space-y-1">
-        <div class="flex items-center gap-2 text-sm text-red-500">
+      <div v-else-if="status === 'error'" class="pt-2 border-t space-y-1">
+        <div class="flex items-center gap-2 text-sm text-destructive">
           <AlertCircle class="h-4 w-4"/>
           <span>检查更新失败</span>
         </div>
-        <p class="text-xs text-muted-foreground">{{ errorMessage }}</p>
+        <p class="text-xs text-muted-foreground pl-6">{{ errorMessage }}</p>
       </div>
     </div>
 
-    <!-- 操作按钮 -->
-    <div class="flex gap-3">
-      <Button
-        v-if="status === 'idle' || status === 'up-to-date' || status === 'error'"
-        variant="outline"
-        size="sm"
-        @click="checkForUpdate"
-      >
-        <RefreshCw class="h-4 w-4 mr-1"/>
-        检查更新
-      </Button>
+    <!-- 新版本可用 -->
+    <div v-if="status === 'available'" class="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 space-y-3">
+      <div class="flex items-center gap-2">
+        <ArrowUpCircle class="h-5 w-5 text-green-600 dark:text-green-400"/>
+        <span class="text-sm font-medium text-green-700 dark:text-green-300">发现新版本</span>
+      </div>
+      <div class="pl-7 space-y-1">
+        <p class="text-base font-semibold">v{{ updateInfo.version }}</p>
+        <p v-if="updateInfo.releaseDate" class="text-xs text-muted-foreground">
+          发布于 {{ formatDate(updateInfo.releaseDate) }}
+        </p>
+      </div>
+      <div class="pl-7">
+        <Button size="sm" @click="downloadUpdate">
+          <Download class="h-3.5 w-3.5 mr-1.5"/>
+          下载更新
+        </Button>
+      </div>
+    </div>
 
-      <Button
-        v-if="status === 'available'"
-        size="sm"
-        @click="downloadUpdate"
-      >
-        <Download class="h-4 w-4 mr-1"/>
-        下载更新
-      </Button>
+    <!-- 下载中 -->
+    <div v-if="status === 'downloading'" class="rounded-lg border bg-card p-4 space-y-3">
+      <div class="flex items-center justify-between text-sm">
+        <div class="flex items-center gap-2 text-muted-foreground">
+          <Download class="h-4 w-4 animate-bounce"/>
+          <span>正在下载更新</span>
+        </div>
+        <span class="font-medium tabular-nums">{{ progress.percent }}%</span>
+      </div>
+      <div class="w-full bg-secondary rounded-full h-2 overflow-hidden">
+        <div
+          class="bg-primary h-full rounded-full transition-all duration-300 ease-out"
+          :style="{ width: progress.percent + '%' }"
+        />
+      </div>
+      <p class="text-xs text-muted-foreground text-right tabular-nums">
+        {{ formatBytes(progress.transferred) }} / {{ formatBytes(progress.total) }}
+      </p>
+    </div>
 
-      <Button
-        v-if="status === 'downloaded'"
-        size="sm"
-        @click="installUpdate"
-      >
-        <RefreshCw class="h-4 w-4 mr-1"/>
-        立即重启安装
-      </Button>
+    <!-- 下载完成 -->
+    <div v-if="status === 'downloaded'" class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <CheckCircle class="h-5 w-5 text-blue-600 dark:text-blue-400"/>
+          <span class="text-sm font-medium text-blue-700 dark:text-blue-300">更新已就绪</span>
+        </div>
+        <Button size="sm" @click="installUpdate">
+          <RefreshCw class="h-3.5 w-3.5 mr-1.5"/>
+          重启安装
+        </Button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import {onMounted, onUnmounted, reactive, ref} from 'vue'
-import {Label} from '@/components/ui/label'
 import {Button} from '@/components/ui/button'
 import {RefreshCw, ArrowUpCircle, CheckCircle, Download, AlertCircle} from 'lucide-vue-next'
 
