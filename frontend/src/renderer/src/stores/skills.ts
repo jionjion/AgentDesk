@@ -1,12 +1,19 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {Skill, SkillFormData} from '@/types/skill'
-import {deleteSkill as apiDeleteSkill, getSkills, setSkillEnabled as apiSetSkillEnabled, syncSkill as apiSyncSkill} from '@/api/skills'
+import {
+    deleteSkill as apiDeleteSkill,
+    getSkills,
+    installSkillPackage as apiInstallPackage,
+    setSkillEnabled as apiSetSkillEnabled,
+    syncSkill as apiSyncSkill
+} from '@/api/skills'
 
 export const useSkillsStore = defineStore('skills', () => {
     // === State ===
     const skills = ref<Skill[]>([])
     const loading = ref(false)
+    const installing = ref(false)
     const searchQuery = ref('')
     const selectedCategory = ref<string | null>(null)
 
@@ -72,7 +79,7 @@ export const useSkillsStore = defineStore('skills', () => {
         }
     }
 
-    /** 创建或更新技能 (sync) */
+    /** 创建或更新技能 (sync) — prompt 型 */
     async function saveSkill(data: SkillFormData) {
         const res = await apiSyncSkill(data)
         const idx = skills.value.findIndex(s => s.id === res.data.id)
@@ -82,6 +89,23 @@ export const useSkillsStore = defineStore('skills', () => {
             skills.value.push(res.data)
         }
         return res.data
+    }
+
+    /** 安装 ZIP 技能包 — package 型 */
+    async function installPackage(file: File) {
+        installing.value = true
+        try {
+            const res = await apiInstallPackage(file)
+            const idx = skills.value.findIndex(s => s.id === res.data.id)
+            if (idx >= 0) {
+                skills.value[idx] = res.data
+            } else {
+                skills.value.push(res.data)
+            }
+            return res.data
+        } finally {
+            installing.value = false
+        }
     }
 
     /** 删除技能 */
@@ -104,6 +128,7 @@ export const useSkillsStore = defineStore('skills', () => {
         // state
         skills,
         loading,
+        installing,
         searchQuery,
         selectedCategory,
         // computed
@@ -115,6 +140,7 @@ export const useSkillsStore = defineStore('skills', () => {
         // actions
         fetchSkills,
         saveSkill,
+        installPackage,
         deleteSkill,
         toggleSkillEnabled
     }

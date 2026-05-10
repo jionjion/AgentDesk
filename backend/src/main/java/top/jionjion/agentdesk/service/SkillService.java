@@ -1,5 +1,8 @@
 package top.jionjion.agentdesk.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +14,8 @@ import top.jionjion.agentdesk.entity.UserSkillPreference;
 import top.jionjion.agentdesk.repository.SkillRepository;
 import top.jionjion.agentdesk.repository.UserSkillPreferenceRepository;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,22 +23,31 @@ import java.util.stream.Collectors;
 
 /**
  * 技能业务逻辑
+ * <p>
+ * 支持两种技能类型:
+ * - prompt 型: 传统提示词驱动的技能（向后兼容）
+ * - package 型: 脚本化技能包，存储在文件系统，由 SkillBox 加载
  *
  * @author Jion
  */
 @Service
 public class SkillService {
 
+    private static final Logger log = LoggerFactory.getLogger(SkillService.class);
+
     private static final Set<String> ALLOWED_TOOLS = Set.of("FileTools", "CalculateTools");
     private static final int MAX_ENABLED_SKILLS = 20;
 
     private final SkillRepository skillRepository;
     private final UserSkillPreferenceRepository preferenceRepository;
+    private final String skillsBaseDir;
 
     public SkillService(SkillRepository skillRepository,
-                        UserSkillPreferenceRepository preferenceRepository) {
+                        UserSkillPreferenceRepository preferenceRepository,
+                        @Value("${agentdesk.skills.base-dir}") String skillsBaseDir) {
         this.skillRepository = skillRepository;
         this.preferenceRepository = preferenceRepository;
+        this.skillsBaseDir = skillsBaseDir;
     }
 
     /**
@@ -77,7 +91,59 @@ public class SkillService {
     }
 
     /**
-     * 从 Electron 同步/上传技能定义（upsert）
+     * 注册已安装的技能包到数据库（由 SkillPackageService 安装后调用）
+     */
+    @Transactional
+    public SkillResponseDto registerInstalledPackage(String skillId, String name, String description, Long userId) {
+        // 不能覆盖内置技能
+        if (skillRepository.existsByIdAndBuiltinTrue(skillId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "不能覆盖内置技能: " + skillId);
+        }
+
+        Skill skill = skillRepository.findById(skillId).orElse(null);
+        long now = System.currentTimeMillis();
+
+        if (skill != null) {
+            if (!userId.equals(skill.getUserId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权修改此技能");
+            }
+            skill.setName(name != null ? name : skill.getName());
+            skill.setDescription(description != null ? description : skill.getDescription());
+            skill.setSkillType("package");
+            skill.setInstallPath(Path.of(skillsBaseDir, String.valueOf(userId), skillId).toString());
+            skill.setUpdatedAt(now);
+        } else {
+            skill = new Skill();
+            skill.setId(skillId);
+            skill.setName(name != null ? name : skillId);
+            skill.setDescription(description != null ? description : "用户安装的技能包");
+            skill.setAuthor("User");
+            skill.setVersion("1.0.0");
+            skill.setCategory("other");
+            skill.setTags(List.of());
+            skill.setSysPrompt(""); // package 型技能不需要 sysPrompt, 内容在 SKILL.md 中
+            skill.setMaxIters(5);
+            skill.setTools(List.of());
+            skill.setSkillType("package");
+            skill.setInstallPath(Path.of(skillsBaseDir, String.valueOf(userId), skillId).toString());
+            skill.setBuiltin(false);
+            skill.setUserId(userId);
+            skill.setCreatedAt(now);
+            skill.setUpdatedAt(now);
+        }
+
+        skillRepository.save(skill);
+
+        // 新技能默认启用
+        if (preferenceRepository.findByUserIdAndSkillId(userId, skillId).isEmpty()) {
+            preferenceRepository.save(new UserSkillPreference(userId, skillId, true));
+        }
+
+        return toResponse(skill, true);
+    }
+
+    /**
+     * 从 Electron 同步/上传技能定义（upsert）— 向后兼容 prompt 型技能
      */
     @Transactional
     public SkillResponseDto syncSkill(SkillDefinitionDto dto, Long userId) {
@@ -103,6 +169,7 @@ public class SkillService {
             skill = new Skill();
             skill.setId(dto.id());
             updateSkillFromDto(skill, dto);
+            skill.setSkillType("prompt");
             skill.setBuiltin(false);
             skill.setUserId(userId);
             skill.setCreatedAt(now);
@@ -163,6 +230,18 @@ public class SkillService {
 
         preferenceRepository.deleteByUserIdAndSkillId(userId, skillId);
         skillRepository.delete(skill);
+
+        // 如果是 package 型, 同时删除文件系统上的技能目录
+        if ("package".equals(skill.getSkillType())) {
+            Path skillDir = Path.of(skillsBaseDir, String.valueOf(userId), skillId);
+            if (Files.exists(skillDir)) {
+                try {
+                    deleteDirectory(skillDir);
+                } catch (Exception e) {
+                    log.warn("删除技能目录失败: {}", skillDir, e);
+                }
+            }
+        }
     }
 
     // ─── 内部方法 ───
@@ -230,7 +309,21 @@ public class SkillService {
                 skill.getMaxIters(),
                 skill.getTools(),
                 skill.isBuiltin(),
-                enabled
+                enabled,
+                skill.getSkillType() != null ? skill.getSkillType() : "prompt",
+                skill.getInstallPath()
         );
+    }
+
+    private void deleteDirectory(Path dir) throws Exception {
+        try (var stream = Files.walk(dir)) {
+            stream.sorted((a, b) -> b.compareTo(a))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (Exception ignored) {
+                        }
+                    });
+        }
     }
 }

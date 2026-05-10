@@ -3,7 +3,7 @@ package top.jionjion.agentdesk.dto.skill;
 import java.util.List;
 
 /**
- * 技能响应 DTO — 返回前端, 包含启用状态
+ * 技能响应 DTO — 返回前端, 包含启用状态和技能类型
  *
  * @author Jion
  */
@@ -21,6 +21,8 @@ public record SkillResponseDto(
         int maxIters,
         List<String> tools,
         boolean builtin,
-        boolean enabled
+        boolean enabled,
+        String skillType,
+        String installPath
 ) {
 }

@@ -9,6 +9,10 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
+        <Button variant="outline" @click="handleInstallPackage">
+          <Package :size="16" class="mr-1"/>
+          安装技能包
+        </Button>
         <Button variant="outline" @click="handleImport">
           <Upload :size="16" class="mr-1"/>
           导入技能
@@ -24,7 +28,9 @@
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
         <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">技能</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 font-normal">管理技能，在对话中扩展 Agent 的能力。启用的技能会自动注册为子代理。</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 font-normal">
+          管理技能，在对话中扩展 Agent 的能力。支持提示词技能和脚本化技能包（ZIP 安装）。
+        </p>
 
         <!-- 分类过滤 -->
         <div class="flex items-center gap-2 mb-4 flex-wrap">
@@ -47,14 +53,15 @@
         </div>
 
         <!-- 技能卡片网格 / 空状态 -->
-        <div v-if="skillsStore.loading" class="flex items-center justify-center py-16">
+        <div v-if="skillsStore.loading || skillsStore.installing" class="flex items-center justify-center py-16">
           <Loader2 :size="24" class="animate-spin text-gray-400"/>
+          <span v-if="skillsStore.installing" class="ml-2 text-sm text-gray-500">正在安装技能包...</span>
         </div>
         <EmptyState
             v-else-if="skillsStore.filteredSkills.length === 0"
             :icon="Sparkles"
             title="还没有技能"
-            :description="skillsStore.searchQuery ? '未找到匹配的技能' : '创建你的第一个技能，扩展 Agent 能力'"
+            :description="skillsStore.searchQuery ? '未找到匹配的技能' : '创建技能或安装 ZIP 技能包，扩展 Agent 能力'"
             action-label="创建技能"
             :action-icon="Plus"
             @action="openCreateDialog"
@@ -91,12 +98,21 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- 隐藏的文件输入 -->
+    <input
+        ref="zipFileInput"
+        type="file"
+        accept=".zip"
+        class="hidden"
+        @change="onZipFileSelected"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import {onMounted, ref} from 'vue'
-import {Loader2, Plus, Search, Sparkles, Upload} from 'lucide-vue-next'
+import {Loader2, Package, Plus, Search, Sparkles, Upload} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Input} from '@/components/ui/input'
 import {Button} from '@/components/ui/button'
@@ -114,6 +130,7 @@ const formDialogOpen = ref(false)
 const editingSkill = ref<Skill | null>(null)
 const deleteConfirmOpen = ref(false)
 const pendingDeleteSkill = ref<Skill | null>(null)
+const zipFileInput = ref<HTMLInputElement | null>(null)
 
 function openCreateDialog() {
   editingSkill.value = null
@@ -141,6 +158,28 @@ async function confirmDelete() {
   pendingDeleteSkill.value = null
 }
 
+/** 打开文件选择器安装 ZIP 技能包 */
+function handleInstallPackage() {
+  zipFileInput.value?.click()
+}
+
+/** ZIP 文件选中后执行安装 */
+async function onZipFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    await skillsStore.installPackage(file)
+  } catch (e: any) {
+    console.error('安装技能包失败', e)
+    alert('安装失败: ' + (e?.response?.data?.message || e?.message || '未知错误'))
+  } finally {
+    // 重置 input 以允许重复选择同一文件
+    input.value = ''
+  }
+}
+
+/** 导入 JSON 格式的 prompt 技能 */
 async function handleImport() {
   try {
     const filePaths = await window.electronAPI.dialog.openFile()

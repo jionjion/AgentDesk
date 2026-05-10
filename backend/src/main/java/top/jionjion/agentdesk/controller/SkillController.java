@@ -1,18 +1,20 @@
 package top.jionjion.agentdesk.controller;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.dto.skill.SkillDefinitionDto;
 import top.jionjion.agentdesk.dto.skill.SkillEnabledRequest;
 import top.jionjion.agentdesk.dto.skill.SkillResponseDto;
 import top.jionjion.agentdesk.security.UserContext;
+import top.jionjion.agentdesk.service.SkillPackageService;
 import top.jionjion.agentdesk.service.SkillService;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 技能控制器: 技能的增删改查与启用/禁用
+ * 技能控制器: 技能的增删改查、启用/禁用、ZIP包安装
  *
  * @author Jion
  */
@@ -21,10 +23,14 @@ import java.util.Map;
 public class SkillController {
 
     private final SkillService skillService;
+    private final SkillPackageService skillPackageService;
     private final AgentPool agentPool;
 
-    public SkillController(SkillService skillService, AgentPool agentPool) {
+    public SkillController(SkillService skillService,
+                           SkillPackageService skillPackageService,
+                           AgentPool agentPool) {
         this.skillService = skillService;
+        this.skillPackageService = skillPackageService;
         this.agentPool = agentPool;
     }
 
@@ -45,7 +51,49 @@ public class SkillController {
     }
 
     /**
-     * 从 Electron 同步/上传技能定义（upsert）
+     * 上传并安装 ZIP 技能包
+     */
+    @PostMapping("/install")
+    public SkillResponseDto install(@RequestParam("file") MultipartFile file) {
+        Long userId = UserContext.getUserId();
+
+        // 1. 解压安装技能包到文件系统
+        SkillPackageService.SkillInstallResult result = skillPackageService.install(file, userId);
+
+        // 2. 注册到数据库
+        SkillResponseDto response = skillService.registerInstalledPackage(
+                result.id(), result.name(), result.description(), userId);
+
+        // 3. 使 Agent 缓存失效, 重新加载技能
+        agentPool.invalidateAll(userId);
+
+        return response;
+    }
+
+    /**
+     * 获取技能包的资源文件列表
+     */
+    @GetMapping("/{skillId}/resources")
+    public List<String> getResources(@PathVariable String skillId) {
+        Long userId = UserContext.getUserId();
+        return skillPackageService.getSkillResources(skillId, userId);
+    }
+
+    /**
+     * 读取技能包中某个资源文件的内容
+     */
+    @GetMapping("/{skillId}/resources/{*resourcePath}")
+    public Map<String, String> readResource(@PathVariable String skillId,
+                                            @PathVariable String resourcePath) {
+        Long userId = UserContext.getUserId();
+        // Spring 6 的 {*path} 会包含前导 /, 需要去除
+        String cleanPath = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+        String content = skillPackageService.readResource(skillId, userId, cleanPath);
+        return Map.of("content", content);
+    }
+
+    /**
+     * 从 Electron 同步/上传技能定义（upsert）— 向后兼容 prompt 型
      */
     @PostMapping("/sync")
     public SkillResponseDto sync(@RequestBody SkillDefinitionDto request) {
@@ -68,7 +116,7 @@ public class SkillController {
     }
 
     /**
-     * 删除用户安装的技能
+     * 删除用户安装的技能（同时删除文件系统上的技能包）
      */
     @DeleteMapping("/{skillId}")
     public Map<String, String> delete(@PathVariable String skillId) {

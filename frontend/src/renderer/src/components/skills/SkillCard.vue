@@ -11,6 +11,7 @@
         <div class="flex items-center gap-2">
           <h3 class="text-sm font-normal text-gray-800 dark:text-gray-200 truncate">{{ skill.name }}</h3>
           <Badge v-if="skill.builtin" variant="outline" class="text-[10px] shrink-0">内置</Badge>
+          <Badge v-if="skill.skillType === 'package'" variant="outline" class="text-[10px] shrink-0 text-blue-600 border-blue-200">脚本</Badge>
           <Badge v-if="skill.category" variant="secondary" class="text-[10px] shrink-0">{{ skill.category }}</Badge>
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2" :title="skill.description">{{ skill.description }}</p>

@@ -3,6 +3,7 @@
     <DialogContent class="max-w-lg max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{{ isEdit ? '编辑技能' : '创建技能' }}</DialogTitle>
+        <DialogDescription class="sr-only">{{ isEdit ? '编辑已有技能的配置' : '创建一个新的技能' }}</DialogDescription>
       </DialogHeader>
 
       <div class="space-y-4">
@@ -80,7 +81,7 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
 import {Loader2} from 'lucide-vue-next'
-import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
 import {Textarea} from '@/components/ui/textarea'
 import {Button} from '@/components/ui/button'
@@ -115,25 +116,44 @@ const form = ref<SkillFormData>({
   tools: []
 })
 
-// 编辑时填充表单
-watch(() => props.open, (val) => {
-  if (val && props.skill) {
+// 监听 open/skill 变化，同步表单数据
+function resetForm(skill: Skill | null | undefined) {
+  if (skill) {
     form.value = {
-      id: props.skill.id,
-      name: props.skill.name,
-      description: props.skill.description,
-      systemPrompt: props.skill.systemPrompt,
-      icon: props.skill.icon || '',
-      category: props.skill.category || '',
-      maxIters: props.skill.maxIters,
-      tools: props.skill.tools
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      systemPrompt: skill.systemPrompt,
+      icon: skill.icon ?? '',
+      category: skill.category ?? '',
+      maxIters: skill.maxIters ?? 3,
+      tools: [...(skill.tools ?? [])]
     }
-    toolsInput.value = (props.skill.tools || []).join(', ')
-  } else if (val) {
-    form.value = {id: '', name: '', description: '', systemPrompt: '', icon: '', category: '', maxIters: 3, tools: []}
+    toolsInput.value = skill.tools?.join(', ') ?? ''
+  } else {
+    form.value = {
+      id: '',
+      name: '',
+      description: '',
+      systemPrompt: '',
+      icon: '',
+      category: '',
+      maxIters: 3,
+      tools: []
+    }
     toolsInput.value = ''
   }
-})
+}
+
+watch(
+    () => props.open,
+    (isOpen) => {
+      if (isOpen) {
+        resetForm(props.skill)
+      }
+    },
+    {immediate: true}
+)
 
 const ID_REGEX = /^[a-z0-9][a-z0-9-]*$/
 

@@ -9,14 +9,16 @@ export interface Skill {
     tags: string[]
     icon?: string             // Lucide 图标名
     bgColor?: string
-    systemPrompt: string      // 子代理系统提示词
+    systemPrompt: string      // 子代理系统提示词 (prompt 型使用)
     maxIters: number          // ReAct 最大迭代
     tools: string[]           // 工具类名列表
     builtin: boolean          // 是否内置技能
     enabled: boolean          // 当前用户是否启用
+    skillType: 'prompt' | 'package' // 技能类型
+    installPath?: string      // 技能包安装路径 (仅 package 类型)
 }
 
-/** 创建/编辑技能的表单数据 — 对应后端 SkillDefinitionDto */
+/** 创建/编辑技能的表单数据 — 对应后端 SkillDefinitionDto (prompt 型) */
 export interface SkillFormData {
     id: string
     name: string

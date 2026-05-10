@@ -10,6 +10,10 @@ import java.util.List;
 
 /**
  * 技能定义实体
+ * <p>
+ * 支持两种技能类型:
+ * - "prompt": 传统提示词驱动的技能（向后兼容）
+ * - "package": 脚本化技能包，存储在文件系统
  *
  * @author Jion
  */
@@ -62,6 +66,18 @@ public class Skill {
 
     @Column(name = "user_id")
     private Long userId;
+
+    /**
+     * 技能类型: "prompt"(提示词驱动) 或 "package"(脚本化技能包)
+     */
+    @Column(name = "skill_type", length = 16)
+    private String skillType;
+
+    /**
+     * 技能包安装路径（仅 package 类型有值）
+     */
+    @Column(name = "install_path", length = 512)
+    private String installPath;
 
     @Column(name = "created_at", nullable = false)
     private long createdAt;
