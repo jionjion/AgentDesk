@@ -38,10 +38,18 @@ export interface AppSettings {
     fontSize: number
 }
 
+/** Obsidian 知识沉淀设置 */
+export interface ObsidianSettings {
+    vaultPath: string | null
+    autoExportOnSessionEnd: boolean
+    defaultCategory: string
+}
+
 /** 完整设置响应 */
 export interface SettingsResponse {
     profile: ProfileInfo
     model: ModelSettings
     app: AppSettings
     memory: MemorySettings
+    obsidian: ObsidianSettings
 }

@@ -129,14 +129,14 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    /** 自动沉淀当前会话到 Obsidian（fire-and-forget） */
+    /** 自动沉淀当前会话到 Obsidian（fire-and-forget，后端会做 AI 价值判断） */
     function autoExportCurrentSession() {
         try {
             const settingsStore = useSettingsStore()
             if (settingsStore.obsidian?.autoExportOnSessionEnd && currentSessionId.value) {
                 const msgs = messagesBySession.value[currentSessionId.value]
                 if (msgs && msgs.length > 0) {
-                    exportSessionToObsidian(currentSessionId.value).catch(console.error)
+                    exportSessionToObsidian(currentSessionId.value, true).catch(console.error)
                 }
             }
         } catch {

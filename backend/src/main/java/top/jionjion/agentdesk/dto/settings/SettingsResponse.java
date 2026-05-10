@@ -8,5 +8,5 @@ import top.jionjion.agentdesk.dto.auth.ProfileDto;
  * @author Jion
  */
 public record SettingsResponse(ProfileDto profile, ModelSettingsDto model, AppSettingsDto app,
-                               MemorySettingsDto memory) {
+                               MemorySettingsDto memory, ObsidianSettingsDto obsidian) {
 }

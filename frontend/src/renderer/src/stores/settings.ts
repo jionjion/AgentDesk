@@ -1,10 +1,10 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
-import {changePassword, getSettings, updateAppSettings, updateModelSettings, updateProfile, uploadAvatar} from '@/api/settings'
+import {changePassword, getSettings, updateAppSettings, updateModelSettings, updateObsidianSettings as apiUpdateObsidianSettings, updateProfile, uploadAvatar} from '@/api/settings'
 import {updateMemorySettings as apiUpdateMemorySettings} from '@/api/memory'
 import {getGroupedModels} from '@/api/models'
 import {useAppStore} from './app'
-import type {AppSettings, ChangePasswordRequest, ModelSettings, ProfileInfo, UpdateProfileRequest} from '@/types/settings'
+import type {AppSettings, ChangePasswordRequest, ModelSettings, ObsidianSettings, ProfileInfo, UpdateProfileRequest} from '@/types/settings'
 import type {MemorySettings} from '@/types/memory'
 import type {ModelDefinition} from '@/types/model'
 
@@ -81,11 +81,19 @@ const DEFAULT_MEMORY: MemorySettings = {
     enabled: false
 }
 
+/** Obsidian 知识沉淀默认值 */
+const DEFAULT_OBSIDIAN: ObsidianSettings = {
+    vaultPath: null,
+    autoExportOnSessionEnd: false,
+    defaultCategory: 'AgentDesk'
+}
+
 export const useSettingsStore = defineStore('settings', () => {
     const profile = ref<ProfileInfo | null>(null)
     const model = ref<ModelSettings>({...DEFAULT_MODEL})
     const app = ref<AppSettings>({...DEFAULT_APP})
     const memory = ref<MemorySettings>({...DEFAULT_MEMORY})
+    const obsidian = ref<ObsidianSettings>({...DEFAULT_OBSIDIAN})
     const loaded = ref(false)
 
     /** 模型列表（按分组），初始使用内置列表 */
@@ -110,6 +118,7 @@ export const useSettingsStore = defineStore('settings', () => {
         model.value = res.data.model
         app.value = res.data.app
         memory.value = res.data.memory ?? {...DEFAULT_MEMORY}
+        obsidian.value = res.data.obsidian ?? {...DEFAULT_OBSIDIAN}
         loaded.value = true
 
         // 应用主题和字体
@@ -190,12 +199,18 @@ export const useSettingsStore = defineStore('settings', () => {
         memory.value = res.data
     }
 
+    /** 修改 Obsidian 配置 */
+    async function saveObsidianSettings(data: ObsidianSettings) {
+        const res = await apiUpdateObsidianSettings(data)
+        obsidian.value = res.data
+    }
+
     return {
-        profile, model, app, memory, loaded,
+        profile, model, app, memory, obsidian, loaded,
         groupedModels, modelList, currentModelDef,
         fetchSettings, fetchModels,
         saveProfile, doChangePassword, doUploadAvatar,
-        saveModelSettings, switchModel, saveAppSettings, saveMemorySettings
+        saveModelSettings, switchModel, saveAppSettings, saveMemorySettings, saveObsidianSettings
     }
 })
 

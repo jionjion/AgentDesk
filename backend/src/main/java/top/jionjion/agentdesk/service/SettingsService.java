@@ -15,6 +15,7 @@ import top.jionjion.agentdesk.dto.auth.ProfileDto;
 import top.jionjion.agentdesk.dto.auth.UpdateProfileRequest;
 import top.jionjion.agentdesk.dto.model.ModelDefinition;
 import top.jionjion.agentdesk.dto.settings.AppSettingsDto;
+import top.jionjion.agentdesk.dto.settings.ObsidianSettingsDto;
 import top.jionjion.agentdesk.dto.settings.MemorySettingsDto;
 import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
 import top.jionjion.agentdesk.dto.settings.SettingsResponse;
@@ -72,8 +73,9 @@ public class SettingsService {
         ModelSettingsDto model = (entity != null) ? parseModel(entity.getSettings()) : ModelSettingsDto.defaults();
         AppSettingsDto app = (entity != null) ? parseApp(entity.getSettings()) : AppSettingsDto.defaults();
         MemorySettingsDto memory = (entity != null) ? parseMemory(entity.getSettings()) : MemorySettingsDto.defaults();
+        ObsidianSettingsDto obsidian = (entity != null) ? parseObsidian(entity.getSettings()) : ObsidianSettingsDto.defaults();
 
-        return new SettingsResponse(profile, model, app, memory);
+        return new SettingsResponse(profile, model, app, memory, obsidian);
     }
 
     /**
@@ -239,6 +241,36 @@ public class SettingsService {
     }
 
     /**
+     * 获取指定用户的 Obsidian 配置
+     */
+    public ObsidianSettingsDto getObsidianSettings(Long userId) {
+        return userSettingsRepository.findByUserId(userId)
+                .map(entity -> parseObsidian(entity.getSettings()))
+                .orElse(ObsidianSettingsDto.defaults());
+    }
+
+    /**
+     * 修改 Obsidian 配置
+     */
+    @Transactional
+    public ObsidianSettingsDto updateObsidianSettings(ObsidianSettingsDto dto) {
+        if (dto.vaultPath() != null && dto.vaultPath().length() > 512) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vault 路径最长512字符");
+        }
+
+        Long userId = UserContext.getUserId();
+        UserSettings entity = getOrCreateSettings(userId);
+
+        ObjectNode root = parseSettingsJson(entity.getSettings());
+        root.set("obsidian", MAPPER.valueToTree(dto));
+        entity.setSettings(toJson(root));
+        entity.setUpdatedAt(System.currentTimeMillis());
+        userSettingsRepository.save(entity);
+
+        return dto;
+    }
+
+    /**
      * 获取指定用户的模型配置 (供 AgentFactory 调用)
      */
     public ModelSettingsDto getModelSettings(Long userId) {
@@ -375,6 +407,18 @@ public class SettingsService {
         } catch (JsonProcessingException ignored) {
         }
         return MemorySettingsDto.defaults();
+    }
+
+    private ObsidianSettingsDto parseObsidian(String json) {
+        try {
+            JsonNode root = MAPPER.readTree(json);
+            JsonNode obsidianNode = root.get("obsidian");
+            if (obsidianNode != null) {
+                return MAPPER.treeToValue(obsidianNode, ObsidianSettingsDto.class);
+            }
+        } catch (JsonProcessingException ignored) {
+        }
+        return ObsidianSettingsDto.defaults();
     }
 
     private String toJson(Object obj) {

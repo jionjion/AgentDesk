@@ -1,5 +1,5 @@
 import request from './request'
-import type {AppSettings, ChangePasswordRequest, ModelSettings, ProfileInfo, SettingsResponse, UpdateProfileRequest} from '@/types/settings'
+import type {AppSettings, ChangePasswordRequest, ModelSettings, ObsidianSettings, ProfileInfo, SettingsResponse, UpdateProfileRequest} from '@/types/settings'
 
 /** 获取全部设置 */
 export function getSettings() {
@@ -33,4 +33,9 @@ export function uploadAvatar(file: File) {
     return request.post<ProfileInfo>('/api/settings/avatar', formData, {
         headers: {'Content-Type': 'multipart/form-data'}
     })
+}
+
+/** 修改 Obsidian 配置 */
+export function updateObsidianSettings(data: ObsidianSettings) {
+    return request.put<ObsidianSettings>('/api/settings/obsidian', data)
 }
