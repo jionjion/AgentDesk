@@ -32,6 +32,12 @@ const router = createRouter({
             meta: {title: '定时任务'}
         },
         {
+            path: '/knowledge',
+            name: 'knowledge',
+            component: () => import('@/views/KnowledgeView.vue'),
+            meta: {title: '知识库'}
+        },
+        {
             path: '/settings',
             name: 'settings',
             component: () => import('@/views/SettingsView.vue'),

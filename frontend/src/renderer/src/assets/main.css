@@ -4,64 +4,94 @@
 
 @theme inline {
     --color-background: hsl(0 0% 100%);
-    --color-foreground: hsl(0 0% 3.9%);
+    --color-foreground: hsl(252 45% 14%);
     --color-card: hsl(0 0% 100%);
-    --color-card-foreground: hsl(0 0% 3.9%);
+    --color-card-foreground: hsl(252 45% 14%);
     --color-popover: hsl(0 0% 100%);
-    --color-popover-foreground: hsl(0 0% 3.9%);
-    --color-primary: hsl(262 83% 58%);
+    --color-popover-foreground: hsl(252 45% 14%);
+    --color-primary: hsl(252 100% 65%);
     --color-primary-foreground: hsl(0 0% 100%);
-    --color-secondary: hsl(0 0% 96.1%);
-    --color-secondary-foreground: hsl(0 0% 9%);
-    --color-muted: hsl(0 0% 96.1%);
-    --color-muted-foreground: hsl(0 0% 45.1%);
-    --color-accent: hsl(0 0% 96.1%);
-    --color-accent-foreground: hsl(0 0% 9%);
-    --color-destructive: hsl(0 84.2% 60.2%);
+    --color-secondary: hsl(252 100% 97%);
+    --color-secondary-foreground: hsl(252 45% 14%);
+    --color-muted: hsl(252 100% 97%);
+    --color-muted-foreground: hsl(252 19% 48%);
+    --color-accent: hsl(252 100% 97%);
+    --color-accent-foreground: hsl(252 45% 14%);
+    --color-destructive: hsl(0 84% 60%);
     --color-destructive-foreground: hsl(0 0% 98%);
-    --color-border: hsl(0 0% 89.8%);
-    --color-input: hsl(0 0% 89.8%);
-    --color-ring: hsl(262 83% 58%);
+    --color-border: hsl(252 20% 90%);
+    --color-input: hsl(252 20% 90%);
+    --color-ring: hsl(252 100% 65%);
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) + 4px);
     --radius: 0.5rem;
-    --color-sidebar: hsl(0 0% 98%);
-    --color-sidebar-foreground: hsl(240 5.3% 26.1%);
-    --color-sidebar-primary: hsl(262 83% 58%);
-    --color-sidebar-primary-foreground: hsl(0 0% 98%);
-    --color-sidebar-accent: hsl(240 4.8% 95.9%);
-    --color-sidebar-accent-foreground: hsl(240 5.9% 10%);
-    --color-sidebar-border: hsl(220 13% 91%);
-    --color-sidebar-ring: hsl(262 83% 58%);
+    --color-sidebar: hsl(252 100% 99%);
+    --color-sidebar-foreground: hsl(252 45% 14%);
+    --color-sidebar-primary: hsl(252 100% 65%);
+    --color-sidebar-primary-foreground: hsl(0 0% 100%);
+    --color-sidebar-accent: hsl(252 100% 97%);
+    --color-sidebar-accent-foreground: hsl(252 45% 14%);
+    --color-sidebar-border: hsl(252 20% 91%);
+    --color-sidebar-ring: hsl(252 100% 65%);
     --color-chart-1: hsl(12 76% 61%);
     --color-chart-2: hsl(173 58% 39%);
     --color-chart-3: hsl(197 37% 24%);
     --color-chart-4: hsl(43 74% 66%);
     --color-chart-5: hsl(27 87% 67%);
+
+    /* Override violet palette to brand colors */
+    --color-violet-50: hsl(252 100% 97%);
+    --color-violet-100: hsl(252 100% 94%);
+    --color-violet-200: hsl(252 80% 88%);
+    --color-violet-300: hsl(252 70% 80%);
+    --color-violet-400: hsl(252 100% 76%);
+    --color-violet-500: hsl(252 100% 65%);
+    --color-violet-600: hsl(252 91% 59%);
+    --color-violet-700: hsl(250 87% 57%);
+    --color-violet-800: hsl(252 46% 19%);
+    --color-violet-900: hsl(252 50% 14%);
+    --color-violet-950: hsl(252 53% 9%);
+
+    /* Gradient stops */
+    --color-gradient-start: hsl(261 100% 76%);
+    --color-gradient-mid: hsl(252 100% 65%);
+    --color-gradient-end: hsl(250 87% 57%);
+
+    /* Glow */
+    --color-glow: hsl(252 100% 71%);
+
+    /* Functional colors */
+    --color-success: hsl(142 71% 45%);
+    --color-warning: hsl(38 92% 50%);
+    --color-error: hsl(0 84% 60%);
+    --color-info: hsl(199 89% 60%);
 }
 
 .dark {
-    --color-background: hsl(0 0% 3.9%);
-    --color-foreground: hsl(0 0% 98%);
-    --color-card: hsl(0 0% 3.9%);
-    --color-card-foreground: hsl(0 0% 98%);
-    --color-popover: hsl(0 0% 3.9%);
-    --color-popover-foreground: hsl(0 0% 98%);
-    --color-primary: hsl(262 83% 70%);
+    /* background: neutral dark */
+    --color-background: hsl(240 6% 6%);
+    --color-foreground: hsl(0 0% 100%);
+    /* surface: 微偏冷 */
+    --color-card: hsl(240 8% 8%);
+    --color-card-foreground: hsl(0 0% 100%);
+    --color-popover: hsl(240 8% 8%);
+    --color-popover-foreground: hsl(0 0% 100%);
+    /* accent: brand purple */
+    --color-primary: hsl(252 100% 71%);
     --color-primary-foreground: hsl(0 0% 100%);
-    --color-secondary: hsl(0 0% 14.9%);
-    --color-secondary-foreground: hsl(0 0% 98%);
-    --color-muted: hsl(0 0% 14.9%);
-    --color-muted-foreground: hsl(0 0% 63.9%);
-    --color-accent: hsl(0 0% 14.9%);
+    --color-secondary: hsl(240 8% 12%);
+    --color-secondary-foreground: hsl(252 50% 80%);
+    --color-muted: hsl(240 8% 12%);
+    --color-muted-foreground: hsl(252 25% 57%);
+    --color-accent: hsl(240 8% 12%);
     --color-accent-foreground: hsl(0 0% 98%);
     --color-destructive: hsl(0 62.8% 30.6%);
     --color-destructive-foreground: hsl(0 0% 98%);
-    --color-border: hsl(0 0% 14.9%);
-    --color-input: hsl(0 0% 14.9%);
-    --color-ring: hsl(262 83% 70%);
+    --color-border: hsl(240 8% 14%);
+    --color-input: hsl(240 8% 14%);
+    --color-ring: hsl(252 100% 71%);
     --color-chart-1: hsl(220 70% 50%);
     --color-chart-2: hsl(160 60% 45%);
     --color-chart-3: hsl(30 80% 55%);
@@ -142,6 +172,9 @@ body[data-scroll-locked] {
     top: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
+    height: fit-content;
+    max-height: 85vh;
+    overflow-y: auto;
     margin: auto !important;
     transform: none;
     /* 只在 open/closed 动画期间应用 zoom 动画类自己的 transform，

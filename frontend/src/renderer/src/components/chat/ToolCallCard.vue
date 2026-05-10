@@ -18,12 +18,12 @@
         <ChevronRight :size="10" :class="showArgs ? 'rotate-90 transition-transform' : 'transition-transform'"/>
         <span>参数</span>
       </div>
-      <pre v-if="showArgs" class="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{{ formattedArgs }}</pre>
+      <pre v-if="showArgs" class="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-400 overflow-auto max-h-24">{{ formattedArgs }}</pre>
     </div>
     <!-- 结果 -->
     <div v-if="message.result" class="px-3 py-2 border-t border-gray-100 dark:border-gray-700">
       <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">结果</div>
-      <div class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ message.result }}</div>
+      <div class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-auto max-h-24">{{ message.result }}</div>
     </div>
   </div>
 </template>

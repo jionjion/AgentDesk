@@ -51,7 +51,7 @@
         <Label>深度思考</Label>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">启用后模型会展示推理过程（需模型支持）</p>
       </div>
-      <Switch v-model:checked="form.enableThinking"/>
+      <Switch v-model="form.enableThinking"/>
     </div>
 
     <!-- 系统提示词 -->

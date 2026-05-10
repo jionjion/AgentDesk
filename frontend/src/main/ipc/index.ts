@@ -18,6 +18,11 @@ export function registerIpcHandlers(): void {
         return result.canceled ? '' : result.filePath
     })
 
+    ipcMain.handle('dialog:openDirectory', async () => {
+        const result = await dialog.showOpenDialog({properties: ['openDirectory']})
+        return result.canceled ? '' : result.filePaths[0]
+    })
+
     // 文件系统操作
     ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
         const data = await readFile(filePath)

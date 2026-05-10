@@ -37,7 +37,7 @@
     <!-- 开机自启 -->
     <div class="flex items-center justify-between">
       <Label for="auto-launch" class="cursor-pointer">开机自动启动</Label>
-      <Switch id="auto-launch" :checked="autoLaunch" @update:checked="onAutoLaunchChange"/>
+      <Switch id="auto-launch" :model-value="autoLaunch" @update:model-value="onAutoLaunchChange"/>
     </div>
 
     <!-- 发送键 -->

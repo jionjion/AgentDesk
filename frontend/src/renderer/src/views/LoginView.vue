@@ -82,7 +82,7 @@
     <div class="w-[480px] bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center relative overflow-hidden">
       <div class="absolute inset-0 opacity-30">
         <svg class="w-full h-full" viewBox="0 0 480 720" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path v-for="i in 20" :key="i" :d="`M${i * 24} 0 Q${i * 24 + 12} 360 ${i * 24} 720`" stroke="#7C3AED" stroke-width="1.5" fill="none"/>
+          <path v-for="i in 20" :key="i" :d="`M${i * 24} 0 Q${i * 24 + 12} 360 ${i * 24} 720`" stroke="#6C4CFF" stroke-width="1.5" fill="none"/>
         </svg>
       </div>
       <p class="relative z-10 text-violet-800 dark:text-violet-300 text-lg font-medium text-center leading-relaxed px-12">

@@ -4,7 +4,7 @@
       @click="$emit('edit')"
   >
     <div class="flex items-center justify-between mb-3">
-      <Switch :checked="task.enabled" @click.stop @update:checked="$emit('toggle-enabled')"/>
+      <Switch :model-value="task.enabled" @click.stop @update:model-value="$emit('toggle-enabled')"/>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button variant="ghost" size="icon" class="h-8 w-8" @click.stop>

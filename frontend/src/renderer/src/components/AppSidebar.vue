@@ -300,7 +300,7 @@ import {useRoute, useRouter} from 'vue-router'
 import type {ThemeMode} from '@/stores/app'
 import {useAppStore} from '@/stores/app'
 import {useChatStore} from '@/stores/chat'
-import {BookOpen, Check, ChevronRight, Download, Edit3, FileText, Info, ListChecks, LogOut, Monitor, Moon, Palette, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Sun, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
+import {BookOpen, Check, ChevronRight, Download, Edit3, FileText, Info, Library, ListChecks, LogOut, Monitor, Moon, Palette, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Sun, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -348,7 +348,8 @@ watch(() => appStore.currentUser.avatar, () => {
 
 const navItems: { path: string; label: string; icon: typeof Ticket; disabled?: boolean; badge?: string }[] = [
   {path: '/skills', label: '技能', icon: Ticket},
-  {path: '/scheduled-tasks', label: '定时任务', icon: Timer}
+  {path: '/scheduled-tasks', label: '定时任务', icon: Timer},
+  {path: '/knowledge', label: '知识库', icon: Library}
 ]
 
 const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [

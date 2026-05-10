@@ -4,7 +4,8 @@ const electronAPI = {
     dialog: {
         openFile: (): Promise<string[]> => ipcRenderer.invoke('dialog:openFile'),
         saveFile: (options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }): Promise<string> =>
-            ipcRenderer.invoke('dialog:saveFile', options)
+            ipcRenderer.invoke('dialog:saveFile', options),
+        openDirectory: (): Promise<string> => ipcRenderer.invoke('dialog:openDirectory')
     },
     fs: {
         readFile: (filePath: string): Promise<Uint8Array> =>

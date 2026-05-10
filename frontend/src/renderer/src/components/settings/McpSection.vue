@@ -80,8 +80,8 @@
           <!-- 右侧操作 -->
           <div class="flex items-center gap-2">
             <Switch
-                :checked="server.enabled"
-                @update:checked="handleToggleEnabled(server)"
+                :model-value="server.enabled"
+                @update:model-value="handleToggleEnabled(server)"
             />
             <div class="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
