@@ -4,6 +4,8 @@ import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, Chat
 import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
+import {exportSessionToObsidian} from '@/api/obsidian'
+import {useSettingsStore} from './settings'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -53,6 +55,8 @@ export const useChatStore = defineStore('chat', () => {
 
     /** 当前对话长期记忆召回数量 (0 表示未召回) */
     const memoryRecalledCount = ref(0)
+    /** 当前对话知识库检索结果 */
+    const knowledgeRetrievedResults = ref<{count: number; sources: string[]; references: {documentName: string; score: number; chunkIndex: number}[]}>({count: 0, sources: [], references: []})
     // === Computed ===
     const currentSession = computed(() =>
         sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -82,6 +86,8 @@ export const useChatStore = defineStore('chat', () => {
 
     /** 创建新会话 */
     async function createNewSession(title?: string): Promise<string> {
+        // 自动沉淀到 Obsidian
+        autoExportCurrentSession()
         const res = await createSession(title)
         const session = res.data
         sessions.value.unshift(session)
@@ -123,9 +129,26 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    /** 自动沉淀当前会话到 Obsidian（fire-and-forget） */
+    function autoExportCurrentSession() {
+        try {
+            const settingsStore = useSettingsStore()
+            if (settingsStore.obsidian?.autoExportOnSessionEnd && currentSessionId.value) {
+                const msgs = messagesBySession.value[currentSessionId.value]
+                if (msgs && msgs.length > 0) {
+                    exportSessionToObsidian(currentSessionId.value).catch(console.error)
+                }
+            }
+        } catch {
+            // 忽略错误，不影响正常流程
+        }
+    }
+
     /** 切换会话 */
     async function switchSession(id: string) {
         if (isStreaming.value) return
+        // 自动沉淀到 Obsidian
+        autoExportCurrentSession()
         isLoadingSession.value = true
         currentSessionId.value = id
         try {
@@ -346,6 +369,10 @@ export const useChatStore = defineStore('chat', () => {
             const msg = getAssistantMsg()
             if (msg) {
                 msg.isStreaming = false
+                // 保存知识库引用到消息中，便于在气泡中展示
+                if (knowledgeRetrievedResults.value.references.length > 0) {
+                    msg.knowledgeRefs = [...knowledgeRetrievedResults.value.references]
+                }
             }
             cleanup()
 
@@ -383,6 +410,19 @@ export const useChatStore = defineStore('chat', () => {
             }
         })
 
+        es.addEventListener('knowledge_retrieved', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data)
+                knowledgeRetrievedResults.value = {
+                    count: data.count || 0,
+                    sources: data.sources || [],
+                    references: data.references || []
+                }
+            } catch {
+                knowledgeRetrievedResults.value = {count: 0, sources: [], references: []}
+            }
+        })
+
         es.addEventListener('error', (e: MessageEvent) => {
             try {
                 const data: SSEEventData = JSON.parse(e.data)
@@ -414,13 +454,14 @@ export const useChatStore = defineStore('chat', () => {
         function cleanup() {
             isStreaming.value = false
             memoryRecalledCount.value = 0
+            knowledgeRetrievedResults.value = {count: 0, sources: [], references: []}
             es.close()
             eventSource.value = null
         }
     }
 
     /** 发送消息 (核心) */
-    async function sendMessage(content: string) {
+    async function sendMessage(content: string, kbIds?: number[]) {
         const hasAttachments = pendingAttachments.value.some(p => !p.uploading && p.id > 0)
         if ((!content.trim() && !hasAttachments) || isStreaming.value) return
 
@@ -464,7 +505,7 @@ export const useChatStore = defineStore('chat', () => {
 
         // 4. 创建 SSE 连接
         isStreaming.value = true
-        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined)
+        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds)
         eventSource.value = es
 
         // 5. 设置监听
@@ -619,6 +660,7 @@ export const useChatStore = defineStore('chat', () => {
         isStreaming,
         isLoadingSession,
         memoryRecalledCount,
+        knowledgeRetrievedResults,
         pendingAttachments,
         pinnedSessionIds,
         // computed

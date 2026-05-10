@@ -40,6 +40,14 @@ management:
 agentdesk:
   # 数据库存储, 不再使用本地文件
   storage: postgresql
+  # 技能包存储目录（用户安装的技能解压到此目录）
+  skills:
+    base-dir: ${AGENTDESK_SKILLS_DIR:${user.home}/.agentdesk/skills}
+    # 代码执行沙箱配置
+    code-execution:
+      enabled: true
+      work-dir: ${AGENTDESK_SKILLS_WORKDIR:${user.home}/.agentdesk/workspace}
+      allowed-commands: python3,python,node,npm,pip
   # JWT 配置
   jwt:
     expiration: 86400000
@@ -47,3 +55,15 @@ agentdesk:
   mem0:
     base-url: ${MEM0_API_BASE_URL:http://localhost:18090}
     api-key: ${MEM0_API_KEY:}
+  # 知识库 RAG 配置
+  knowledge:
+    enabled: true
+    embedding-model: text-embedding-v3
+    embedding-dimensions: 1024
+    chunk-size: 512
+    chunk-overlap: 50
+    max-file-size: 52428800
+    retrieve:
+      default-top-k: 5
+      default-score-threshold: 0.8
+      max-context-tokens: 2000

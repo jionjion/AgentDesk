@@ -9,6 +9,26 @@
       "name": "agentdesk.storage",
       "type": "java.lang.String",
       "description": "存储的方式本地存储/数据库存储."
+    },
+    {
+      "name": "agentdesk.skills.base-dir",
+      "type": "java.lang.String",
+      "description": "技能包存储根目录（用户安装的技能解压到此目录）."
+    },
+    {
+      "name": "agentdesk.skills.code-execution.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用技能代码执行沙箱."
+    },
+    {
+      "name": "agentdesk.skills.code-execution.work-dir",
+      "type": "java.lang.String",
+      "description": "代码执行工作目录."
+    },
+    {
+      "name": "agentdesk.skills.code-execution.allowed-commands",
+      "type": "java.lang.String",
+      "description": "允许执行的命令白名单（逗号分隔）."
     }
   ]
 }

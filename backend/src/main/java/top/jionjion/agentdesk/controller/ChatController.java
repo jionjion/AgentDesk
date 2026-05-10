@@ -23,8 +23,11 @@ import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.repository.SessionRepository;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.FileService;
+import top.jionjion.agentdesk.service.KnowledgeRetrievalService;
+import top.jionjion.agentdesk.service.RetrievalIntentService;
 import top.jionjion.agentdesk.service.TitleGenerationService;
 import top.jionjion.agentdesk.service.SessionService;
+import top.jionjion.agentdesk.dto.knowledge.RetrievalResultDto;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -71,16 +74,22 @@ public class ChatController {
     private final SessionService sessionService;
     private final FileService fileService;
     private final TitleGenerationService titleGenerationService;
+    private final KnowledgeRetrievalService knowledgeRetrievalService;
+    private final RetrievalIntentService retrievalIntentService;
 
     public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository,
                           SessionRepository sessionRepository, SessionService sessionService,
-                          FileService fileService, TitleGenerationService titleGenerationService) {
+                          FileService fileService, TitleGenerationService titleGenerationService,
+                          KnowledgeRetrievalService knowledgeRetrievalService,
+                          RetrievalIntentService retrievalIntentService) {
         this.agentPool = agentPool;
         this.chatMessageRepository = chatMessageRepository;
         this.sessionRepository = sessionRepository;
         this.sessionService = sessionService;
         this.fileService = fileService;
         this.titleGenerationService = titleGenerationService;
+        this.knowledgeRetrievalService = knowledgeRetrievalService;
+        this.retrievalIntentService = retrievalIntentService;
     }
 
     /**
@@ -104,7 +113,8 @@ public class ChatController {
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestParam String sessionId,
                                  @RequestParam String message,
-                                 @RequestParam(required = false) String fileIds) {
+                                 @RequestParam(required = false) String fileIds,
+                                 @RequestParam(required = false) String kbIds) {
         validateSessionId(sessionId);
         if (message == null || message.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is empty");
@@ -138,7 +148,55 @@ public class ChatController {
         // 持久化用户消息 (含 fileIds)
         saveUserMessage(sessionId, message, parsedFileIds);
 
+        // ─── 知识库检索增强 ───
+        String messageForAgent = message;
+        List<RetrievalResultDto> retrievalResults = List.of();
+        try {
+            boolean enabled = knowledgeRetrievalService.isEnabled(UserContext.getUserId());
+            log.info("知识库检索: enabled={}, userId={}, kbIds={}", enabled, UserContext.getUserId(), kbIds);
+            if (enabled) {
+                // AI 意图判断: 是否需要检索知识库
+                boolean needsRetrieval = retrievalIntentService.needsRetrieval(message);
+                if (needsRetrieval) {
+                    List<Long> parsedKbIds = parseKbIds(kbIds);
+                    retrievalResults = knowledgeRetrievalService.retrieve(
+                            UserContext.getUserId(), message, parsedKbIds);
+                    log.info("知识库检索完成: 命中 {} 条", retrievalResults.size());
+                    if (!retrievalResults.isEmpty()) {
+                        messageForAgent = knowledgeRetrievalService.buildAugmentedMessage(message, retrievalResults);
+                    }
+                } else {
+                    log.info("AI 判断无需检索知识库, 跳过检索");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("知识检索异常, 降级为无检索模式: {}", e.getMessage(), e);
+        }
+
         configureSseCallbacks(emitter, sessionId, handle);
+
+        // 推送知识检索事件 (含来源和分数, 供前端展示引用)
+        if (!retrievalResults.isEmpty()) {
+            try {
+                List<Map<String, Object>> refs = retrievalResults.stream()
+                        .map(r -> Map.<String, Object>of(
+                                "documentName", r.documentName(),
+                                "score", Math.round(r.score() * 100) / 100.0,
+                                "chunkIndex", r.chunkIndex()
+                        )).toList();
+                List<String> sources = retrievalResults.stream()
+                        .map(RetrievalResultDto::documentName)
+                        .distinct().toList();
+                String json = OBJECT_MAPPER.writeValueAsString(Map.of(
+                        "count", retrievalResults.size(),
+                        "sources", sources,
+                        "references", refs
+                ));
+                emitter.send(SseEmitter.event().name("knowledge_retrieved").data(json));
+            } catch (Exception ex) {
+                log.debug("Failed to send knowledge_retrieved event: {}", ex.getMessage());
+            }
+        }
 
         // 通知 Hook 长期记忆已启用, 由 Hook 在实际召回时发送事件
         if (handle.longTermMemoryEnabled()) {
@@ -148,13 +206,13 @@ public class ChatController {
         Msg userMsg;
         if (imageFiles.isEmpty()) {
             // 纯文本路径 (无图片附件)
-            String enrichedMessage = buildMessageWithFiles(message, nonImageFiles);
+            String enrichedMessage = buildMessageWithFiles(messageForAgent, nonImageFiles);
             userMsg = Msg.builder()
                     .textContent(enrichedMessage)
                     .build();
         } else {
             // 多模态路径 (含图片附件)
-            userMsg = buildMultimodalMsg(message, imageFiles, nonImageFiles);
+            userMsg = buildMultimodalMsg(messageForAgent, imageFiles, nonImageFiles);
         }
 
         handle.agent().stream(userMsg)
@@ -174,7 +232,7 @@ public class ChatController {
                         log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
                     }
                 })
-                .doFinally(_ -> agentPool.release(sessionId))
+                .doFinally(signal -> agentPool.release(sessionId))
                 .subscribe();
 
         return emitter;
@@ -221,8 +279,11 @@ public class ChatController {
         while (cause != null) {
             String msg = cause.getMessage();
             if (msg != null && (msg.contains("Broken pipe")
+                    || msg.contains("broken pipe")
                     || msg.contains("disconnected client")
-                    || msg.contains("Connection reset"))) {
+                    || msg.contains("Connection reset")
+                    || msg.contains("connection reset")
+                    || msg.contains("中止"))) {
                 return true;
             }
             cause = cause.getCause();
@@ -351,7 +412,7 @@ public class ChatController {
                         log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
                     }
                 })
-                .doFinally(_ -> agentPool.release(sessionId))
+                .doFinally(signal -> agentPool.release(sessionId))
                 .subscribe();
 
         return emitter;
@@ -435,6 +496,17 @@ public class ChatController {
             return Collections.emptyList();
         }
         return Arrays.stream(fileIds.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Long::valueOf)
+                .toList();
+    }
+
+    private List<Long> parseKbIds(String kbIds) {
+        if (kbIds == null || kbIds.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(kbIds.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(Long::valueOf)

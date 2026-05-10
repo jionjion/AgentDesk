@@ -162,10 +162,15 @@ public class GlobalExceptionHandler {
     private boolean isBrokenPipe(Throwable ex) {
         Throwable cause = ex;
         while (cause != null) {
-            if (cause instanceof java.io.IOException
-                    && cause.getMessage() != null
-                    && cause.getMessage().toLowerCase().contains("broken pipe")) {
-                return true;
+            if (cause instanceof java.io.IOException && cause.getMessage() != null) {
+                String msg = cause.getMessage().toLowerCase();
+                // Linux: broken pipe; Windows: 中止/connection abort/reset
+                if (msg.contains("broken pipe")
+                        || msg.contains("connection reset")
+                        || msg.contains("connection abort")
+                        || msg.contains("中止")) {
+                    return true;
+                }
             }
             cause = cause.getCause();
         }

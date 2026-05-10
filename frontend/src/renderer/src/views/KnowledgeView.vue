@@ -132,13 +132,13 @@
           <DialogTitle>新建知识库</DialogTitle>
         </DialogHeader>
         <div class="space-y-3">
-          <div>
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">名称</label>
+          <div class="space-y-1.5">
+            <Label>名称</Label>
             <Input v-model="createForm.name" placeholder="例如: 产品文档"/>
           </div>
-          <div>
-            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">描述 (可选)</label>
-            <Input v-model="createForm.description" placeholder="简要描述知识库用途"/>
+          <div class="space-y-1.5">
+            <Label>描述 (可选)</Label>
+            <Textarea v-model="createForm.description" placeholder="简要描述知识库用途" rows="3" class="resize-none"/>
           </div>
         </div>
         <DialogFooter class="gap-2 mt-4">
@@ -169,6 +169,8 @@ import {useKnowledgeStore} from '@/stores/knowledge'
 import type {KnowledgeBase} from '@/types/knowledge'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
+import {Label} from '@/components/ui/label'
+import {Textarea} from '@/components/ui/textarea'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 

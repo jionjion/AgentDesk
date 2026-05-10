@@ -268,33 +268,37 @@ ON CONFLICT (id) DO NOTHING;
 -- 11. 技能表
 CREATE TABLE IF NOT EXISTS agent_desk.skills
 (
-    id          VARCHAR(64) PRIMARY KEY,
-    name        VARCHAR(128) NOT NULL,
-    description VARCHAR(512) NOT NULL,
-    author      VARCHAR(128) NOT NULL DEFAULT 'AgentDesk',
-    version     VARCHAR(32)  NOT NULL DEFAULT '1.0.0',
-    category    VARCHAR(32)  NOT NULL DEFAULT 'other',
-    tags        JSONB        NOT NULL DEFAULT '[]',
-    icon        VARCHAR(64),
-    bg_color    VARCHAR(16),
-    sys_prompt  TEXT         NOT NULL,
-    max_iters   INTEGER      NOT NULL DEFAULT 3,
-    tools       JSONB        NOT NULL DEFAULT '[]',
-    builtin     BOOLEAN      NOT NULL DEFAULT FALSE,
-    user_id     BIGINT REFERENCES agent_desk.users (id),
-    created_at  BIGINT       NOT NULL,
-    updated_at  BIGINT       NOT NULL
+    id           VARCHAR(64) PRIMARY KEY,
+    name         VARCHAR(128) NOT NULL,
+    description  VARCHAR(512) NOT NULL,
+    author       VARCHAR(128) NOT NULL DEFAULT 'AgentDesk',
+    version      VARCHAR(32)  NOT NULL DEFAULT '1.0.0',
+    category     VARCHAR(32)  NOT NULL DEFAULT 'other',
+    tags         JSONB        NOT NULL DEFAULT '[]',
+    icon         VARCHAR(64),
+    bg_color     VARCHAR(16),
+    sys_prompt   TEXT         NOT NULL DEFAULT '',
+    max_iters    INTEGER      NOT NULL DEFAULT 3,
+    tools        JSONB        NOT NULL DEFAULT '[]',
+    builtin      BOOLEAN      NOT NULL DEFAULT FALSE,
+    user_id      BIGINT REFERENCES agent_desk.users (id),
+    skill_type   VARCHAR(16)  NOT NULL DEFAULT 'prompt',
+    install_path VARCHAR(512),
+    created_at   BIGINT       NOT NULL,
+    updated_at   BIGINT       NOT NULL
 );
 
 COMMENT ON TABLE agent_desk.skills IS '技能定义表';
 COMMENT ON COLUMN agent_desk.skills.id IS '技能唯一标识, 小写字母+数字+连字符';
 COMMENT ON COLUMN agent_desk.skills.name IS '显示名称';
 COMMENT ON COLUMN agent_desk.skills.description IS '技能描述, 也是 Agent 委派依据';
-COMMENT ON COLUMN agent_desk.skills.sys_prompt IS '子代理系统提示词';
+COMMENT ON COLUMN agent_desk.skills.sys_prompt IS '子代理系统提示词 (prompt 型使用)';
 COMMENT ON COLUMN agent_desk.skills.max_iters IS 'ReAct 最大迭代次数';
 COMMENT ON COLUMN agent_desk.skills.tools IS '工具类名列表, JSON数组';
 COMMENT ON COLUMN agent_desk.skills.builtin IS '是否内置技能';
 COMMENT ON COLUMN agent_desk.skills.user_id IS '所属用户ID, 内置技能为 NULL';
+COMMENT ON COLUMN agent_desk.skills.skill_type IS '技能类型: prompt(提示词驱动) 或 package(脚本化技能包)';
+COMMENT ON COLUMN agent_desk.skills.install_path IS '技能包安装路径 (仅 package 类型有值)';
 
 CREATE INDEX IF NOT EXISTS idx_skills_user ON agent_desk.skills (user_id);
 CREATE INDEX IF NOT EXISTS idx_skills_builtin ON agent_desk.skills (builtin);
@@ -435,3 +439,151 @@ COMMENT ON COLUMN agent_desk.scheduled_task_logs.ended_at IS '结束时间戳(�
 
 CREATE INDEX IF NOT EXISTS idx_task_logs_task ON agent_desk.scheduled_task_logs (task_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_task_logs_user ON agent_desk.scheduled_task_logs (user_id, started_at DESC);
+
+-- 15. MCP 服务器配置表
+CREATE TABLE IF NOT EXISTS agent_desk.mcp_servers
+(
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT       NOT NULL REFERENCES agent_desk.users (id),
+    name        VARCHAR(128) NOT NULL,
+    description VARCHAR(512),
+    type        VARCHAR(16)  NOT NULL,
+    config      JSONB        NOT NULL DEFAULT '{}',
+    enabled     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  BIGINT       NOT NULL,
+    updated_at  BIGINT       NOT NULL,
+    UNIQUE (user_id, name)
+);
+
+COMMENT ON TABLE agent_desk.mcp_servers IS 'MCP 服务器配置表';
+COMMENT ON COLUMN agent_desk.mcp_servers.user_id IS '所属用户ID';
+COMMENT ON COLUMN agent_desk.mcp_servers.name IS '服务器名称, 同一用户下唯一';
+COMMENT ON COLUMN agent_desk.mcp_servers.description IS '服务器描述';
+COMMENT ON COLUMN agent_desk.mcp_servers.type IS '传输类型: sse / stdio';
+COMMENT ON COLUMN agent_desk.mcp_servers.config IS '传输配置, JSON格式. SSE: {url, headers}; StdIO: {command, env, workingDirectory}';
+COMMENT ON COLUMN agent_desk.mcp_servers.enabled IS '是否启用';
+COMMENT ON COLUMN agent_desk.mcp_servers.created_at IS '创建时间戳(毫秒)';
+COMMENT ON COLUMN agent_desk.mcp_servers.updated_at IS '更新时间戳(毫秒)';
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_user ON agent_desk.mcp_servers (user_id);
+
+-- =============================================
+-- 16. 知识库 RAG 相关表 (需要 pgvector 扩展)
+-- =============================================
+
+-- 启用 pgvector 扩展 (需要超级用户权限或预先安装)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 16.1 知识库表
+CREATE TABLE IF NOT EXISTS agent_desk.knowledge_bases
+(
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT       NOT NULL REFERENCES agent_desk.users (id),
+    name        VARCHAR(128) NOT NULL,
+    description VARCHAR(512),
+    doc_count   INTEGER      NOT NULL DEFAULT 0,
+    chunk_count INTEGER      NOT NULL DEFAULT 0,
+    status      VARCHAR(16)  NOT NULL DEFAULT 'active',
+    created_at  BIGINT       NOT NULL,
+    updated_at  BIGINT       NOT NULL
+);
+
+COMMENT ON TABLE agent_desk.knowledge_bases IS '知识库表';
+COMMENT ON COLUMN agent_desk.knowledge_bases.user_id IS '所属用户ID';
+COMMENT ON COLUMN agent_desk.knowledge_bases.name IS '知识库名称';
+COMMENT ON COLUMN agent_desk.knowledge_bases.description IS '知识库描述';
+COMMENT ON COLUMN agent_desk.knowledge_bases.doc_count IS '文档数量';
+COMMENT ON COLUMN agent_desk.knowledge_bases.chunk_count IS '分片数量';
+COMMENT ON COLUMN agent_desk.knowledge_bases.status IS '状态: active / archived';
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_bases_user ON agent_desk.knowledge_bases (user_id);
+
+-- 16.2 知识库文档表
+CREATE TABLE IF NOT EXISTS agent_desk.knowledge_documents
+(
+    id           BIGSERIAL PRIMARY KEY,
+    kb_id        BIGINT       NOT NULL REFERENCES agent_desk.knowledge_bases (id) ON DELETE CASCADE,
+    user_id      BIGINT       NOT NULL REFERENCES agent_desk.users (id),
+    file_name    VARCHAR(512) NOT NULL,
+    content_type VARCHAR(128),
+    file_size    BIGINT       NOT NULL DEFAULT 0,
+    char_count   INTEGER      NOT NULL DEFAULT 0,
+    chunk_count  INTEGER      NOT NULL DEFAULT 0,
+    status       VARCHAR(16)  NOT NULL DEFAULT 'pending',
+    error_message TEXT,
+    created_at   BIGINT       NOT NULL,
+    updated_at   BIGINT       NOT NULL
+);
+
+COMMENT ON TABLE agent_desk.knowledge_documents IS '知识库文档表';
+COMMENT ON COLUMN agent_desk.knowledge_documents.kb_id IS '所属知识库ID';
+COMMENT ON COLUMN agent_desk.knowledge_documents.user_id IS '所属用户ID';
+COMMENT ON COLUMN agent_desk.knowledge_documents.file_name IS '原始文件名';
+COMMENT ON COLUMN agent_desk.knowledge_documents.content_type IS 'MIME 类型';
+COMMENT ON COLUMN agent_desk.knowledge_documents.file_size IS '文件大小(字节)';
+COMMENT ON COLUMN agent_desk.knowledge_documents.char_count IS '解析后字符数';
+COMMENT ON COLUMN agent_desk.knowledge_documents.chunk_count IS '分片数量';
+COMMENT ON COLUMN agent_desk.knowledge_documents.status IS '处理状态: pending / processing / done / failed';
+COMMENT ON COLUMN agent_desk.knowledge_documents.error_message IS '处理失败时的错误信息';
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_documents_kb ON agent_desk.knowledge_documents (kb_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_documents_user ON agent_desk.knowledge_documents (user_id);
+
+-- 16.3 知识库文本分片表 (含向量列)
+CREATE TABLE IF NOT EXISTS agent_desk.knowledge_chunks
+(
+    id          BIGSERIAL PRIMARY KEY,
+    doc_id      BIGINT  NOT NULL REFERENCES agent_desk.knowledge_documents (id) ON DELETE CASCADE,
+    kb_id       BIGINT  NOT NULL REFERENCES agent_desk.knowledge_bases (id) ON DELETE CASCADE,
+    user_id     BIGINT  NOT NULL REFERENCES agent_desk.users (id),
+    chunk_index INTEGER NOT NULL DEFAULT 0,
+    content     TEXT    NOT NULL,
+    token_count INTEGER NOT NULL DEFAULT 0,
+    metadata    JSONB            DEFAULT '{}',
+    embedding   public.vector(1024),
+    created_at  BIGINT  NOT NULL
+);
+
+COMMENT ON TABLE agent_desk.knowledge_chunks IS '知识库文本分片表';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.doc_id IS '所属文档ID';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.kb_id IS '所属知识库ID';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.user_id IS '所属用户ID';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.chunk_index IS '分片在文档中的序号';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.content IS '分片文本内容';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.token_count IS 'Token 数量估算';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.metadata IS '额外元数据(JSON)';
+COMMENT ON COLUMN agent_desk.knowledge_chunks.embedding IS '向量嵌入, 1024维 (text-embedding-v3)';
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_doc ON agent_desk.knowledge_chunks (doc_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_kb ON agent_desk.knowledge_chunks (kb_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_user ON agent_desk.knowledge_chunks (user_id);
+
+-- IVFFlat 向量索引 (适合中小规模数据, 推荐数据量 > 1000 条后再创建)
+-- 注意: lists 参数建议为 sqrt(总行数), 此处设为 100 适合 1万条以内数据
+-- 注意: IVFFlat 索引需要表中已有数据才能构建 (K-means 训练)
+-- 空表创建会报错, 建议在写入 >1000 条数据后手动创建:
+--   CREATE INDEX idx_knowledge_chunks_embedding
+--       ON agent_desk.knowledge_chunks
+--       USING ivfflat (embedding public.vector_cosine_ops)
+--       WITH (lists = 100);
+
+-- 16.4 知识库用户设置表
+CREATE TABLE IF NOT EXISTS agent_desk.knowledge_settings
+(
+    user_id         BIGINT  NOT NULL PRIMARY KEY REFERENCES agent_desk.users (id),
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    top_k           INTEGER NOT NULL DEFAULT 5,
+    score_threshold DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+    created_at      BIGINT  NOT NULL,
+    updated_at      BIGINT  NOT NULL
+);
+
+COMMENT ON TABLE agent_desk.knowledge_settings IS '知识库检索用户设置';
+COMMENT ON COLUMN agent_desk.knowledge_settings.user_id IS '用户ID, 一对一, 同时作为主键';
+COMMENT ON COLUMN agent_desk.knowledge_settings.enabled IS '是否启用知识库检索增强';
+COMMENT ON COLUMN agent_desk.knowledge_settings.top_k IS '检索返回数量';
+COMMENT ON COLUMN agent_desk.knowledge_settings.score_threshold IS '最低相似度阈值';
+
+-- =============================================
+-- 数据库迁移: DDL语句写在后面
+-- =============================================

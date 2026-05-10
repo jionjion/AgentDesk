@@ -29,7 +29,7 @@
     <div v-else ref="bubbleRef" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
       <!-- 头像 -->
       <div
-          class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm overflow-hidden"
+          class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm overflow-hidden border border-gray-200 dark:border-gray-600"
           :class="isUser ? 'bg-violet-200 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'"
       >
         <img v-if="isUser && userAvatar && !avatarError" :src="userAvatar" alt="头像" class="w-full h-full object-cover" @error="avatarError = true"/>
@@ -37,12 +37,14 @@
         <template v-else>你</template>
       </div>
       <!-- 消息内容 -->
-      <div class="max-w-[75%] min-w-0 group/bubble" :class="isUser ? 'text-right' : ''">
+      <div class="min-w-0 group/bubble" :class="[isUser ? 'text-right max-w-[75%]' : hasToolCalls ? 'w-[75%]' : 'max-w-[75%]']">
         <div
-            class="inline-block px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words text-left"
-            :class="isUser
-              ? 'bg-violet-500 text-white rounded-br-md'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'"
+            class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words text-left"
+            :class="[
+              isUser
+                ? 'inline-block bg-violet-500 text-white rounded-br-md'
+                : 'block bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'
+            ]"
         >
           <div v-if="isUser">
             {{ (message as UserMessage).content }}
@@ -97,10 +99,10 @@
                         :class="expandedToolCalls.has(seg.toolCallId!) ? 'rotate-90' : ''"
                     />
                   </div>
-                  <div v-if="expandedToolCalls.has(seg.toolCallId!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50">
+                  <div v-if="expandedToolCalls.has(seg.toolCallId!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 overflow-auto max-h-32">
                     <div v-if="seg.toolCall.arguments && Object.keys(seg.toolCall.arguments).length > 0" class="mb-2">
                       <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">参数</div>
-                      <pre class="p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-400 overflow-x-auto">{{ JSON.stringify(seg.toolCall.arguments, null, 2) }}</pre>
+                      <pre class="p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-400">{{ JSON.stringify(seg.toolCall.arguments, null, 2) }}</pre>
                     </div>
                     <div v-if="seg.toolCall.result">
                       <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">结果</div>
@@ -142,6 +144,20 @@
             </div>
           </div>
         </div>
+        <!-- 知识库引用来源 -->
+        <div
+            v-if="!isUser && (message as AssistantMessage).knowledgeRefs?.length"
+            class="flex flex-wrap items-center gap-1.5 mt-2"
+        >
+          <Database :size="12" class="text-emerald-500 shrink-0"/>
+          <span
+              v-for="(ref, idx) in uniqueKnowledgeRefs" :key="idx"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+          >
+            {{ ref.documentName }}
+            <span class="text-emerald-400 dark:text-emerald-500">{{ (ref.score * 100).toFixed(0) }}%</span>
+          </span>
+        </div>
         <!-- 图片附件（气泡外部） -->
         <div
             v-if="isUser && imageAttachments.length"
@@ -166,6 +182,14 @@
               @click="handleCopyContent"
           >
             <Copy :size="14"/>
+          </button>
+          <button
+              v-if="obsidianConfigured"
+              class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="沉淀到 Obsidian"
+              @click="showPrecipitateDialog = true"
+          >
+            <BookMarked :size="14"/>
           </button>
           <button
               class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -196,6 +220,12 @@
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
+  <!-- 沉淀到 Obsidian 弹窗 -->
+  <PrecipitateDialog
+      v-if="showPrecipitateDialog"
+      :message-id="message.id"
+      @close="showPrecipitateDialog = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -203,13 +233,15 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {Marked} from 'marked'
 import hljs from 'highlight.js'
 import {api as viewerApi} from 'v-viewer'
-import {CheckCircle2, ChevronRight, Copy, FileText, Loader2, RefreshCw, Settings2, Trash2} from 'lucide-vue-next'
+import {CheckCircle2, ChevronRight, Copy, Database, FileText, Loader2, RefreshCw, Settings2, Trash2, BookMarked} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
 import {useChatStore} from '@/stores/chat'
 import {useAppStore} from '@/stores/app'
+import {useSettingsStore} from '@/stores/settings'
 import aiIcon from '@/assets/icon_255.png'
 import {formatFileSize, isImageType} from '@/utils/file'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
+import PrecipitateDialog from '@/components/chat/PrecipitateDialog.vue'
 
 const marked = new Marked()
 
@@ -241,6 +273,7 @@ const props = defineProps<{
 
 const chatStore = useChatStore()
 const appStore = useAppStore()
+const settingsStore = useSettingsStore()
 
 const isUser = computed(() => props.message.role === 'user')
 const userAvatar = computed(() => appStore.currentUser.avatar)
@@ -386,6 +419,21 @@ const contentSegments = computed<ContentSegment[]>(() => {
   return segments
 })
 
+const hasToolCalls = computed(() =>
+    contentSegments.value.some(seg => seg.toolCall)
+)
+
+const uniqueKnowledgeRefs = computed(() => {
+  const refs = (props.message as AssistantMessage).knowledgeRefs
+  if (!refs?.length) return []
+  const seen = new Set<string>()
+  return refs.filter(r => {
+    if (seen.has(r.documentName)) return false
+    seen.add(r.documentName)
+    return true
+  })
+})
+
 const renderedContent = computed(() => {
   const content = (props.message as AssistantMessage).content || ''
   const clean = content.replace(new RegExp(ANY_MARKER.source, 'g'), '')
@@ -409,6 +457,9 @@ function handleRegenerate() {
 }
 
 const deleteConfirmOpen = ref(false)
+const showPrecipitateDialog = ref(false)
+
+const obsidianConfigured = computed(() => !!settingsStore.obsidian.vaultPath)
 
 function handleDelete() {
   deleteConfirmOpen.value = true

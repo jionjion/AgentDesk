@@ -9,8 +9,12 @@ import top.jionjion.agentdesk.dto.auth.ChangePasswordRequest;
 import top.jionjion.agentdesk.dto.auth.ProfileDto;
 import top.jionjion.agentdesk.dto.auth.UpdateProfileRequest;
 import top.jionjion.agentdesk.dto.settings.AppSettingsDto;
+import top.jionjion.agentdesk.dto.settings.KnowledgeSettingsDto;
 import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
+import top.jionjion.agentdesk.dto.settings.ObsidianSettingsDto;
 import top.jionjion.agentdesk.dto.settings.SettingsResponse;
+import top.jionjion.agentdesk.entity.KnowledgeSettings;
+import top.jionjion.agentdesk.repository.KnowledgeSettingsRepository;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.SettingsService;
 
@@ -27,10 +31,13 @@ public class SettingsController {
 
     private final SettingsService settingsService;
     private final AgentPool agentPool;
+    private final KnowledgeSettingsRepository knowledgeSettingsRepository;
 
-    public SettingsController(SettingsService settingsService, AgentPool agentPool) {
+    public SettingsController(SettingsService settingsService, AgentPool agentPool,
+                              KnowledgeSettingsRepository knowledgeSettingsRepository) {
         this.settingsService = settingsService;
         this.agentPool = agentPool;
+        this.knowledgeSettingsRepository = knowledgeSettingsRepository;
     }
 
     @GetMapping
@@ -71,6 +78,11 @@ public class SettingsController {
         return settingsService.updateAppSettings(request);
     }
 
+    @PutMapping("/obsidian")
+    public ObsidianSettingsDto updateObsidian(@RequestBody ObsidianSettingsDto request) {
+        return settingsService.updateObsidianSettings(request);
+    }
+
     /**
      * 获取脱敏的 DashScope API Key
      */
@@ -103,5 +115,41 @@ public class SettingsController {
         settingsService.updateDashScopeApiKey(UserContext.getUserId(), "");
         agentPool.invalidateAll(UserContext.getUserId());
         return Map.of("message", "已恢复使用系统默认密钥");
+    }
+
+    /**
+     * 获取知识库检索设置
+     */
+    @GetMapping("/knowledge")
+    public KnowledgeSettingsDto getKnowledgeSettings() {
+        Long userId = UserContext.getUserId();
+        return knowledgeSettingsRepository.findById(userId)
+                .map(s -> new KnowledgeSettingsDto(s.isEnabled(), s.getTopK(), s.getScoreThreshold()))
+                .orElse(KnowledgeSettingsDto.defaults());
+    }
+
+    /**
+     * 更新知识库检索设置
+     */
+    @PutMapping("/knowledge")
+    public KnowledgeSettingsDto updateKnowledgeSettings(@RequestBody KnowledgeSettingsDto dto) {
+        if (dto.topK() != null && (dto.topK() < 1 || dto.topK() > 20)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "topK 范围: 1 ~ 20");
+        }
+        if (dto.scoreThreshold() != null && (dto.scoreThreshold() < 0.0 || dto.scoreThreshold() > 1.0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scoreThreshold 范围: 0.0 ~ 1.0");
+        }
+
+        Long userId = UserContext.getUserId();
+        KnowledgeSettings entity = knowledgeSettingsRepository.findById(userId)
+                .orElseGet(() -> new KnowledgeSettings(userId));
+
+        if (dto.enabled() != null) entity.setEnabled(dto.enabled());
+        if (dto.topK() != null) entity.setTopK(dto.topK());
+        if (dto.scoreThreshold() != null) entity.setScoreThreshold(dto.scoreThreshold());
+        entity.setUpdatedAt(System.currentTimeMillis());
+
+        knowledgeSettingsRepository.save(entity);
+        return new KnowledgeSettingsDto(entity.isEnabled(), entity.getTopK(), entity.getScoreThreshold());
     }
 }

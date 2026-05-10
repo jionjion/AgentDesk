@@ -83,6 +83,9 @@
         <!-- 长期记忆提示（输入框上方） -->
         <MemoryIndicator/>
 
+        <!-- 知识库检索提示（输入框上方） -->
+        <KnowledgeIndicator/>
+
         <!-- 任务状态栏（输入框上方） -->
         <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState"/>
 
@@ -182,6 +185,7 @@
             </div>
             <div class="flex items-center gap-2">
               <ModelSelector/>
+              <KnowledgeSelector v-model="selectedKbIds"/>
               <!-- 发送 / 停止按钮 -->
               <Button
                   v-if="!chatStore.isStreaming"
@@ -222,9 +226,11 @@ import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
 import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
+import KnowledgeSelector from '@/components/chat/KnowledgeSelector.vue'
 import SkillSelector from '@/components/chat/SkillSelector.vue'
 import SkillStatusBar from '@/components/chat/SkillStatusBar.vue'
 import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
+import KnowledgeIndicator from '@/components/chat/KnowledgeIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
@@ -413,6 +419,7 @@ const inputRef = ref<InstanceType<typeof Textarea> | null>(null)
 const messageListRef = ref<HTMLElement>()
 const scrollAnchorRef = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedKbIds = ref<number[]>([])
 
 // 是否吸附在底部（用户滚动位置距底部 <= 阈值时视为吸附）
 const isStickToBottom = ref(true)
@@ -502,7 +509,7 @@ function handleSend() {
   const hasAttachments = chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)
   if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
   isStickToBottom.value = true
-  chatStore.sendMessage(inputText.value)
+  chatStore.sendMessage(inputText.value, selectedKbIds.value.length > 0 ? selectedKbIds.value : undefined)
   inputText.value = ''
 }
 

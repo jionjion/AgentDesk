@@ -15,11 +15,14 @@ export function getMessages(sessionId: string) {
 /**
  * 创建 SSE 流式聊天连接
  */
-export function createChatStream(sessionId: string, message: string, fileIds?: number[]): EventSource {
+export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[]): EventSource {
     const token = localStorage.getItem('auth_token') || ''
     let url = `${BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}&token=${encodeURIComponent(token)}`
     if (fileIds && fileIds.length > 0) {
         url += `&fileIds=${fileIds.join(',')}`
+    }
+    if (kbIds && kbIds.length > 0) {
+        url += `&kbIds=${kbIds.join(',')}`
     }
     return new EventSource(url)
 }

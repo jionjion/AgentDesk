@@ -35,6 +35,7 @@ export interface AssistantMessage {
     content: string
     timestamp: number
     isStreaming: boolean
+    knowledgeRefs?: {documentName: string; score: number; chunkIndex: number}[]
 }
 
 /** 工具调用消息 */
