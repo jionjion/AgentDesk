@@ -24,8 +24,14 @@ public class SseStreamingHook implements Hook {
 
     private static final Logger log = LoggerFactory.getLogger(SseStreamingHook.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final int MAX_TOOL_RETRIES = 3;
 
     private volatile SseEmitter emitter;
+
+    /**
+     * 追踪同一工具连续失败次数，防止死循环重试
+     */
+    private final Map<String, Integer> toolFailureCount = new HashMap<>();
 
     /**
      * 获取最近一次 Agent 回复的完整文本
@@ -64,7 +70,10 @@ public class SseStreamingHook implements Hook {
     public <T extends HookEvent> Mono<T> onEvent(T event) {
         try {
             switch (event) {
-                case PreCallEvent _ -> sendEvent("agent_start", ChatEventDto.agentStart());
+                case PreCallEvent ignored -> {
+                    toolFailureCount.clear();
+                    sendEvent("agent_start", ChatEventDto.agentStart());
+                }
 
                 case ReasoningChunkEvent e -> {
                     Msg chunk = e.getIncrementalChunk();
@@ -113,6 +122,20 @@ public class SseStreamingHook implements Hook {
                                 .map(b -> ((TextBlock) b).getText())
                                 .reduce("", (a, b) -> a + b);
                     }
+
+                    // 追踪工具连续失败，超过阈值后注入停止重试提示
+                    if (resultText.contains("Error:") || resultText.contains("error")) {
+                        int count = toolFailureCount.merge(toolName, 1, Integer::sum);
+                        if (count >= MAX_TOOL_RETRIES && result != null && result.getOutput() != null) {
+                            result.getOutput().add(TextBlock.builder()
+                                    .text("\n\n[SYSTEM] 该工具已连续失败 " + count + " 次，请勿再次重试。直接告知用户该工具/服务暂时不可用，并尝试其他方式回答。")
+                                    .build());
+                            log.warn("工具 {} 已连续失败 {} 次，已注入停止重试提示", toolName, count);
+                        }
+                    } else {
+                        toolFailureCount.remove(toolName);
+                    }
+
                     sendEvent("tool_call_end", ChatEventDto.toolCallEnd(toolName, toolId, resultText));
 
                     // AGENT_CONTROL 模式: Agent 主动调用 retrieveFromMemory 时通知前端

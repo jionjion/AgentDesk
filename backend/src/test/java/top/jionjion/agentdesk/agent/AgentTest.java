@@ -7,6 +7,7 @@ import io.agentscope.core.tool.Toolkit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
 import top.jionjion.agentdesk.service.OssService;
 

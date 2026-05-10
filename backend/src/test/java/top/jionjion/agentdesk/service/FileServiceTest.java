@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
-import top.jionjion.agentdesk.dto.FileResponse;
+import top.jionjion.agentdesk.dto.file.FileResponse;
 
 import java.io.IOException;
 import java.nio.file.Files;

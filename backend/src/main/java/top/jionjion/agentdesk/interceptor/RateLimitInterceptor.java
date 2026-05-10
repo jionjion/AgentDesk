@@ -53,7 +53,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         long now = System.currentTimeMillis();
         long windowStart = now - rateLimit.windowSeconds() * 1000L;
 
-        Deque<Long> timestamps = requestRecords.computeIfAbsent(key, _ -> new ConcurrentLinkedDeque<>());
+        Deque<Long> timestamps = requestRecords.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
 
         // 清除窗口外的过期记录
         while (!timestamps.isEmpty() && timestamps.peekFirst() < windowStart) {

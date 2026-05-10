@@ -6,31 +6,42 @@ import io.agentscope.core.memory.LongTermMemoryMode;
 import io.agentscope.core.memory.mem0.Mem0ApiType;
 import io.agentscope.core.memory.mem0.Mem0LongTermMemory;
 import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.skill.AgentSkill;
+import io.agentscope.core.skill.SkillBox;
+import io.agentscope.core.skill.repository.ClasspathSkillRepository;
+import io.agentscope.core.skill.repository.FileSystemSkillRepository;
 import io.agentscope.core.tool.Toolkit;
+import io.agentscope.core.tool.coding.ShellCommandTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
-import top.jionjion.agentdesk.agent.tool.CalculateTools;
-import top.jionjion.agentdesk.agent.tool.FileTools;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.dto.settings.MemorySettingsDto;
 import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
+import top.jionjion.agentdesk.entity.McpServer;
 import top.jionjion.agentdesk.entity.Skill;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
 import top.jionjion.agentdesk.security.UserContext;
+import top.jionjion.agentdesk.service.McpServerService;
 import top.jionjion.agentdesk.service.OssService;
 import top.jionjion.agentdesk.service.SettingsService;
 import top.jionjion.agentdesk.service.SkillService;
 
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Agent 工厂: 为每个会话创建独立的 Agent 实例
  * <p>
- * 子代理由数据库中启用的技能动态注册, 不再硬编码。
+ * 使用 AgentScope SkillBox 系统进行技能管理:
+ * - 内置技能通过 ClasspathSkillRepository 加载
+ * - 用户安装的技能通过 FileSystemSkillRepository 加载
+ * - 启用沙箱化代码执行 (ShellCommandTool)
  *
  * @author Jion
  */
@@ -39,48 +50,68 @@ public class AgentFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AgentFactory.class);
 
-    private static final String SYS_PROMPT_TEMPLATE = """
-            你是一个名为 Assistant 的智能助手协调者。你可以直接回答简单问题，也可以将复杂任务委派给专业的子助手。
-            
-            %s
+    private static final String SYS_PROMPT = """
+            你是一个名为 Assistant 的智能助手。你可以直接回答简单问题，也可以使用已加载的技能完成复杂任务。
             
             当用户上传了文件时，消息中会包含文件的元信息 (文件名、大小、类型、fileId)。
-            对于文件相关任务，请将 fileId 传递给相应的子助手。
+            对于文件相关任务，请将 fileId 传递给相应的工具。
             
             你也可以直接使用 get_current_time、calculate、read_file 等工具处理简单任务。
             不要猜测文件内容，请先调用 read_file 获取实际内容。
             
+            工具调用规则: 如果同一个工具连续调用失败（返回 Error），最多重试 2 次。
+            超过 2 次后不要再重试，直接告知用户该工具暂时不可用，并尝试用其他方式回答。
+            
             请用中文回答。
             """;
-
-    private static final String FALLBACK_SYS_PROMPT = SYS_PROMPT_TEMPLATE.formatted("你暂时没有可调用的专家，请直接回答用户问题。");
 
     private final ChatModelFactory chatModelFactory;
     private final FileRecordRepository fileRecordRepository;
     private final OssService ossService;
     private final SettingsService settingsService;
     private final SkillService skillService;
+    private final McpServerService mcpServerService;
+    private final McpConnectionManager mcpConnectionManager;
     private final String mem0BaseUrl;
     private final String mem0ApiKey;
+    private final String skillsBaseDir;
+    private final String codeExecutionWorkDir;
+    private final boolean codeExecutionEnabled;
+    private final Set<String> allowedCommands;
 
     public AgentFactory(ChatModelFactory chatModelFactory,
                         FileRecordRepository fileRecordRepository,
                         OssService ossService,
                         SettingsService settingsService,
                         SkillService skillService,
+                        McpServerService mcpServerService,
+                        McpConnectionManager mcpConnectionManager,
                         @Value("${agentdesk.mem0.base-url}") String mem0BaseUrl,
-                        @Value("${agentdesk.mem0.api-key:}") String mem0ApiKey) {
+                        @Value("${agentdesk.mem0.api-key:}") String mem0ApiKey,
+                        @Value("${agentdesk.skills.base-dir}") String skillsBaseDir,
+                        @Value("${agentdesk.skills.code-execution.work-dir}") String codeExecutionWorkDir,
+                        @Value("${agentdesk.skills.code-execution.enabled:true}") boolean codeExecutionEnabled,
+                        @Value("${agentdesk.skills.code-execution.allowed-commands:python3,python,node}") String allowedCommandsStr) {
         this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
         this.settingsService = settingsService;
         this.skillService = skillService;
+        this.mcpServerService = mcpServerService;
+        this.mcpConnectionManager = mcpConnectionManager;
         this.mem0BaseUrl = mem0BaseUrl.endsWith("/") ? mem0BaseUrl.substring(0, mem0BaseUrl.length() - 1) : mem0BaseUrl;
         this.mem0ApiKey = (mem0ApiKey == null || mem0ApiKey.isBlank()) ? null : mem0ApiKey;
+        this.skillsBaseDir = skillsBaseDir;
+        this.codeExecutionWorkDir = codeExecutionWorkDir;
+        this.codeExecutionEnabled = codeExecutionEnabled;
+        this.allowedCommands = Arrays.stream(allowedCommandsStr.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
     }
 
     /**
-     * 创建一个新的 Agent 实例（含 Toolkit 和 Hook）
+     * 创建一个新的 Agent 实例（含 SkillBox、Toolkit 和 Hook）
      */
     public AgentHandle createAgent(String sessionId) {
         // 每个 Agent 独立的 Toolkit（Toolkit 有状态, 不可共享）
@@ -97,39 +128,43 @@ public class AgentFactory {
         ModelSettingsDto ms = ModelSettingsDto.defaults();
         MemorySettingsDto memSettings = MemorySettingsDto.defaults();
         String userApiKey = null;
-        String sysPrompt;
-        List<Skill> enabledSkills = List.of();
+        String sysPrompt = SYS_PROMPT;
         Long userId = null;
 
         if (UserContext.isAuthenticated()) {
             userId = UserContext.getUserId();
             ms = settingsService.getModelSettings(userId);
             userApiKey = settingsService.getDashScopeApiKey(userId);
-            enabledSkills = skillService.getEnabledSkills(userId);
             memSettings = settingsService.getMemorySettings(userId);
         }
 
         // 通过工厂创建模型（自动 fallback 到系统默认 Key）
         DashScopeChatModel model = chatModelFactory.create(ms, userApiKey);
 
-        // 动态注册子代理（基于启用的技能）
-        registerSkillSubAgents(toolkit, model, enabledSkills);
+        // 构建 SkillBox（核心变更: 从 sub-agent 模式迁移到 SkillBox 模式）
+        SkillBox skillBox = buildSkillBox(toolkit, userId);
 
-        // 构建系统提示词
-        sysPrompt = buildSystemPrompt(enabledSkills);
-
-        // 用户自定义系统提示词优先，但追加技能列表
-        if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
-            String skillSection = buildSkillSection(enabledSkills);
-            sysPrompt = ms.systemPrompt() + (skillSection.isEmpty() ? "" : "\n\n" + skillSection);
+        // MCP 服务器集成: 连接已启用的 MCP 服务器并注册工具
+        if (userId != null) {
+            List<McpServer> mcpServers = mcpServerService.getEnabledServers(userId);
+            if (!mcpServers.isEmpty()) {
+                mcpConnectionManager.connectAndRegister(toolkit, mcpServers);
+                log.info("已为会话 {} 注册 {} 个 MCP 服务器", sessionId, mcpServers.size());
+            }
         }
 
-        // 构建 ReActAgent
+        // 用户自定义系统提示词优先
+        if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
+            sysPrompt = ms.systemPrompt();
+        }
+
+        // 构建 ReActAgent（集成 SkillBox）
         ReActAgent.Builder builder = ReActAgent.builder()
                 .name("assistant-" + sessionId)
                 .sysPrompt(sysPrompt)
                 .model(model)
                 .toolkit(toolkit)
+                .skillBox(skillBox)
                 .memory(memory)
                 .enablePlan()
                 .hook(hook)
@@ -162,72 +197,66 @@ public class AgentFactory {
     }
 
     /**
-     * 根据启用的技能动态注册子代理
+     * 构建 SkillBox: 加载内置技能 + 用户安装的技能, 并启用代码执行沙箱
      */
-    private void registerSkillSubAgents(Toolkit toolkit, DashScopeChatModel model, List<Skill> skills) {
-        for (Skill skill : skills) {
-            toolkit.registration()
-                    .subAgent(() -> {
-                        ReActAgent.Builder builder = ReActAgent.builder()
-                                .name(skill.getId().replace("-", "_"))
-                                .description(skill.getDescription())
-                                .sysPrompt(skill.getSysPrompt())
-                                .model(model)
-                                .maxIters(skill.getMaxIters());
+    private SkillBox buildSkillBox(Toolkit toolkit, Long userId) {
+        SkillBox skillBox = new SkillBox(toolkit);
 
-                        // 如果技能配置了工具，创建独立的 Toolkit
-                        if (skill.getTools() != null && !skill.getTools().isEmpty()) {
-                            Toolkit subToolkit = new Toolkit();
-                            for (String toolName : skill.getTools()) {
-                                Object toolInstance = resolveToolInstance(toolName);
-                                if (toolInstance != null) {
-                                    subToolkit.registerTool(toolInstance);
-                                }
-                            }
-                            builder.toolkit(subToolkit);
-                        }
+        // 1. 加载内置技能（从 classpath:skills/ 目录）
+        try (ClasspathSkillRepository builtinRepo = new ClasspathSkillRepository("skills")) {
+            List<AgentSkill> builtinSkills = builtinRepo.getAllSkills();
+            // 获取用户启用的技能 ID 列表
+            List<Skill> enabledSkills = userId != null ? skillService.getEnabledSkills(userId) : List.of();
+            Set<String> enabledIds = enabledSkills.stream().map(Skill::getId).collect(Collectors.toSet());
 
-                        return builder.build();
-                    })
-                    .apply();
-        }
-    }
-
-    /**
-     * 根据工具类名创建工具实例
-     */
-    private Object resolveToolInstance(String toolName) {
-        return switch (toolName) {
-            case "FileTools" -> new FileTools(fileRecordRepository, ossService);
-            case "CalculateTools" -> new CalculateTools();
-            default -> {
-                log.warn("未知的工具类名: {}, 已跳过", toolName);
-                yield null;
+            for (AgentSkill skill : builtinSkills) {
+                // 仅注册用户启用的内置技能（如果没有偏好设置, 内置技能默认启用）
+                if (enabledIds.isEmpty() || enabledIds.contains(skill.getName())) {
+                    skillBox.registerSkill(skill);
+                    log.debug("注册内置技能: {}", skill.getName());
+                }
             }
-        };
-    }
-
-    /**
-     * 基于启用的技能构建完整的系统提示词
-     */
-    private String buildSystemPrompt(List<Skill> skills) {
-        if (skills.isEmpty()) {
-            return FALLBACK_SYS_PROMPT;
+        } catch (Exception e) {
+            log.warn("加载内置技能失败: {}", e.getMessage());
         }
-        String skillSection = buildSkillSection(skills);
-        return SYS_PROMPT_TEMPLATE.formatted(skillSection);
-    }
 
-    /**
-     * 构建技能列表描述段落
-     */
-    private String buildSkillSection(List<Skill> skills) {
-        if (skills.isEmpty()) {
-            return "";
+        // 2. 加载用户安装的技能（从文件系统）
+        if (userId != null) {
+            Path userSkillsDir = Path.of(skillsBaseDir, String.valueOf(userId));
+            if (userSkillsDir.toFile().exists()) {
+                try {
+                    FileSystemSkillRepository userRepo = new FileSystemSkillRepository(userSkillsDir);
+                    List<AgentSkill> userSkills = userRepo.getAllSkills();
+                    List<Skill> enabledSkills = skillService.getEnabledSkills(userId);
+                    Set<String> enabledIds = enabledSkills.stream().map(Skill::getId).collect(Collectors.toSet());
+
+                    for (AgentSkill skill : userSkills) {
+                        if (enabledIds.contains(skill.getName())) {
+                            skillBox.registerSkill(skill);
+                            log.debug("注册用户技能: {}", skill.getName());
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("加载用户技能失败 (userId={}): {}", userId, e.getMessage());
+                }
+            }
         }
-        String skillList = skills.stream()
-                .map(s -> "- call_" + s.getId().replace("-", "_") + ": " + s.getDescription())
-                .collect(Collectors.joining("\n"));
-        return "你有以下专家可以调用：\n" + skillList;
+
+        // 3. 启用代码执行沙箱（受限的 Shell 命令）
+        if (codeExecutionEnabled) {
+            try {
+                skillBox.codeExecution()
+                        .workDir(codeExecutionWorkDir)
+                        .withShell(new ShellCommandTool(null, allowedCommands, null))
+                        .withRead()
+                        .withWrite()
+                        .enable();
+                log.info("技能代码执行沙箱已启用, workDir={}, 允许命令={}", codeExecutionWorkDir, allowedCommands);
+            } catch (Exception e) {
+                log.warn("启用代码执行沙箱失败: {}", e.getMessage());
+            }
+        }
+
+        return skillBox;
     }
 }
