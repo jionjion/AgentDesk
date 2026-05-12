@@ -54,6 +54,16 @@
           <p v-if="fieldErrors.inviteCode" class="text-red-500 text-xs mt-1">{{ fieldErrors.inviteCode }}</p>
         </div>
 
+        <!-- 记住密码 -->
+        <label v-if="!isRegister" class="flex items-center gap-2 cursor-pointer select-none">
+          <input
+              v-model="rememberMe"
+              type="checkbox"
+              class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-violet-600 focus:ring-violet-500"
+          />
+          <span class="text-sm text-gray-600 dark:text-gray-400">记住用户名和密码</span>
+        </label>
+
         <!-- 错误提示 -->
         <p v-if="errorMsg" class="text-red-500 text-sm">{{ errorMsg }}</p>
 
@@ -93,9 +103,11 @@
 </template>
 
 <script setup lang="ts">
-import {reactive, ref} from 'vue'
+import {onMounted, reactive, ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
+
+const REMEMBER_KEY = 'agent_desk_remember_credentials'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -103,6 +115,7 @@ const authStore = useAuthStore()
 const isRegister = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
+const rememberMe = ref(false)
 
 const INVITE_CODE = '123456'
 
@@ -111,6 +124,20 @@ const form = reactive({
   password: '',
   nickname: '',
   inviteCode: ''
+})
+
+onMounted(() => {
+  const saved = localStorage.getItem(REMEMBER_KEY)
+  if (saved) {
+    try {
+      const {username, password} = JSON.parse(saved)
+      form.username = username || ''
+      form.password = password || ''
+      rememberMe.value = true
+    } catch {
+      localStorage.removeItem(REMEMBER_KEY)
+    }
+  }
 })
 
 const fieldErrors = reactive({
@@ -177,6 +204,12 @@ async function handleSubmit() {
       await authStore.doRegister(form)
     } else {
       await authStore.doLogin({username: form.username, password: form.password})
+      // 记住密码
+      if (rememberMe.value) {
+        localStorage.setItem(REMEMBER_KEY, JSON.stringify({username: form.username, password: form.password}))
+      } else {
+        localStorage.removeItem(REMEMBER_KEY)
+      }
     }
     router.push('/chat')
   } catch (err: any) {

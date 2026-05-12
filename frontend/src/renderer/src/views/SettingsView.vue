@@ -166,7 +166,7 @@
 
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
-import {useRouter} from 'vue-router'
+import {useRoute, useRouter} from 'vue-router'
 import TitleBar from '@/components/TitleBar.vue'
 import ProfileSection from '@/components/settings/ProfileSection.vue'
 import AppSection from '@/components/settings/AppSection.vue'
@@ -181,6 +181,7 @@ import {Button} from '@/components/ui/button'
 import {useSettingsStore} from '@/stores/settings'
 import {BookOpen, Box, Brain, Cpu, Database, FlaskConical, Github, Home, Info, Link, RefreshCw, Shield, SlidersHorizontal, User} from 'lucide-vue-next'
 
+const route = useRoute()
 const router = useRouter()
 const settingsStore = useSettingsStore()
 const activeSection = ref('preferences')
@@ -188,6 +189,10 @@ const activeSection = ref('preferences')
 onMounted(() => {
   if (!settingsStore.loaded) {
     settingsStore.fetchSettings()
+  }
+  const tab = route.query.tab as string
+  if (tab) {
+    activeSection.value = tab
   }
 })
 

@@ -71,7 +71,6 @@ import {Camera as CameraIcon, Loader2, LogOut, User as UserIcon} from 'lucide-vu
 import {useSettingsStore} from '@/stores/settings'
 import {useAuthStore} from '@/stores/auth'
 import {cacheAvatar} from '@/utils/avatar-cache'
-import {useRouter} from 'vue-router'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
@@ -79,7 +78,6 @@ import ChangePasswordDialog from '@/components/settings/ChangePasswordDialog.vue
 
 const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
-const router = useRouter()
 
 const form = reactive({
   nickname: '',
@@ -152,6 +150,6 @@ async function handleNicknameBlur() {
 }
 
 function handleLogout() {
-  router.push('/login')
+  authStore.doLogout()
 }
 </script>
