@@ -42,7 +42,7 @@
             class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words text-left"
             :class="[
               isUser
-                ? 'inline-block bg-violet-500 text-white rounded-br-md'
+                ? 'inline-block max-w-full break-all bg-violet-500 text-white rounded-br-md'
                 : 'block bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'
             ]"
         >

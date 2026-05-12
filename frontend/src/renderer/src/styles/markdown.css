@@ -80,12 +80,23 @@
 /* 代码块容器 — 明确边框区分 */
 .code-block-wrapper {
     position: relative;
-    margin-top: 0.6em;
-    margin-bottom: 0.6em;
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
     max-width: 100%;
     overflow: hidden;
     border-radius: 0.5rem;
     border: 1px solid #e2e2e2;
+}
+
+/* 列表内代码块间距更紧凑 */
+.markdown-body li .code-block-wrapper {
+    margin-top: 0.3em;
+    margin-bottom: 0.3em;
+}
+
+.markdown-body li pre {
+    margin-top: 0.3em;
+    margin-bottom: 0.3em;
 }
 
 .code-block-header {
@@ -131,13 +142,14 @@
     margin-bottom: 0;
     border-radius: 0;
     font-size: 0.82em;
+    padding: 0.1em 0.2em;
     overflow-x: auto;
     background: #fafafa !important;
 }
 
 .markdown-body pre {
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
     border-radius: 0.5rem;
     font-size: 0.82em;
     overflow-x: auto;
