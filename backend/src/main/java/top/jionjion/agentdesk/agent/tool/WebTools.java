@@ -38,7 +38,7 @@ public class WebTools {
                 .build();
     }
 
-    @Tool(name = "web_search", description = "搜索互联网, 返回与查询相关的搜索结果列表。每条结果包含标题、摘要和链接。")
+    @Tool(name = ToolDefinitions.WEB_SEARCH, description = ToolDefinitions.WEB_SEARCH_DESC)
     public String webSearch(
             @ToolParam(name = "query", description = "搜索关键词") String query,
             @ToolParam(name = "count", description = "返回结果数量, 默认5") Integer count) {
@@ -64,7 +64,7 @@ public class WebTools {
         }
     }
 
-    @Tool(name = "url_fetch", description = "抓取指定 URL 的网页正文内容, 返回提取后的纯文本。用于深入了解搜索结果中的某个链接。")
+    @Tool(name = ToolDefinitions.URL_FETCH, description = ToolDefinitions.URL_FETCH_DESC)
     public String urlFetch(
             @ToolParam(name = "url", description = "要抓取的网页 URL") String url,
             @ToolParam(name = "maxLength", description = "返回内容的最大字符数, 默认3000") Integer maxLength) {

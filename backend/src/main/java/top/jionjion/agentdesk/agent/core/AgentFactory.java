@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
+import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
 import top.jionjion.agentdesk.agent.tool.WebTools;
 import top.jionjion.agentdesk.dto.settings.MemorySettingsDto;
 import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
@@ -31,6 +32,9 @@ import top.jionjion.agentdesk.service.OssService;
 import top.jionjion.agentdesk.service.SettingsService;
 import top.jionjion.agentdesk.service.SkillService;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -287,16 +291,17 @@ public class AgentFactory {
             Toolkit subToolkit = new Toolkit();
             subToolkit.registerTool(webTools);
 
+            String prompt = loadAgentPrompt("agents/web-researcher.ftl");
+
             SubAgentConfig webResearcherConfig = SubAgentConfig.builder()
-                    .toolName("web_researcher")
-                    .description("联网研究助手。当用户需要搜索互联网、查询网页内容、获取最新资讯时，将任务委派给此子代理。" +
-                            "传入清晰的任务描述，子代理会搜索并返回精简的结果摘要。")
+                    .toolName(ToolDefinitions.WEB_RESEARCHER)
+                    .description(ToolDefinitions.WEB_RESEARCHER_DESC)
                     .build();
 
             toolkit.registration()
                     .subAgent(() -> ReActAgent.builder()
                                     .name("web-researcher")
-                                    .sysPrompt(WEB_RESEARCHER_PROMPT)
+                                    .sysPrompt(prompt)
                                     .model(model)
                                     .toolkit(subToolkit)
                                     .memory(new InMemoryMemory())
@@ -311,22 +316,19 @@ public class AgentFactory {
         }
     }
 
-    private static final String WEB_RESEARCHER_PROMPT = """
-            你是联网研究助手。你的职责是根据任务描述搜索互联网并提取有用信息。
-
-            工作流程:
-            1. 分析任务，确定最佳搜索关键词（可拆分为多次搜索）
-            2. 使用 web_search 搜索相关信息
-            3. 如需深入了解某个结果，使用 url_fetch 抓取网页正文
-            4. 整理并返回精简的结果摘要
-
-            输出要求:
-            - 返回结构化的摘要，包含关键信息
-            - 附上信息来源链接
-            - 控制输出在 500 字以内
-            - 如果搜索无结果，明确说明并建议换个关键词
-            - 不要返回原始 HTML 或未经整理的大段文本
-
-            请用中文回答。
-            """;
+    /**
+     * 从 classpath 加载子代理 prompt 文件（.ftl 纯文本模板）。
+     */
+    private String loadAgentPrompt(String resourcePath) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                log.warn("子代理 prompt 文件未找到: {}", resourcePath);
+                return "";
+            }
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8).trim();
+        } catch (IOException e) {
+            log.warn("加载子代理 prompt 失败: {}", e.getMessage());
+            return "";
+        }
+    }
 }

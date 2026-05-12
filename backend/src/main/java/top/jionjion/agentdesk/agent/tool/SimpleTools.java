@@ -48,7 +48,7 @@ public class SimpleTools {
         this.ossService = ossService;
     }
 
-    @Tool(name = "get_current_time", description = "获取当前时间, 可以指定时区")
+    @Tool(name = ToolDefinitions.GET_CURRENT_TIME, description = ToolDefinitions.GET_CURRENT_TIME_DESC)
     public String getCurrentTime(@ToolParam(name = "timezone", description = "时区, 例如: Asia/Shanghai, America/New_York") String timezone) {
         ZoneId zoneId;
         try {
@@ -60,7 +60,7 @@ public class SimpleTools {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
-    @Tool(name = "calculate", description = "计算一个数学表达式, 支持加减乘除")
+    @Tool(name = ToolDefinitions.CALCULATE, description = ToolDefinitions.CALCULATE_DESC)
     public String calculate(@ToolParam(name = "expression", description = "数学表达式, 例如: 1+2*3") String expression) {
         try {
             // 简单的四则运算支持
@@ -71,10 +71,7 @@ public class SimpleTools {
         }
     }
 
-    @Tool(name = "read_file",
-            description = "读取用户上传的文件内容。传入 fileId 获取文件的文本内容。" +
-                    "支持的文件类型: txt, md, csv, json, xml, log, java, py, js, ts, html, css, yaml, yml, properties, sql。" +
-                    "文件大小上限 500KB。")
+    @Tool(name = ToolDefinitions.READ_FILE, description = ToolDefinitions.READ_FILE_DESC)
     public String readFile(
             @ToolParam(name = "fileId", description = "文件ID，从用户上传的文件信息中获取")
             Long fileId

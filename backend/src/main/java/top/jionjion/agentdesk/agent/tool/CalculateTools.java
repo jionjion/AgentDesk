@@ -18,7 +18,7 @@ public class CalculateTools {
     private static final char CHAR_ZERO = '0';
     private static final char CHAR_NINE = '9';
 
-    @Tool(name = "calculate", description = "计算一个数学表达式, 支持加减乘除")
+    @Tool(name = ToolDefinitions.CALCULATE, description = ToolDefinitions.CALCULATE_DESC)
     public String calculate(@ToolParam(name = "expression", description = "数学表达式, 例如: 1+2*3") String expression) {
         try {
             double result = evalExpression(expression);
