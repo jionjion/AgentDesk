@@ -3,7 +3,7 @@
     <TitleBar/>
     <div class="flex flex-1 overflow-hidden">
       <!-- 左侧导航 -->
-      <aside class="w-56 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
+      <aside class="w-72 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 flex flex-col h-full">
         <!-- 返回按钮 -->
         <div class="px-4 pt-4 pb-2">
           <button
@@ -113,15 +113,16 @@
           </div>
         </nav>
 
-        <!-- 底部升级方案 -->
+        <!-- 底部 GitHub 链接 -->
         <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-700">
-          <button
-              class="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-violet-600 dark:text-violet-400 rounded-md hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-              @click="activeSection = 'upgrade'"
+          <a
+              href="https://jionjion.github.io/AgentDesk/"
+              target="_blank"
+              class="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
-            <Sparkles :size="16"/>
-            <span>升级方案</span>
-          </button>
+            <Github :size="16"/>
+            <span>GitHub</span>
+          </a>
         </div>
       </aside>
 
@@ -162,7 +163,7 @@ import McpSection from '@/components/settings/McpSection.vue'
 import KnowledgeSection from '@/components/settings/KnowledgeSection.vue'
 import UpdateSection from '@/components/settings/UpdateSection.vue'
 import {useSettingsStore} from '@/stores/settings'
-import {ArrowLeft, BookOpen, Box, Brain, Cpu, Database, FlaskConical, Link, RefreshCw, Shield, SlidersHorizontal, Sparkles, User} from 'lucide-vue-next'
+import {ArrowLeft, BookOpen, Box, Brain, Cpu, Database, FlaskConical, Github, Link, RefreshCw, Shield, SlidersHorizontal, User} from 'lucide-vue-next'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()
@@ -211,8 +212,7 @@ const sectionMeta: Record<string, { label: string; description: string }> = {
   memory: {label: '长期记忆', description: '管理 AI 助手的跨会话记忆。'},
   sandbox: {label: '虚拟机沙盒', description: '配置安全沙盒环境。'},
   experimental: {label: '实验特性', description: '启用或关闭实验性功能。'},
-  update: {label: '更新应用', description: '检查并安装应用更新。'},
-  upgrade: {label: '升级方案', description: '查看套餐与定价信息。'}
+  update: {label: '更新应用', description: '检查并安装应用更新。'}
 }
 
 const activeSectionLabel = computed(() => sectionMeta[activeSection.value]?.label ?? '')
