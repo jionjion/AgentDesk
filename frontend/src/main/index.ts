@@ -112,9 +112,9 @@ let forceQuit = false
 
 function createWindow(): void {
     mainWindow = new BrowserWindow({
-        width: 1280,
+        width: 1360,
         height: 860,
-        minWidth: 900,
+        minWidth: 960,
         minHeight: 600,
         show: false,
         frame: false,

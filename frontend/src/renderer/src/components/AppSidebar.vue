@@ -1,5 +1,5 @@
 <template>
-  <aside class="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 flex flex-col h-full">
+  <aside class="w-72 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 flex flex-col h-full">
     <!-- 新任务按钮 -->
     <div class="px-3 pt-3 pb-1">
       <button
