@@ -1,5 +1,5 @@
 <template>
-  <aside class="w-60 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 flex flex-col h-full">
+  <aside class="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 flex flex-col h-full">
     <!-- 新任务按钮 -->
     <div class="px-3 pt-3 pb-1">
       <button
@@ -107,8 +107,8 @@
           </button>
         </div>
       </div>
-      <ScrollArea class="h-full">
-        <div class="px-2 space-y-0.5">
+      <ScrollArea class="h-full px-3">
+        <div class="space-y-0.5">
           <!-- 批量模式 -->
           <template v-if="batchMode">
             <div
@@ -116,6 +116,7 @@
                 :key="session.id"
                 class="flex items-center gap-1.5 px-2 py-1.5 text-sm rounded cursor-pointer truncate hover:bg-gray-100 dark:hover:bg-gray-800"
                 :class="selectedSessionIds.has(session.id) ? 'bg-violet-50 dark:bg-violet-900/20' : ''"
+                :title="session.title"
                 @click="toggleSessionSelect(session.id)"
             >
               <div
@@ -135,14 +136,15 @@
             <ContextMenu v-for="session in filteredSessions" :key="session.id">
               <ContextMenuTrigger as-child>
                 <div
-                    class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer truncate"
+                    class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer"
                     :class="chatStore.currentSessionId === session.id
                   ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
+                    :title="session.title"
                     @click="handleSwitchSession(session.id)"
                 >
                   <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500"/>
-                  <span class="flex-1 truncate">{{ session.title }}</span>
+                  <span class="flex-1 min-w-0 truncate">{{ session.title }}</span>
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent class="w-40">
