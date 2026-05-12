@@ -12,12 +12,14 @@ import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.skill.repository.FileSystemSkillRepository;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.coding.ShellCommandTool;
+import io.agentscope.core.tool.subagent.SubAgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
+import top.jionjion.agentdesk.agent.tool.WebTools;
 import top.jionjion.agentdesk.dto.settings.MemorySettingsDto;
 import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
 import top.jionjion.agentdesk.entity.McpServer;
@@ -52,16 +54,19 @@ public class AgentFactory {
 
     private static final String SYS_PROMPT = """
             你是一个名为 Assistant 的智能助手。你可以直接回答简单问题，也可以使用已加载的技能完成复杂任务。
-            
+
             当用户上传了文件时，消息中会包含文件的元信息 (文件名、大小、类型、fileId)。
             对于文件相关任务，请将 fileId 传递给相应的工具。
-            
+
             你也可以直接使用 get_current_time、calculate、read_file 等工具处理简单任务。
             不要猜测文件内容，请先调用 read_file 获取实际内容。
-            
+
+            当用户需要搜索互联网、查询网页内容或获取最新资讯时，使用 web_researcher 子代理。
+            传入清晰的任务描述即可，子代理会搜索并返回精简的结果摘要。
+
             工具调用规则: 如果同一个工具连续调用失败（返回 Error），最多重试 2 次。
             超过 2 次后不要再重试，直接告知用户该工具暂时不可用，并尝试用其他方式回答。
-            
+
             请用中文回答。
             """;
 
@@ -78,6 +83,7 @@ public class AgentFactory {
     private final String codeExecutionWorkDir;
     private final boolean codeExecutionEnabled;
     private final Set<String> allowedCommands;
+    private final String tavilyApiKey;
 
     public AgentFactory(ChatModelFactory chatModelFactory,
                         FileRecordRepository fileRecordRepository,
@@ -91,7 +97,8 @@ public class AgentFactory {
                         @Value("${agentdesk.skills.base-dir}") String skillsBaseDir,
                         @Value("${agentdesk.skills.code-execution.work-dir}") String codeExecutionWorkDir,
                         @Value("${agentdesk.skills.code-execution.enabled:true}") boolean codeExecutionEnabled,
-                        @Value("${agentdesk.skills.code-execution.allowed-commands:python3,python,node}") String allowedCommandsStr) {
+                        @Value("${agentdesk.skills.code-execution.allowed-commands:python3,python,node}") String allowedCommandsStr,
+                        @Value("${agentdesk.tools.web-search.api-key:}") String tavilyApiKey) {
         this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
@@ -108,6 +115,7 @@ public class AgentFactory {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet());
+        this.tavilyApiKey = (tavilyApiKey == null || tavilyApiKey.isBlank()) ? null : tavilyApiKey;
     }
 
     /**
@@ -152,6 +160,9 @@ public class AgentFactory {
                 log.info("已为会话 {} 注册 {} 个 MCP 服务器", sessionId, mcpServers.size());
             }
         }
+
+        // 子代理集成: 注册 web-researcher 子代理（通过 Agent as Tool 模式）
+        registerSubAgents(toolkit, model);
 
         // 用户自定义系统提示词优先
         if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
@@ -259,4 +270,63 @@ public class AgentFactory {
 
         return skillBox;
     }
+
+    /**
+     * 注册子代理: 将专用子代理作为工具注册到父 Agent 的 Toolkit。
+     * 子代理在独立上下文中执行任务, 只返回精简结果, 减少父 Agent 上下文消耗。
+     */
+    private void registerSubAgents(Toolkit toolkit, DashScopeChatModel model) {
+        if (tavilyApiKey == null) {
+            log.info("未配置 Tavily API Key, 跳过 web-researcher 子代理注册");
+            return;
+        }
+
+        try {
+            // web-researcher 子代理: 联网搜索 + 网页抓取
+            WebTools webTools = new WebTools(tavilyApiKey);
+            Toolkit subToolkit = new Toolkit();
+            subToolkit.registerTool(webTools);
+
+            SubAgentConfig webResearcherConfig = SubAgentConfig.builder()
+                    .toolName("web_researcher")
+                    .description("联网研究助手。当用户需要搜索互联网、查询网页内容、获取最新资讯时，将任务委派给此子代理。" +
+                            "传入清晰的任务描述，子代理会搜索并返回精简的结果摘要。")
+                    .build();
+
+            toolkit.registration()
+                    .subAgent(() -> ReActAgent.builder()
+                                    .name("web-researcher")
+                                    .sysPrompt(WEB_RESEARCHER_PROMPT)
+                                    .model(model)
+                                    .toolkit(subToolkit)
+                                    .memory(new InMemoryMemory())
+                                    .maxIters(5)
+                                    .build(),
+                            webResearcherConfig)
+                    .apply();
+
+            log.info("已注册子代理: web-researcher");
+        } catch (Exception e) {
+            log.warn("注册子代理失败: {}", e.getMessage());
+        }
+    }
+
+    private static final String WEB_RESEARCHER_PROMPT = """
+            你是联网研究助手。你的职责是根据任务描述搜索互联网并提取有用信息。
+
+            工作流程:
+            1. 分析任务，确定最佳搜索关键词（可拆分为多次搜索）
+            2. 使用 web_search 搜索相关信息
+            3. 如需深入了解某个结果，使用 url_fetch 抓取网页正文
+            4. 整理并返回精简的结果摘要
+
+            输出要求:
+            - 返回结构化的摘要，包含关键信息
+            - 附上信息来源链接
+            - 控制输出在 500 字以内
+            - 如果搜索无结果，明确说明并建议换个关键词
+            - 不要返回原始 HTML 或未经整理的大段文本
+
+            请用中文回答。
+            """;
 }

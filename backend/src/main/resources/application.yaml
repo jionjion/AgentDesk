@@ -48,6 +48,10 @@ agentdesk:
       enabled: true
       work-dir: ${AGENTDESK_SKILLS_WORKDIR:${user.home}/.agentdesk/workspace}
       allowed-commands: python3,python,node,npm,pip
+  # 联网搜索工具配置
+  tools:
+    web-search:
+      api-key: ${TAVILY_API_KEY:}
   # JWT 配置
   jwt:
     expiration: 86400000
