@@ -26,7 +26,7 @@
     </div>
 
     <!-- 普通消息气泡 -->
-    <div v-else ref="bubbleRef" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
+    <div v-else ref="bubbleRef" :data-msg-id="message.id" class="flex gap-3 py-3" :class="isUser ? 'flex-row-reverse' : 'flex-row'">
       <!-- 头像 -->
       <div
           class="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm overflow-hidden border border-gray-200 dark:border-gray-600"

@@ -7,29 +7,39 @@ import java.util.Map;
 /**
  * SSE 事件载荷 DTO
  *
+ * @param type        事件类型, 如 text_chunk, thinking_chunk, tool_call_start 等
+ * @param content     文本内容
+ * @param toolName    工具名称
+ * @param toolId      工具调用ID
+ * @param arguments   工具调用参数
+ * @param result      工具调用结果
+ * @param reason      完成原因
+ * @param error       错误信息
+ * @param messageId   数据库消息ID, 用于 agent_complete 事件
+ * @param memoryCount 记忆召回数量, 用于 memory_recalled 事件
  * @author Jion
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ChatEventDto(
-        /* 事件类型, 如 text_chunk, thinking_chunk, tool_call_start 等 */
+        /** 事件类型, 如 text_chunk, thinking_chunk, tool_call_start 等 */
         String type,
-        /* 文本内容 */
+        /** 文本内容 */
         String content,
-        /* 工具名称 */
+        /** 工具名称 */
         String toolName,
-        /* 工具调用ID */
+        /** 工具调用ID */
         String toolId,
-        /* 工具调用参数 */
+        /** 工具调用参数 */
         Map<String, Object> arguments,
-        /* 工具调用结果 */
+        /** 工具调用结果 */
         String result,
-        /* 完成原因 */
+        /** 完成原因 */
         String reason,
-        /* 错误信息 */
+        /** 错误信息 */
         String error,
-        /* 数据库消息ID, 用于 agent_complete 事件 */
+        /** 数据库消息ID, 用于 agent_complete 事件 */
         Long messageId,
-        /* 记忆召回数量, 用于 memory_recalled 事件 */
+        /** 记忆召回数量, 用于 memory_recalled 事件 */
         Integer memoryCount
 ) {
     /**

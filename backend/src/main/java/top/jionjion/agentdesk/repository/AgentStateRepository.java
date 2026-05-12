@@ -1,8 +1,9 @@
 package top.jionjion.agentdesk.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.repository.query.Param;
 import top.jionjion.agentdesk.entity.AgentState;
 import top.jionjion.agentdesk.entity.AgentStateId;
 
@@ -34,12 +35,13 @@ public interface AgentStateRepository extends JpaRepository<AgentState, AgentSta
     boolean existsBySessionId(String sessionId);
 
     /**
-     * 删除指定会话的所有Agent状态
+     * 删除指定会话的所有Agent状态 (批量DELETE, 不加载实体到持久化上下文)
      *
      * @param sessionId 会话ID
      */
-    @Transactional(rollbackFor = Exception.class)
-    void deleteBySessionId(String sessionId);
+    @Modifying
+    @Query("DELETE FROM AgentState a WHERE a.sessionId = :sessionId")
+    void deleteBySessionId(@Param("sessionId") String sessionId);
 
     /**
      * 查询所有存在Agent状态的会话ID
