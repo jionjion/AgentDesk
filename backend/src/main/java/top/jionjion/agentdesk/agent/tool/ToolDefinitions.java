@@ -37,4 +37,12 @@ public final class ToolDefinitions {
     public static final String WEB_RESEARCHER = "web_researcher";
     public static final String WEB_RESEARCHER_DESC = "联网研究助手。当用户需要搜索互联网、查询网页内容、获取最新资讯时，" +
             "将任务委派给此子代理。传入清晰的任务描述，子代理会搜索并返回精简的结果摘要。";
+
+    public static final String DEEP_RESEARCHER = "deep_researcher";
+    public static final String DEEP_RESEARCHER_DESC = "深度研究助手。当用户提出复杂问题需要多角度调研、交叉验证、综合分析时，" +
+            "将任务委派给此子代理。子代理会进行多轮搜索，对比不同来源，输出结构化的研究报告。";
+
+    public static final String TRANSLATOR = "translator";
+    public static final String TRANSLATOR_DESC = "翻译助手。当用户需要翻译文本、文档或技术内容时，将任务委派给此子代理。" +
+            "传入待翻译文本和目标语言，子代理会返回准确、自然的翻译结果。";
 }
