@@ -3,18 +3,25 @@
     <!-- 头像 -->
     <div class="flex items-center gap-4">
       <div class="relative cursor-pointer group" @click="avatarInputRef?.click()">
-        <div class="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-          <img v-if="avatarPreview || (form.avatar && !avatarError)" :src="avatarPreview || form.avatar" alt="头像" class="h-full w-full object-cover" @error="onImgError"/>
+        <div
+            class="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+          <img v-if="avatarPreview || (form.avatar && !avatarError)"
+               :src="avatarPreview || form.avatar"
+               alt="头像"
+               class="h-full w-full object-cover"
+               @error="onImgError"/>
           <UserIcon v-else :size="28" class="text-gray-400"/>
         </div>
-        <div class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+            class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <CameraIcon :size="18" class="text-white"/>
         </div>
-        <Loader2 v-if="uploadingAvatar" :size="18" class="absolute inset-0 m-auto text-white animate-spin"/>
+        <Loader2 v-if="uploadingAvatar" :size="18"
+                 class="absolute inset-0 m-auto text-white animate-spin"/>
       </div>
-      <div class="space-y-1">
+      <div class="space-y-0.5">
         <p class="text-sm font-medium text-gray-900 dark:text-gray-100">头像</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400">点击更换头像图片</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">点击更换，支持 JPG/PNG/GIF/WebP，最大 2MB</p>
       </div>
       <input
           ref="avatarInputRef"
@@ -28,61 +35,62 @@
     <!-- 昵称 -->
     <div class="space-y-2">
       <Label>昵称</Label>
-      <Input v-model="form.nickname" :placeholder="settingsStore.profile?.nickname || '输入你的昵称'"/>
+      <Input v-model="form.nickname"
+             :placeholder="settingsStore.profile?.nickname || '输入你的昵称'"
+             @blur="handleNicknameBlur"/>
     </div>
 
-    <!-- 修改密码 -->
-    <div class="space-y-2">
-      <Label>当前密码</Label>
-      <Input v-model="passwordForm.oldPassword" type="password" placeholder="请输入当前密码"/>
-    </div>
-    <div class="space-y-2">
-      <Label>新密码</Label>
-      <Input v-model="passwordForm.newPassword" type="password" placeholder="至少 6 个字符"/>
-    </div>
-    <div class="space-y-2">
-      <Label>确认密码</Label>
-      <Input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码"/>
-    </div>
-    <p v-if="passwordError" class="text-sm text-red-500">{{ passwordError }}</p>
-
-    <!-- 保存 -->
-    <div class="flex justify-end">
-      <Button :disabled="saving" @click="handleSave">
-        {{ saving ? '保存中...' : '保存' }}
+    <!-- 密码 -->
+    <div class="flex items-center justify-between">
+      <div class="space-y-0.5">
+        <Label>登录密码</Label>
+        <p class="text-xs text-gray-500 dark:text-gray-400">定期修改密码可以提高账号安全性</p>
+      </div>
+      <Button variant="outline" size="sm" class="w-24" @click="showPasswordDialog = true">
+        修改密码
       </Button>
     </div>
+
+    <!-- 退出登录 -->
+    <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+      <p class="text-xs text-gray-500 dark:text-gray-400">退出后需重新登录</p>
+      <Button variant="outline" size="sm" class="w-24 text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
+              @click="handleLogout">
+        退出登录
+      </Button>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <ChangePasswordDialog v-model:open="showPasswordDialog"/>
   </div>
 </template>
 
 <script setup lang="ts">
 import {reactive, ref, watch} from 'vue'
-import {Camera as CameraIcon, Loader2, User as UserIcon} from 'lucide-vue-next'
+import {Camera as CameraIcon, Loader2, LogOut, User as UserIcon} from 'lucide-vue-next'
 import {useSettingsStore} from '@/stores/settings'
 import {useAuthStore} from '@/stores/auth'
 import {cacheAvatar} from '@/utils/avatar-cache'
+import {useRouter} from 'vue-router'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
+import ChangePasswordDialog from '@/components/settings/ChangePasswordDialog.vue'
 
 const settingsStore = useSettingsStore()
 const authStore = useAuthStore()
+const router = useRouter()
 
 const form = reactive({
   nickname: '',
   avatar: ''
 })
-const passwordForm = reactive({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: ''
-})
-const passwordError = ref('')
-const saving = ref(false)
+
 const uploadingAvatar = ref(false)
 const avatarError = ref(false)
 const avatarPreview = ref('')
 const avatarInputRef = ref<HTMLInputElement | null>(null)
+const showPasswordDialog = ref(false)
 
 watch(() => settingsStore.profile, (val) => {
   if (val) {
@@ -93,7 +101,6 @@ watch(() => settingsStore.profile, (val) => {
 }, {immediate: true})
 
 function onImgError() {
-  // blob URL 不会出错，只有远程 URL 可能失败
   if (!avatarPreview.value) {
     avatarError.value = true
   }
@@ -110,7 +117,6 @@ async function handleAvatarSelect(e: Event) {
     return
   }
 
-  // 立即用本地 blob URL 预览
   avatarPreview.value = URL.createObjectURL(file)
   avatarError.value = false
 
@@ -118,13 +124,11 @@ async function handleAvatarSelect(e: Event) {
   try {
     const profileData = await settingsStore.doUploadAvatar(file)
     form.avatar = profileData.avatar
-    // 缓存到 localStorage 并同步到 auth store
     const cached = await cacheAvatar(profileData.avatar)
     if (authStore.user) {
       authStore.user.avatar = cached || profileData.avatar
     }
   } catch {
-    // 上传失败，清除预览
     avatarPreview.value = ''
     alert('头像上传失败，请重试')
   } finally {
@@ -132,47 +136,22 @@ async function handleAvatarSelect(e: Event) {
   }
 }
 
-async function handleSave() {
-  // 如果填写了密码字段，先校验并修改密码
-  const hasPassword = passwordForm.oldPassword || passwordForm.newPassword || passwordForm.confirmPassword
-  if (hasPassword) {
-    passwordError.value = ''
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      passwordError.value = '两次输入的密码不一致'
-      return
-    }
-    if (passwordForm.newPassword.length < 6) {
-      passwordError.value = '新密码至少 6 个字符'
-      return
-    }
-  }
+async function handleNicknameBlur() {
+  const original = settingsStore.profile?.nickname || ''
+  if (form.nickname === original || !form.nickname.trim()) return
 
-  saving.value = true
   try {
-    if (hasPassword) {
-      await settingsStore.doChangePassword({
-        oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword
-      })
-      passwordForm.oldPassword = ''
-      passwordForm.newPassword = ''
-      passwordForm.confirmPassword = ''
-      passwordError.value = ''
-    }
     await settingsStore.saveProfile(form)
     if (authStore.user) {
       authStore.user.nickname = form.nickname
-      if (form.avatar) {
-        const cached = await cacheAvatar(form.avatar)
-        authStore.user.avatar = cached || form.avatar
-      }
     }
-  } catch (e: any) {
-    if (hasPassword) {
-      passwordError.value = e.response?.data?.message || '修改失败，请重试'
-    }
-  } finally {
-    saving.value = false
+  } catch {
+    // 保存失败时恢复原值
+    form.nickname = original
   }
+}
+
+function handleLogout() {
+  router.push('/login')
 }
 </script>

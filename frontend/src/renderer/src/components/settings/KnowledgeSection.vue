@@ -81,7 +81,7 @@ import {getKnowledgeBases, getKnowledgeSettings, updateKnowledgeSettings} from '
 import type {KnowledgeBase} from '@/types/knowledge'
 
 const form = reactive({
-  enabled: true,
+  enabled: false,
   topK: 5,
   scoreThreshold: 0.8
 })

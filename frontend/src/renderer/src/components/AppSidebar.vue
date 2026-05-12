@@ -184,78 +184,9 @@
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ appStore.currentUser.name }}</div>
       </div>
-      <Popover>
-        <PopoverTrigger as-child>
-          <Button variant="ghost" size="icon" class="h-8 w-8">
-            <SettingsIcon :size="16" class="text-gray-400"/>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent side="top" align="end" class="w-48 p-1 dark:bg-gray-800 dark:border-gray-700">
-          <button
-              class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              @click="handleOpenSettings"
-          >
-            <SettingsIcon :size="16" class="text-gray-500 dark:text-gray-400"/>
-            <span>设置</span>
-          </button>
-          <!-- 主题子菜单 -->
-          <Popover>
-            <PopoverTrigger as-child>
-              <button
-                  class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <Palette :size="16" class="text-gray-500 dark:text-gray-400"/>
-                <span>主题</span>
-                <ChevronRight :size="14" class="ml-auto text-gray-400"/>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="right" align="start" class="w-36 p-1 dark:bg-gray-800 dark:border-gray-700">
-              <button
-                  v-for="item in themeOptions"
-                  :key="item.value"
-                  class="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md transition-colors"
-                  :class="appStore.theme === item.value
-                  ? 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20'
-                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'"
-                  @click="appStore.setTheme(item.value)"
-              >
-                <component :is="item.icon" :size="16"/>
-                <span>{{ item.label }}</span>
-                <Check v-if="appStore.theme === item.value" :size="14" class="ml-auto"/>
-              </button>
-            </PopoverContent>
-          </Popover>
-          <button
-              class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              @click="handleOpenHelp"
-          >
-            <BookOpen :size="16" class="text-gray-500 dark:text-gray-400"/>
-            <span>帮助文档</span>
-          </button>
-          <button
-              class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              @click="handleOpenChangelog"
-          >
-            <FileText :size="16" class="text-gray-500 dark:text-gray-400"/>
-            <span>更新日志</span>
-          </button>
-          <button
-              class="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              @click="handleOpenAbout"
-          >
-            <Info :size="16" class="text-gray-500 dark:text-gray-400"/>
-            <span>关于作者</span>
-          </button>
-          <div class="my-1 border-t border-gray-200 dark:border-gray-700"/>
-          <button
-              class="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-              @click="handleLogout"
-          >
-            <LogOut :size="16" class="text-red-500"/>
-            <span>退出登录</span>
-          </button>
-        </PopoverContent>
-      </Popover>
+      <Button variant="ghost" size="icon" class="h-8 w-8" @click="handleOpenSettings">
+        <SettingsIcon :size="16" class="text-gray-400"/>
+      </Button>
     </div>
 
     <!-- 删除确认对话框 -->
@@ -299,14 +230,12 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
-import type {ThemeMode} from '@/stores/app'
 import {useAppStore} from '@/stores/app'
 import {useChatStore} from '@/stores/chat'
-import {BookOpen, Check, ChevronRight, Download, Edit3, FileText, Info, Library, ListChecks, LogOut, Monitor, Moon, Palette, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Sun, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
+import {Check, Download, Edit3, Library, ListChecks, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger} from '@/components/ui/context-menu'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
@@ -352,12 +281,6 @@ const navItems: { path: string; label: string; icon: typeof Ticket; disabled?: b
   {path: '/skills', label: '技能', icon: Ticket},
   {path: '/scheduled-tasks', label: '定时任务', icon: Timer},
   {path: '/knowledge', label: '知识库', icon: Library}
-]
-
-const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [
-  {label: '亮色', value: 'light', icon: Sun},
-  {label: '暗色', value: 'dark', icon: Moon},
-  {label: '自动', value: 'auto', icon: Monitor}
 ]
 
 function isActive(path: string): boolean {
@@ -464,22 +387,6 @@ function confirmRename() {
 
 function handleOpenSettings() {
   router.push('/settings')
-}
-
-function handleOpenHelp() {
-  window.open('https://jionjion.github.io/AgentDesk', '_blank')
-}
-
-function handleOpenChangelog() {
-  window.open('https://github.com/jionjion/AgentDesk/blob/main/CHANGELOG.md', '_blank')
-}
-
-function handleOpenAbout() {
-  window.open('https://github.com/jionjion', '_blank')
-}
-
-function handleLogout() {
-  router.push('/login')
 }
 
 onMounted(() => {

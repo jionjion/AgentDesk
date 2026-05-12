@@ -54,11 +54,6 @@
         </div>
       </RadioGroup>
     </div>
-
-    <!-- 版本信息 -->
-    <div v-if="appVersion" class="pt-4 border-t text-xs text-gray-400 dark:text-gray-500">
-      当前版本: v{{ appVersion }}
-    </div>
   </div>
 </template>
 
@@ -81,7 +76,6 @@ const form = reactive<AppSettings>({
 })
 const closeAction = ref<'ask' | 'minimize' | 'quit'>('ask')
 const autoLaunch = ref(false)
-const appVersion = ref('')
 
 const themeOptions = [
   {label: '跟随系统', value: 'auto'},
@@ -111,9 +105,6 @@ onMounted(async () => {
 
   const launched = await window.electronAPI?.app.getAutoLaunch()
   if (launched !== undefined) autoLaunch.value = launched
-
-  const version = await window.electronAPI?.app.getVersion()
-  if (version) appVersion.value = version
 
   initialized = true
 })
