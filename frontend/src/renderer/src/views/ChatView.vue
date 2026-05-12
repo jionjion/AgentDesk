@@ -32,20 +32,23 @@
       </div>
     </div>
 
-    <!-- 消息列表 -->
-    <div v-else ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4" @scroll="onMessageListScroll">
-      <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
-        <template v-for="(msg, idx) in chatStore.currentMessages" :key="msg.id">
-          <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
-          <template v-else-if="msg.role === 'tool_call'"/>
-          <template v-else-if="msg.role === 'plan'"/>
-          <MessageBubble
-              v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
-              :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
-          />
-        </template>
-        <div ref="scrollAnchorRef"/>
+    <!-- 消息列表 + 右侧导航条 -->
+    <div v-else class="flex-1 flex overflow-hidden relative">
+      <div ref="messageListRef" class="flex-1 overflow-y-auto px-8 py-4 scrollbar-hide" @scroll="onMessageListScroll">
+        <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
+          <template v-for="(msg, idx) in chatStore.currentMessages" :key="msg.id">
+            <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
+            <template v-else-if="msg.role === 'tool_call'"/>
+            <template v-else-if="msg.role === 'plan'"/>
+            <MessageBubble
+                v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
+                :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
+            />
+          </template>
+          <div ref="scrollAnchorRef"/>
+        </div>
       </div>
+      <ChatNavRail :messages="chatStore.currentMessages" :active-id="activeNavMsgId" @scroll-to="handleNavScrollTo"/>
     </div>
 
     <!-- 底部输入区 -->
@@ -232,6 +235,7 @@ import SkillStatusBar from '@/components/chat/SkillStatusBar.vue'
 import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
 import KnowledgeIndicator from '@/components/chat/KnowledgeIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
+import ChatNavRail from '@/components/chat/ChatNavRail.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
 import {formatFileSize, isImageType} from '@/utils/file'
@@ -424,11 +428,41 @@ const selectedKbIds = ref<number[]>([])
 // 是否吸附在底部（用户滚动位置距底部 <= 阈值时视为吸附）
 const isStickToBottom = ref(true)
 const STICK_THRESHOLD = 80 // px
+const activeNavMsgId = ref('')
 
 function onMessageListScroll() {
   const el = messageListRef.value
   if (!el) return
   isStickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD
+  updateActiveNavMsg(el)
+}
+
+function updateActiveNavMsg(container: HTMLElement) {
+  const userMsgIds = new Set(
+    chatStore.currentMessages.filter(m => m.role === 'user').map(m => m.id)
+  )
+  const bubbles = container.querySelectorAll<HTMLElement>('[data-msg-id]')
+  const containerTop = container.scrollTop
+  const containerBottom = containerTop + container.clientHeight
+  let lastVisible = ''
+  for (const bubble of bubbles) {
+    const msgId = bubble.getAttribute('data-msg-id') || ''
+    if (!userMsgIds.has(msgId)) continue
+    const top = bubble.offsetTop
+    if (top <= containerBottom && top + bubble.offsetHeight >= containerTop) {
+      lastVisible = msgId
+    }
+  }
+  if (lastVisible) {
+    activeNavMsgId.value = lastVisible
+  }
+}
+
+function handleNavScrollTo(msgId: string) {
+  const el = messageListRef.value?.querySelector(`[data-msg-id="${msgId}"]`)
+  if (el) {
+    el.scrollIntoView({behavior: 'smooth', block: 'start'})
+  }
 }
 
 const {showMenu: slashMenuOpen, selectedIndex: slashSelectedIndex, filteredSkills: slashFilteredSkills, selectSkill: slashSelectSkill, handleKeydown: slashHandleKeydown} = useSlashCommand(inputText)
@@ -530,6 +564,11 @@ watch(
         nextTick(() => {
           scrollAnchorRef.value?.scrollIntoView({behavior: 'smooth'})
         })
+      }
+      // 更新导航条高亮：默认指向最后一条用户消息
+      const lastUser = [...chatStore.currentMessages].reverse().find(m => m.role === 'user')
+      if (lastUser) {
+        activeNavMsgId.value = lastUser.id
       }
     },
     {deep: true}

@@ -157,6 +157,15 @@ html ::-webkit-scrollbar-corner {
     background: transparent !important;
 }
 
+/* 隐藏滚动条但保留滚动能力 */
+.scrollbar-hide {
+    scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
 /* 修复 reka-ui (Select/Dialog) 打开时给 body 加 scroll-lock margin 导致整页重绘模糊的问题 */
 body[data-scroll-locked] {
     margin-right: 0 !important;
