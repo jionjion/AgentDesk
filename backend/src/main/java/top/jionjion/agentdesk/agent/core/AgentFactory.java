@@ -68,6 +68,7 @@ public class AgentFactory {
             当用户需要搜索互联网、查询网页内容或获取最新资讯时，使用 web_researcher 子代理。
             当用户提出复杂问题需要多角度调研、交叉验证时，使用 deep_researcher 子代理。
             当用户需要翻译文本或文档时，使用 translator 子代理。
+            当用户提交代码要求审查、或需要代码质量分析时，使用 code_reviewer 子代理。
             传入清晰的任务描述即可，子代理会返回精简的结果。
 
             工具调用规则: 如果同一个工具连续调用失败（返回 Error），最多重试 2 次。
@@ -346,6 +347,28 @@ public class AgentFactory {
                                     .build())
                     .apply();
             log.info("已注册子代理: translator");
+
+            // code-reviewer 子代理: 代码审查，使用代码专用模型
+            DashScopeChatModel codeModel = chatModelFactory.createByModelName("qwen3-coder-plus");
+            Toolkit codeToolkit = new Toolkit();
+            codeToolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
+
+            String codeReviewerPrompt = loadAgentPrompt("agents/code-reviewer.ftl");
+            toolkit.registration()
+                    .subAgent(() -> ReActAgent.builder()
+                                    .name("code-reviewer")
+                                    .sysPrompt(codeReviewerPrompt)
+                                    .model(codeModel)
+                                    .toolkit(codeToolkit)
+                                    .memory(new InMemoryMemory())
+                                    .maxIters(5)
+                                    .build(),
+                            SubAgentConfig.builder()
+                                    .toolName(ToolDefinitions.CODE_REVIEWER)
+                                    .description(ToolDefinitions.CODE_REVIEWER_DESC)
+                                    .build())
+                    .apply();
+            log.info("已注册子代理: code-reviewer (model=qwen3-coder-plus)");
 
         } catch (Exception e) {
             log.warn("注册子代理失败: {}", e.getMessage());

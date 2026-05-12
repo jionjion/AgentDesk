@@ -50,4 +50,17 @@ public class ChatModelFactory {
     public DashScopeChatModel create(ModelSettingsDto settings) {
         return create(settings, null);
     }
+
+    /**
+     * 按模型名创建实例（子代理使用, 使用默认参数）。
+     *
+     * @param modelName 模型名称, 如 "qwen-coder-plus"
+     * @return DashScopeChatModel 实例
+     */
+    public DashScopeChatModel createByModelName(String modelName) {
+        return DashScopeChatModel.builder()
+                .apiKey(defaultApiKey)
+                .modelName(modelName)
+                .build();
+    }
 }

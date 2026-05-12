@@ -45,4 +45,8 @@ public final class ToolDefinitions {
     public static final String TRANSLATOR = "translator";
     public static final String TRANSLATOR_DESC = "翻译助手。当用户需要翻译文本、文档或技术内容时，将任务委派给此子代理。" +
             "传入待翻译文本和目标语言，子代理会返回准确、自然的翻译结果。";
+
+    public static final String CODE_REVIEWER = "code_reviewer";
+    public static final String CODE_REVIEWER_DESC = "代码审查助手。当用户提交代码要求审查、或上传文件需要代码分析时，" +
+            "将任务委派给此子代理。子代理会从安全性、性能、正确性、可维护性等维度审查代码，返回结构化的审查意见。";
 }
