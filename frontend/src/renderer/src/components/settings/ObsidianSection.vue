@@ -34,17 +34,6 @@
       </p>
     </div>
 
-    <!-- 自动沉淀开关 -->
-    <div class="flex items-center justify-between">
-      <div>
-        <Label>会话切换时自动沉淀</Label>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          切换或新建会话时，自动将当前对话导出到 Obsidian
-        </p>
-      </div>
-      <Switch v-model="form.autoExportOnSessionEnd" @update:model-value="saveSettings"/>
-    </div>
-
     <!-- 默认分类 -->
     <div class="space-y-2">
       <Label>默认分类目录</Label>
@@ -68,14 +57,12 @@ import {validateVaultPath} from '@/api/obsidian'
 import {Button} from '@/components/ui/button'
 import {Label} from '@/components/ui/label'
 import {Input} from '@/components/ui/input'
-import {Switch} from '@/components/ui/switch'
 import {CheckCircle2, FolderOpen, Loader2} from 'lucide-vue-next'
 
 const settingsStore = useSettingsStore()
 
 const form = ref({
   vaultPath: '',
-  autoExportOnSessionEnd: false,
   defaultCategory: 'AgentDesk'
 })
 
@@ -84,7 +71,6 @@ const validateResult = ref<{ valid: boolean; message: string } | null>(null)
 
 watch(() => settingsStore.obsidian, (val) => {
   form.value.vaultPath = val.vaultPath || ''
-  form.value.autoExportOnSessionEnd = val.autoExportOnSessionEnd
   form.value.defaultCategory = val.defaultCategory || 'AgentDesk'
 }, {immediate: true})
 
@@ -114,7 +100,7 @@ async function saveSettings() {
   try {
     await settingsStore.saveObsidianSettings({
       vaultPath: form.value.vaultPath || null,
-      autoExportOnSessionEnd: form.value.autoExportOnSessionEnd,
+      autoExportOnSessionEnd: false,
       defaultCategory: form.value.defaultCategory || 'AgentDesk'
     })
   } catch { /* handled by interceptor */ }

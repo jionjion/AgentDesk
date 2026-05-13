@@ -160,6 +160,10 @@
                   <Download :size="14"/>
                   <span>导出</span>
                 </ContextMenuItem>
+                <ContextMenuItem class="cursor-pointer" @select="chatStore.archiveToObsidian(session.id)">
+                  <Archive :size="14"/>
+                  <span>归档</span>
+                </ContextMenuItem>
                 <ContextMenuSeparator/>
                 <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(session.id)">
                   <Trash2 :size="14"/>
@@ -233,7 +237,7 @@ import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {useAppStore} from '@/stores/app'
 import {useChatStore} from '@/stores/chat'
-import {Check, Download, Edit3, Library, ListChecks, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
+import {Archive, Check, Download, Edit3, Library, ListChecks, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'

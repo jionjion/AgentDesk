@@ -5,7 +5,6 @@ import {batchDeleteSessions, createSession, deleteSession, getSession, getSessio
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
-import {useSettingsStore} from './settings'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -129,26 +128,17 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    /** 自动沉淀当前会话到 Obsidian（fire-and-forget，后端会做 AI 价值判断） */
-    function autoExportCurrentSession() {
-        try {
-            const settingsStore = useSettingsStore()
-            if (settingsStore.obsidian?.autoExportOnSessionEnd && currentSessionId.value) {
-                const msgs = messagesBySession.value[currentSessionId.value]
-                if (msgs && msgs.length > 0) {
-                    exportSessionToObsidian(currentSessionId.value, true).catch(console.error)
-                }
-            }
-        } catch {
-            // 忽略错误，不影响正常流程
+    /** 手动归档会话到 Obsidian */
+    async function archiveToObsidian(sessionId: string) {
+        const msgs = messagesBySession.value[sessionId]
+        if (msgs && msgs.length > 0) {
+            await exportSessionToObsidian(sessionId, false)
         }
     }
 
     /** 切换会话 */
     async function switchSession(id: string) {
         if (isStreaming.value) return
-        // 自动沉淀到 Obsidian
-        autoExportCurrentSession()
         isLoadingSession.value = true
         currentSessionId.value = id
         try {
@@ -683,6 +673,7 @@ export const useChatStore = defineStore('chat', () => {
         isPinned,
         deleteMessage,
         regenerateMessage,
-        exportSession
+        exportSession,
+        archiveToObsidian
     }
 })
