@@ -24,6 +24,10 @@ public final class ToolDefinitions {
             "支持的文件类型: txt, md, csv, json, xml, log, java, py, js, ts, html, css, yaml, yml, properties, sql。" +
             "文件大小上限 500KB。";
 
+    public static final String API_CALL = "api_call";
+    public static final String API_CALL_DESC = "向第三方 API 发送 HTTP 请求。支持 GET、POST、PUT、DELETE 方法。" +
+            "可自定义请求头和请求体。返回响应状态码和响应内容（截断到 4000 字符）。";
+
     // ==================== Web 工具（子代理使用） ====================
 
     public static final String WEB_SEARCH = "web_search";
@@ -50,4 +54,12 @@ public final class ToolDefinitions {
     public static final String CODE_REVIEWER_DESC = "代码分析助手。当用户提交代码要求审查、分析、优化、找bug、看看有没有问题时，" +
             "将任务委派给此子代理。支持直接分析消息中的代码片段，也支持通过 read_file 读取上传的代码文件。" +
             "子代理会从安全性、性能、正确性、可维护性等维度分析代码，返回结构化的分析意见。";
+
+    public static final String SUMMARIZER = "summarizer";
+    public static final String SUMMARIZER_DESC = "摘要助手。当用户需要对长文本、长文档、长对话、日志等内容进行总结、提炼、归纳要点时，" +
+            "将任务委派给此子代理。传入需要摘要的内容，子代理会返回精简的结构化摘要。";
+
+    public static final String PLANNER = "planner";
+    public static final String PLANNER_DESC = "任务规划助手。当用户提出一个复杂目标、项目计划、学习路线、或需要拆解执行步骤时，" +
+            "将任务委派给此子代理。子代理会输出结构化的步骤清单，包含优先级、依赖关系和注意事项。";
 }

@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
+import top.jionjion.agentdesk.agent.tool.ApiCallTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
 import top.jionjion.agentdesk.agent.tool.WebTools;
@@ -62,14 +63,25 @@ public class AgentFactory {
             当用户上传了文件时，消息中会包含文件的元信息 (文件名、大小、类型、fileId)。
             对于文件相关任务，请将 fileId 传递给相应的工具。
 
-            你也可以直接使用 get_current_time、calculate、read_file 等工具处理简单任务。
+            你也可以直接使用 get_current_time、calculate、read_file、api_call 等工具处理简单任务。
             不要猜测文件内容，请先调用 read_file 获取实际内容。
+            当用户需要调用第三方 API 或测试接口时，使用 api_call 工具发送 HTTP 请求。
 
             当用户需要搜索互联网、查询网页内容或获取最新资讯时，使用 web_researcher 子代理。
             当用户提出复杂问题需要多角度调研、交叉验证时，使用 deep_researcher 子代理。
             当用户需要翻译文本或文档时，使用 translator 子代理。
             当用户提交代码要求审查、分析、优化、找bug或看看有没有问题时，必须使用 code_reviewer 子代理。
+            当用户需要对长文本、文档、日志、对话进行总结、提炼要点时，使用 summarizer 子代理。
+            当用户提出复杂目标需要拆解步骤、制定计划、规划路线时，使用 planner 子代理。
             传入清晰的任务描述即可，子代理会返回精简的结果。
+
+            重要: 在调用任何工具或子代理之前，先用一句话告知用户你接下来要做什么。例如:
+            - "我来帮你查一下当前时间。"
+            - "我来读取这个文件的内容。"
+            - "我来搜索一下相关信息。"
+            - "我来帮你调用这个接口。"
+            - "我来分析一下这段代码。"
+            这样用户可以了解你的操作意图。
 
             工具调用规则: 如果同一个工具连续调用失败（返回 Error），最多重试 2 次。
             超过 2 次后不要再重试，直接告知用户该工具暂时不可用，并尝试用其他方式回答。
@@ -132,6 +144,7 @@ public class AgentFactory {
         // 每个 Agent 独立的 Toolkit（Toolkit 有状态, 不可共享）
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
+        toolkit.registerTool(new ApiCallTool());
 
         // 每个 Agent 独立的 Hook
         SseStreamingHook hook = new SseStreamingHook();
@@ -245,8 +258,10 @@ public class AgentFactory {
             Path userSkillsDir = Path.of(skillsBaseDir, String.valueOf(userId));
             if (userSkillsDir.toFile().exists()) {
                 try {
-                    FileSystemSkillRepository userRepo = new FileSystemSkillRepository(userSkillsDir);
-                    List<AgentSkill> userSkills = userRepo.getAllSkills();
+                    List<AgentSkill> userSkills;
+                    try (FileSystemSkillRepository userRepo = new FileSystemSkillRepository(userSkillsDir)) {
+                        userSkills = userRepo.getAllSkills();
+                    }
                     List<Skill> enabledSkills = skillService.getEnabledSkills(userId);
                     Set<String> enabledIds = enabledSkills.stream().map(Skill::getId).collect(Collectors.toSet());
 
@@ -375,6 +390,42 @@ public class AgentFactory {
                                     .build())
                     .apply();
             log.info("已注册子代理: code-reviewer (model=qwen3-coder-plus)");
+
+            // summarizer 子代理: 长文本摘要
+            String summarizerPrompt = loadAgentPrompt("agents/summarizer.ftl");
+            toolkit.registration()
+                    .subAgent(() -> ReActAgent.builder()
+                                    .name("summarizer")
+                                    .sysPrompt(summarizerPrompt)
+                                    .model(model)
+                                    .toolkit(new Toolkit())
+                                    .memory(new InMemoryMemory())
+                                    .maxIters(3)
+                                    .build(),
+                            SubAgentConfig.builder()
+                                    .toolName(ToolDefinitions.SUMMARIZER)
+                                    .description(ToolDefinitions.SUMMARIZER_DESC)
+                                    .build())
+                    .apply();
+            log.info("已注册子代理: summarizer");
+
+            // planner 子代理: 任务规划
+            String plannerPrompt = loadAgentPrompt("agents/planner.ftl");
+            toolkit.registration()
+                    .subAgent(() -> ReActAgent.builder()
+                                    .name("planner")
+                                    .sysPrompt(plannerPrompt)
+                                    .model(model)
+                                    .toolkit(new Toolkit())
+                                    .memory(new InMemoryMemory())
+                                    .maxIters(3)
+                                    .build(),
+                            SubAgentConfig.builder()
+                                    .toolName(ToolDefinitions.PLANNER)
+                                    .description(ToolDefinitions.PLANNER_DESC)
+                                    .build())
+                    .apply();
+            log.info("已注册子代理: planner");
         } catch (Exception e) {
             log.warn("注册独立子代理失败: {}", e.getMessage());
         }
