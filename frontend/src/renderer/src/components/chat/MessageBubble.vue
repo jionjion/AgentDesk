@@ -46,7 +46,7 @@
                 : 'block bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-md'
             ]"
         >
-          <div v-if="isUser">
+          <div v-if="isUser" class="whitespace-pre-wrap">
             {{ (message as UserMessage).content }}
             <!-- 非图片附件保留在气泡内 -->
             <div v-if="fileAttachments.length" class="flex flex-wrap gap-1.5 mt-2">
