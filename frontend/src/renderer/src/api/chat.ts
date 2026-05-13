@@ -13,18 +13,100 @@ export function getMessages(sessionId: string) {
 }
 
 /**
- * 创建 SSE 流式聊天连接
+ * 轻量 SSE 包装器，兼容 EventSource 的 addEventListener / close 接口，
+ * 但底层使用 fetch（支持 POST + JSON body）。
  */
-export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[]): EventSource {
+export interface FetchSSE {
+    addEventListener(event: string, handler: (e: MessageEvent) => void): void
+    close(): void
+    set onerror(handler: (() => void) | null)
+}
+
+export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[]): FetchSSE {
     const token = localStorage.getItem('auth_token') || ''
-    let url = `${BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}&token=${encodeURIComponent(token)}`
-    if (fileIds && fileIds.length > 0) {
-        url += `&fileIds=${fileIds.join(',')}`
+    const url = `${BASE_URL}/api/chat/stream`
+
+    const listeners: Record<string, ((e: MessageEvent) => void)[]> = {}
+    let errorHandler: (() => void) | null = null
+    let abortController: AbortController | null = new AbortController()
+
+    const instance: FetchSSE = {
+        addEventListener(event: string, handler: (e: MessageEvent) => void) {
+            if (!listeners[event]) listeners[event] = []
+            listeners[event].push(handler)
+        },
+        close() {
+            abortController?.abort()
+            abortController = null
+        },
+        set onerror(handler: (() => void) | null) {
+            errorHandler = handler
+        }
     }
-    if (kbIds && kbIds.length > 0) {
-        url += `&kbIds=${kbIds.join(',')}`
-    }
-    return new EventSource(url)
+
+    // 启动 fetch 并解析 SSE 流
+    ;(async () => {
+        try {
+            const body: Record<string, unknown> = {sessionId, message}
+            if (fileIds && fileIds.length > 0) body.fileIds = fileIds.join(',')
+            if (kbIds && kbIds.length > 0) body.kbIds = kbIds.join(',')
+
+            const headers: Record<string, string> = {'Content-Type': 'application/json'}
+            if (token) headers['Authorization'] = `Bearer ${token}`
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+                signal: abortController?.signal
+            })
+
+            if (!response.ok || !response.body) {
+                errorHandler?.()
+                return
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            let currentEvent = 'message'
+            let currentData = ''
+
+            while (true) {
+                const {done, value} = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, {stream: true})
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim()
+                    } else if (line.startsWith('data:')) {
+                        currentData = line.slice(5).trim()
+                    } else if (line === '') {
+                        // 空行表示事件结束，分发事件
+                        if (currentData) {
+                            const handlers = listeners[currentEvent]
+                            if (handlers) {
+                                const messageEvent = new MessageEvent(currentEvent, {data: currentData})
+                                handlers.forEach(h => h(messageEvent))
+                            }
+                        }
+                        currentEvent = 'message'
+                        currentData = ''
+                    }
+                }
+            }
+        } catch (e: unknown) {
+            if (e instanceof Error && e.name !== 'AbortError') {
+                errorHandler?.()
+            }
+        }
+    })()
+
+    return instance
 }
 
 /**

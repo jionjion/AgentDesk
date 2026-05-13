@@ -2,7 +2,7 @@ import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, SSEEventData} from '@/types/chat'
 import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
-import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat} from '@/api/chat'
+import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
 import {useSettingsStore} from './settings'
@@ -48,7 +48,7 @@ export const useChatStore = defineStore('chat', () => {
     const messagesBySession = ref<Record<string, ChatMessage[]>>({})
     const isStreaming = ref(false)
     const isLoadingSession = ref(false)
-    const eventSource = ref<EventSource | null>(null)
+    const eventSource = ref<EventSource | FetchSSE | null>(null)
     const pinnedSessionIds = ref<Set<string>>(new Set())
 
     const pendingAttachments = ref<PendingFile[]>([])
@@ -253,7 +253,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     /** 设置 SSE 事件监听 (sendMessage 和 regenerateMessage 共用) */
-    function setupSSEListeners(es: EventSource, sessionId: string, assistantMsgId: string) {
+    function setupSSEListeners(es: EventSource | FetchSSE, sessionId: string, assistantMsgId: string) {
         const getAssistantMsg = (): AssistantMessage | undefined => {
             const msgs = messagesBySession.value[sessionId]
             return msgs?.findLast(m => m.role === 'assistant') as AssistantMessage | undefined
