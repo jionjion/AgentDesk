@@ -68,7 +68,7 @@ public class AgentFactory {
             当用户需要搜索互联网、查询网页内容或获取最新资讯时，使用 web_researcher 子代理。
             当用户提出复杂问题需要多角度调研、交叉验证时，使用 deep_researcher 子代理。
             当用户需要翻译文本或文档时，使用 translator 子代理。
-            当用户提交代码要求审查、或需要代码质量分析时，使用 code_reviewer 子代理。
+            当用户提交代码要求审查、分析、优化、找bug或看看有没有问题时，必须使用 code_reviewer 子代理。
             传入清晰的任务描述即可，子代理会返回精简的结果。
 
             工具调用规则: 如果同一个工具连续调用失败（返回 Error），最多重试 2 次。
@@ -170,6 +170,8 @@ public class AgentFactory {
 
         // 子代理集成: 注册 web-researcher 子代理（通过 Agent as Tool 模式）
         registerSubAgents(toolkit, model);
+
+        log.info("会话 {} 工具注册完成, 已注册工具: {}", sessionId, toolkit.getToolNames());
 
         // 用户自定义系统提示词优先
         if (ms.systemPrompt() != null && !ms.systemPrompt().isBlank()) {
@@ -283,54 +285,58 @@ public class AgentFactory {
      * 子代理在独立上下文中执行任务, 只返回精简结果, 减少父 Agent 上下文消耗。
      */
     private void registerSubAgents(Toolkit toolkit, DashScopeChatModel model) {
-        if (tavilyApiKey == null) {
+        // ─── 联网子代理（依赖 Tavily API Key）───
+        if (tavilyApiKey != null) {
+            try {
+                WebTools webTools = new WebTools(tavilyApiKey);
+                Toolkit webToolkit = new Toolkit();
+                webToolkit.registerTool(webTools);
+
+                // web-researcher 子代理: 快速联网搜索
+                String webPrompt = loadAgentPrompt("agents/web-researcher.ftl");
+                toolkit.registration()
+                        .subAgent(() -> ReActAgent.builder()
+                                        .name("web-researcher")
+                                        .sysPrompt(webPrompt)
+                                        .model(model)
+                                        .toolkit(webToolkit)
+                                        .memory(new InMemoryMemory())
+                                        .maxIters(5)
+                                        .build(),
+                                SubAgentConfig.builder()
+                                        .toolName(ToolDefinitions.WEB_RESEARCHER)
+                                        .description(ToolDefinitions.WEB_RESEARCHER_DESC)
+                                        .build())
+                        .apply();
+                log.info("已注册子代理: web-researcher");
+
+                // deep-researcher 子代理: 多轮深度研究
+                String deepPrompt = loadAgentPrompt("agents/deep-researcher.ftl");
+                toolkit.registration()
+                        .subAgent(() -> ReActAgent.builder()
+                                        .name("deep-researcher")
+                                        .sysPrompt(deepPrompt)
+                                        .model(model)
+                                        .toolkit(webToolkit)
+                                        .memory(new InMemoryMemory())
+                                        .maxIters(15)
+                                        .build(),
+                                SubAgentConfig.builder()
+                                        .toolName(ToolDefinitions.DEEP_RESEARCHER)
+                                        .description(ToolDefinitions.DEEP_RESEARCHER_DESC)
+                                        .build())
+                        .apply();
+                log.info("已注册子代理: deep-researcher");
+            } catch (Exception e) {
+                log.warn("注册联网子代理失败: {}", e.getMessage());
+            }
+        } else {
             log.info("未配置 Tavily API Key, 跳过联网子代理注册");
-            return;
         }
 
+        // ─── 独立子代理（不依赖外部 API Key）───
         try {
-            // 共用的 Web 工具集
-            WebTools webTools = new WebTools(tavilyApiKey);
-            Toolkit webToolkit = new Toolkit();
-            webToolkit.registerTool(webTools);
-
-            // web-researcher 子代理: 快速联网搜索
-            String webPrompt = loadAgentPrompt("agents/web-researcher.ftl");
-            toolkit.registration()
-                    .subAgent(() -> ReActAgent.builder()
-                                    .name("web-researcher")
-                                    .sysPrompt(webPrompt)
-                                    .model(model)
-                                    .toolkit(webToolkit)
-                                    .memory(new InMemoryMemory())
-                                    .maxIters(5)
-                                    .build(),
-                            SubAgentConfig.builder()
-                                    .toolName(ToolDefinitions.WEB_RESEARCHER)
-                                    .description(ToolDefinitions.WEB_RESEARCHER_DESC)
-                                    .build())
-                    .apply();
-            log.info("已注册子代理: web-researcher");
-
-            // deep-researcher 子代理: 多轮深度研究
-            String deepPrompt = loadAgentPrompt("agents/deep-researcher.ftl");
-            toolkit.registration()
-                    .subAgent(() -> ReActAgent.builder()
-                                    .name("deep-researcher")
-                                    .sysPrompt(deepPrompt)
-                                    .model(model)
-                                    .toolkit(webToolkit)
-                                    .memory(new InMemoryMemory())
-                                    .maxIters(15)
-                                    .build(),
-                            SubAgentConfig.builder()
-                                    .toolName(ToolDefinitions.DEEP_RESEARCHER)
-                                    .description(ToolDefinitions.DEEP_RESEARCHER_DESC)
-                                    .build())
-                    .apply();
-            log.info("已注册子代理: deep-researcher");
-
-            // translator 子代理: 纯 LLM 翻译，无需额外工具
+            // translator 子代理: 纯 LLM 翻译
             String translatorPrompt = loadAgentPrompt("agents/translator.ftl");
             toolkit.registration()
                     .subAgent(() -> ReActAgent.builder()
@@ -369,9 +375,8 @@ public class AgentFactory {
                                     .build())
                     .apply();
             log.info("已注册子代理: code-reviewer (model=qwen3-coder-plus)");
-
         } catch (Exception e) {
-            log.warn("注册子代理失败: {}", e.getMessage());
+            log.warn("注册独立子代理失败: {}", e.getMessage());
         }
     }
 

@@ -47,6 +47,7 @@ public final class ToolDefinitions {
             "传入待翻译文本和目标语言，子代理会返回准确、自然的翻译结果。";
 
     public static final String CODE_REVIEWER = "code_reviewer";
-    public static final String CODE_REVIEWER_DESC = "代码审查助手。当用户提交代码要求审查、或上传文件需要代码分析时，" +
-            "将任务委派给此子代理。子代理会从安全性、性能、正确性、可维护性等维度审查代码，返回结构化的审查意见。";
+    public static final String CODE_REVIEWER_DESC = "代码分析助手。当用户提交代码要求审查、分析、优化、找bug、看看有没有问题时，" +
+            "将任务委派给此子代理。支持直接分析消息中的代码片段，也支持通过 read_file 读取上传的代码文件。" +
+            "子代理会从安全性、性能、正确性、可维护性等维度分析代码，返回结构化的分析意见。";
 }

@@ -16,6 +16,7 @@ import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.annotation.RateLimit;
 import top.jionjion.agentdesk.dto.chat.ChatEventDto;
+import top.jionjion.agentdesk.dto.chat.ChatRequest;
 import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.dto.chat.SearchResultDto;
 import top.jionjion.agentdesk.entity.ChatMessage;
@@ -110,11 +111,13 @@ public class ChatController {
      * 流式对话接口, 通过SSE推送Agent的回复事件
      */
     @RateLimit(maxRequests = 10, windowSeconds = 70, message = "对话请求过于频繁, 请稍后再试")
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamChat(@RequestParam String sessionId,
-                                 @RequestParam String message,
-                                 @RequestParam(required = false) String fileIds,
-                                 @RequestParam(required = false) String kbIds) {
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamChat(@RequestBody ChatRequest chatRequest) {
+        String sessionId = chatRequest.sessionId();
+        String message = chatRequest.message();
+        String fileIds = chatRequest.fileIds();
+        String kbIds = chatRequest.kbIds();
+
         validateSessionId(sessionId);
         if (message == null || message.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is empty");
