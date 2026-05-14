@@ -63,7 +63,7 @@ public class ScheduledTaskService {
     /**
      * 创建定时任务
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScheduledTaskResponse createTask(ScheduledTaskRequest req, Long userId) {
         validateRequest(req);
         validateCronExpression(req.cronExpression());
@@ -88,7 +88,7 @@ public class ScheduledTaskService {
     /**
      * 更新定时任务
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ScheduledTaskResponse updateTask(Long taskId, ScheduledTaskRequest req, Long userId) {
         validateRequest(req);
         validateCronExpression(req.cronExpression());
@@ -114,7 +114,7 @@ public class ScheduledTaskService {
     /**
      * 删除定时任务
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteTask(Long taskId, Long userId) {
         ScheduledTask task = findOwnedTask(taskId, userId);
         dynamicTaskScheduler.unschedule(taskId);
@@ -124,7 +124,7 @@ public class ScheduledTaskService {
     /**
      * 启用/禁用定时任务
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void setEnabled(Long taskId, boolean enabled, Long userId) {
         ScheduledTask task = findOwnedTask(taskId, userId);
         task.setEnabled(enabled);

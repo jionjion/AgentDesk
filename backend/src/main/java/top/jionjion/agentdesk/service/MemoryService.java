@@ -1,5 +1,6 @@
 package top.jionjion.agentdesk.service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -182,7 +183,9 @@ public class MemoryService {
      * 安全读取 JSON 字段，过滤 "null" 字符串
      */
     private static String nullSafe(JsonNode node, String field) {
-        if (!node.has(field) || node.get(field).isNull()) return null;
+        if (!node.has(field) || node.get(field).isNull()) {
+            return null;
+        }
         String val = node.get(field).asText();
         return "null".equals(val) ? null : val;
     }
@@ -215,6 +218,7 @@ public class MemoryService {
     /**
      * Mem0 添加记忆的请求体
      */
-    private record AddMemoryBody(List<Map<String, String>> messages, String user_id) {
+    private record AddMemoryBody(List<Map<String, String>> messages,
+                                    @JsonProperty("user_id") String userId) {
     }
 }

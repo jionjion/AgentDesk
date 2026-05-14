@@ -38,9 +38,15 @@ public class SkillPackageService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillPackageService.class);
 
-    private static final long MAX_ZIP_SIZE = 10 * 1024 * 1024; // 10MB
-    private static final long MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024; // 50MB
+    /** 最大 ZIP 文件大小: 10MB */
+    private static final long MAX_ZIP_SIZE = 10 * 1024 * 1024;
+    /** 最大解压后大小: 50MB */
+    private static final long MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024;
     private static final int MAX_ENTRIES = 100;
+    private static final int MAX_SKILL_ID_LENGTH = 64;
+    private static final String SKILL_MANIFEST = "SKILL.md";
+    private static final String ZIP_EXTENSION = ".zip";
+    private static final String FRONTMATTER_DELIMITER = "---";
     private static final Pattern SKILL_NAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
     private static final Pattern FRONTMATTER_NAME = Pattern.compile("^name:\\s*(.+)$", Pattern.MULTILINE);
     private static final Pattern FRONTMATTER_DESC = Pattern.compile("^description:\\s*(.+)$", Pattern.MULTILINE);
@@ -76,7 +82,7 @@ public class SkillPackageService {
             Path skillDir = tempDir.resolve(skillId);
             if (!Files.exists(skillDir)) {
                 // ZIP 内容可能直接是文件（没有外层目录）
-                if (Files.exists(tempDir.resolve("SKILL.md"))) {
+                if (Files.exists(tempDir.resolve(SKILL_MANIFEST))) {
                     skillDir = tempDir;
                     skillId = inferSkillId(skillDir);
                 } else {
@@ -94,7 +100,7 @@ public class SkillPackageService {
             }
 
             // 6. 验证技能 ID 格式
-            if (!SKILL_NAME_PATTERN.matcher(skillId).matches() || skillId.length() > 64) {
+            if (!SKILL_NAME_PATTERN.matcher(skillId).matches() || skillId.length() > MAX_SKILL_ID_LENGTH) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "技能 ID 格式错误: 只能包含小写字母、数字和连字符, 不能以连字符开头, 最长 64 字符");
             }
@@ -194,7 +200,7 @@ public class SkillPackageService {
                     "ZIP 文件过大, 最大 10MB, 当前 " + (file.getSize() / 1024 / 1024) + "MB");
         }
         String name = file.getOriginalFilename();
-        if (name == null || !name.toLowerCase().endsWith(".zip")) {
+        if (name == null || !name.toLowerCase().endsWith(ZIP_EXTENSION)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "仅支持 .zip 格式的技能包");
         }
     }
@@ -269,13 +275,13 @@ public class SkillPackageService {
     }
 
     private SkillMetadata parseSkillMetadata(Path skillDir) throws IOException {
-        String content = Files.readString(skillDir.resolve("SKILL.md"), StandardCharsets.UTF_8);
+        String content = Files.readString(skillDir.resolve(SKILL_MANIFEST), StandardCharsets.UTF_8);
         String name = null;
         String description = null;
 
         // 解析 YAML frontmatter
-        if (content.startsWith("---")) {
-            int end = content.indexOf("---", 3);
+        if (content.startsWith(FRONTMATTER_DELIMITER)) {
+            int end = content.indexOf(FRONTMATTER_DELIMITER, 3);
             if (end > 0) {
                 String frontmatter = content.substring(3, end);
                 Matcher nameMatcher = FRONTMATTER_NAME.matcher(frontmatter);
@@ -313,9 +319,12 @@ public class SkillPackageService {
     }
 
     private void deleteDirectory(Path dir) throws IOException {
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) {
+            return;
+        }
         try (var stream = Files.walk(dir)) {
-            stream.sorted((a, b) -> b.compareTo(a)) // 反序删除, 先文件后目录
+            // 反序删除, 先文件后目录
+            stream.sorted((a, b) -> b.compareTo(a))
                     .forEach(path -> {
                         try {
                             Files.deleteIfExists(path);

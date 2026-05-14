@@ -77,7 +77,9 @@ public class TextChunker {
             } else {
                 if (!currentChunk.isEmpty()) {
                     String trimmed = currentChunk.toString().trim();
-                    if (!trimmed.isEmpty()) chunks.add(trimmed);
+                    if (!trimmed.isEmpty()) {
+                        chunks.add(trimmed);
+                    }
                 }
 
                 if (part.length() > chunkSize) {
@@ -91,7 +93,9 @@ public class TextChunker {
 
         if (!currentChunk.isEmpty()) {
             String trimmed = currentChunk.toString().trim();
-            if (!trimmed.isEmpty()) chunks.add(trimmed);
+            if (!trimmed.isEmpty()) {
+                chunks.add(trimmed);
+            }
         }
 
         return applyOverlap(chunks);
@@ -103,9 +107,13 @@ public class TextChunker {
         while (start < text.length()) {
             int end = Math.min(start + chunkSize, text.length());
             String chunk = text.substring(start, end).trim();
-            if (!chunk.isEmpty()) chunks.add(chunk);
+            if (!chunk.isEmpty()) {
+                chunks.add(chunk);
+            }
             start = end - overlap;
-            if (start >= end) break;
+            if (start >= end) {
+                break;
+            }
         }
         return chunks;
     }
@@ -131,13 +139,17 @@ public class TextChunker {
     }
 
     private List<String> mergeSmallChunks(List<String> chunks) {
-        if (chunks.size() <= 1) return chunks;
+        if (chunks.size() <= 1) {
+            return chunks;
+        }
 
         List<String> result = new ArrayList<>();
         int minSize = chunkSize / 4;
 
         for (String chunk : chunks) {
-            if (chunk.isBlank()) continue;
+            if (chunk.isBlank()) {
+                continue;
+            }
             if (!result.isEmpty() && chunk.length() < minSize) {
                 int lastIdx = result.size() - 1;
                 result.set(lastIdx, result.get(lastIdx) + "\n" + chunk);

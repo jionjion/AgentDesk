@@ -37,6 +37,7 @@ public class SkillService {
 
     private static final Set<String> ALLOWED_TOOLS = Set.of("FileTools", "CalculateTools");
     private static final int MAX_ENABLED_SKILLS = 20;
+    private static final int MAX_ITERS = 10;
 
     private final SkillRepository skillRepository;
     private final UserSkillPreferenceRepository preferenceRepository;
@@ -93,7 +94,7 @@ public class SkillService {
     /**
      * 注册已安装的技能包到数据库（由 SkillPackageService 安装后调用）
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public SkillResponseDto registerInstalledPackage(String skillId, String name, String description, Long userId) {
         // 不能覆盖内置技能
         if (skillRepository.existsByIdAndBuiltinTrue(skillId)) {
@@ -121,7 +122,8 @@ public class SkillService {
             skill.setVersion("1.0.0");
             skill.setCategory("other");
             skill.setTags(List.of());
-            skill.setSysPrompt(""); // package 型技能不需要 sysPrompt, 内容在 SKILL.md 中
+            // package 型技能不需要 sysPrompt, 内容在 SKILL.md 中
+            skill.setSysPrompt("");
             skill.setMaxIters(5);
             skill.setTools(List.of());
             skill.setSkillType("package");
@@ -145,7 +147,7 @@ public class SkillService {
     /**
      * 从 Electron 同步/上传技能定义（upsert）— 向后兼容 prompt 型技能
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public SkillResponseDto syncSkill(SkillDefinitionDto dto, Long userId) {
         validateSkillDefinition(dto);
 
@@ -189,7 +191,7 @@ public class SkillService {
     /**
      * 启用/禁用技能
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void setSkillEnabled(Long userId, String skillId, boolean enabled) {
         // 验证技能存在且用户可见
         Skill skill = skillRepository.findById(skillId)
@@ -216,7 +218,7 @@ public class SkillService {
     /**
      * 删除用户安装的技能
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteSkill(String skillId, Long userId) {
         Skill skill = skillRepository.findById(skillId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "技能不存在"));
@@ -268,7 +270,7 @@ public class SkillService {
         if (dto.systemPrompt().length() > 8192) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "系统提示词最长 8192 字符");
         }
-        if (dto.maxIters() != null && (dto.maxIters() < 1 || dto.maxIters() > 10)) {
+        if (dto.maxIters() != null && (dto.maxIters() < 1 || dto.maxIters() > MAX_ITERS)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxIters 范围 1~10");
         }
         if (dto.tools() != null) {

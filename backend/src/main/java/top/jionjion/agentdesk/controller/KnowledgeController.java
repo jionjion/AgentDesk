@@ -26,7 +26,8 @@ public class KnowledgeController {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeController.class);
 
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    /** 最大文件大小: 50MB */
+    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
 
     private final KnowledgeService knowledgeService;
 

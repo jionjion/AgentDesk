@@ -26,7 +26,12 @@ public class ApiCallTool {
 
     private static final MediaType JSON_TYPE = MediaType.get("application/json; charset=utf-8");
     private static final int MAX_RESPONSE_LENGTH = 4000;
-    private static final int MAX_BODY_SIZE = 1024 * 1024; // 1MB
+    /** 最大请求体大小: 1MB */
+    private static final int MAX_BODY_SIZE = 1024 * 1024;
+    private static final String HTTP_PREFIX = "http://";
+    private static final String HTTPS_PREFIX = "https://";
+    private static final String METHOD_POST = "POST";
+    private static final String METHOD_PUT = "PUT";
 
     private static final Set<String> ALLOWED_METHODS = Set.of("GET", "POST", "PUT", "DELETE");
 
@@ -71,7 +76,7 @@ public class ApiCallTool {
         if (url == null || url.isBlank()) {
             return "错误: url 不能为空";
         }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        if (!url.startsWith(HTTP_PREFIX) && !url.startsWith(HTTPS_PREFIX)) {
             return "错误: url 必须以 http:// 或 https:// 开头";
         }
 
@@ -87,7 +92,7 @@ public class ApiCallTool {
 
             // 设置请求体
             RequestBody requestBody = null;
-            if ("POST".equals(upperMethod) || "PUT".equals(upperMethod)) {
+            if (METHOD_POST.equals(upperMethod) || METHOD_PUT.equals(upperMethod)) {
                 String content = (body != null && !body.isBlank()) ? body : "";
                 requestBody = RequestBody.create(content, JSON_TYPE);
             }
@@ -103,6 +108,7 @@ public class ApiCallTool {
                         requestBuilder.delete();
                     }
                 }
+                default -> throw new IllegalArgumentException("不支持的 HTTP 方法: " + upperMethod);
             }
 
             Request request = requestBuilder.build();

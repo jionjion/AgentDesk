@@ -67,7 +67,9 @@ public class KnowledgeRetrievalService {
      * 构建增强消息 (将检索结果注入到用户消息前面)
      */
     public String buildAugmentedMessage(String originalMessage, List<RetrievalResultDto> results) {
-        if (results.isEmpty()) return originalMessage;
+        if (results.isEmpty()) {
+            return originalMessage;
+        }
 
         StringBuilder context = new StringBuilder();
         context.append("以下是来自知识库的参考资料, 请结合这些信息回答问题。如果参考资料与问题无关, 请忽略并直接回答:\n\n");
@@ -75,7 +77,9 @@ public class KnowledgeRetrievalService {
         int totalChars = 0;
         for (RetrievalResultDto result : results) {
             int chunkChars = result.content().length();
-            if (totalChars + chunkChars > maxContextTokens) break;
+            if (totalChars + chunkChars > maxContextTokens) {
+                break;
+            }
 
             context.append(String.format("[来源: %s | 相关度: %.2f]\n", result.documentName(), result.score()));
             context.append(result.content());

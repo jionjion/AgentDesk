@@ -35,6 +35,7 @@ import java.util.stream.Stream;
 public class ObsidianService {
 
     private static final Logger log = LoggerFactory.getLogger(ObsidianService.class);
+    private static final int MAX_NAME_LENGTH = 80;
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
             .withZone(ZoneId.systemDefault());
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
@@ -183,20 +184,26 @@ public class ObsidianService {
         StringBuilder sb = new StringBuilder();
         int rounds = 0;
         for (ChatMessage msg : messages) {
-            if (msg.getContent() == null || msg.getContent().isBlank()) continue;
+            if (msg.getContent() == null || msg.getContent().isBlank()) {
+                continue;
+            }
             if ("user".equals(msg.getRole())) {
                 sb.append("用户: ").append(truncate(msg.getContent(), 200)).append("\n");
                 rounds++;
             } else if ("assistant".equals(msg.getRole())) {
                 sb.append("助手: ").append(truncate(msg.getContent(), 300)).append("\n");
             }
-            if (rounds >= 5) break;
+            if (rounds >= 5) {
+                break;
+            }
         }
         return sb.toString();
     }
 
     private String truncate(String text, int maxLen) {
-        if (text.length() <= maxLen) return text;
+        if (text.length() <= maxLen) {
+            return text;
+        }
         return text.substring(0, maxLen) + "...";
     }
 
@@ -293,8 +300,8 @@ public class ObsidianService {
             return "untitled";
         }
         String sanitized = name.replaceAll("[\\\\/:*?\"<>|]", "_");
-        if (sanitized.length() > 80) {
-            sanitized = sanitized.substring(0, 80);
+        if (sanitized.length() > MAX_NAME_LENGTH) {
+            sanitized = sanitized.substring(0, MAX_NAME_LENGTH);
         }
         return sanitized.strip();
     }
@@ -307,8 +314,8 @@ public class ObsidianService {
         String sanitized = category.replaceAll("[\\\\/:*?\"<>|]", "_");
         // 移除 .. 路径穿越
         sanitized = sanitized.replace("..", "_");
-        if (sanitized.length() > 80) {
-            sanitized = sanitized.substring(0, 80);
+        if (sanitized.length() > MAX_NAME_LENGTH) {
+            sanitized = sanitized.substring(0, MAX_NAME_LENGTH);
         }
         return sanitized.strip();
     }

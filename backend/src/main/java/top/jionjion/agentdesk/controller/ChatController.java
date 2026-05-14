@@ -36,7 +36,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -51,6 +53,7 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private static final Pattern SESSION_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String ROLE_ASSISTANT = "assistant";
     private static final int BYTES_PER_KB = 1024;
     private static final int BYTES_PER_MB = 1024 * 1024;
     private static final double KB_DIVISOR = 1024.0;
@@ -63,11 +66,14 @@ public class ChatController {
     /**
      * 标题生成专用线程池, 避免阻塞 ForkJoinPool.commonPool 导致线程饥饿
      */
-    private static final ExecutorService TITLE_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "title-gen");
-        t.setDaemon(true);
-        return t;
-    });
+    private static final ExecutorService TITLE_EXECUTOR = new ThreadPoolExecutor(
+            1, 1, 0L, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(128),
+            r -> {
+                Thread t = new Thread(r, "title-gen");
+                t.setDaemon(true);
+                return t;
+            });
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
@@ -125,7 +131,6 @@ public class ChatController {
         if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
-
         if (!agentPool.tryAcquire(sessionId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
         }
@@ -134,109 +139,27 @@ public class ChatController {
         SseEmitter emitter = new SseEmitter(300_000L);
         handle.hook().setEmitter(emitter);
 
-        // 解析 fileIds 并查询文件元数据
+        // 解析文件并持久化用户消息
         List<Long> parsedFileIds = parseFileIds(fileIds);
         List<FileResponse> files = parsedFileIds.isEmpty()
                 ? Collections.emptyList()
                 : fileService.getByIds(parsedFileIds);
-
-        // 拼接带文件信息的 prompt
-        List<FileResponse> imageFiles = files.stream()
-                .filter(f -> isImageFile(f.contentType()))
-                .toList();
-        List<FileResponse> nonImageFiles = files.stream()
-                .filter(f -> !isImageFile(f.contentType()))
-                .toList();
-
-        // 持久化用户消息 (含 fileIds)
+        List<FileResponse> imageFiles = files.stream().filter(f -> isImageFile(f.contentType())).toList();
+        List<FileResponse> nonImageFiles = files.stream().filter(f -> !isImageFile(f.contentType())).toList();
         saveUserMessage(sessionId, message, parsedFileIds);
 
-        // ─── 知识库检索增强 ───
-        String messageForAgent = message;
-        List<RetrievalResultDto> retrievalResults = List.of();
-        try {
-            boolean enabled = knowledgeRetrievalService.isEnabled(UserContext.getUserId());
-            log.info("知识库检索: enabled={}, userId={}, kbIds={}", enabled, UserContext.getUserId(), kbIds);
-            if (enabled) {
-                // AI 意图判断: 是否需要检索知识库
-                boolean needsRetrieval = retrievalIntentService.needsRetrieval(message);
-                if (needsRetrieval) {
-                    List<Long> parsedKbIds = parseKbIds(kbIds);
-                    retrievalResults = knowledgeRetrievalService.retrieve(
-                            UserContext.getUserId(), message, parsedKbIds);
-                    log.info("知识库检索完成: 命中 {} 条", retrievalResults.size());
-                    if (!retrievalResults.isEmpty()) {
-                        messageForAgent = knowledgeRetrievalService.buildAugmentedMessage(message, retrievalResults);
-                    }
-                } else {
-                    log.info("AI 判断无需检索知识库, 跳过检索");
-                }
-            }
-        } catch (Exception e) {
-            log.warn("知识检索异常, 降级为无检索模式: {}", e.getMessage(), e);
-        }
+        // 知识库检索增强
+        RetrievalContext retrieval = performKnowledgeRetrieval(message, kbIds);
 
         configureSseCallbacks(emitter, sessionId, handle);
-
-        // 推送知识检索事件 (含来源和分数, 供前端展示引用)
-        if (!retrievalResults.isEmpty()) {
-            try {
-                List<Map<String, Object>> refs = retrievalResults.stream()
-                        .map(r -> Map.<String, Object>of(
-                                "documentName", r.documentName(),
-                                "score", Math.round(r.score() * 100) / 100.0,
-                                "chunkIndex", r.chunkIndex()
-                        )).toList();
-                List<String> sources = retrievalResults.stream()
-                        .map(RetrievalResultDto::documentName)
-                        .distinct().toList();
-                String json = OBJECT_MAPPER.writeValueAsString(Map.of(
-                        "count", retrievalResults.size(),
-                        "sources", sources,
-                        "references", refs
-                ));
-                emitter.send(SseEmitter.event().name("knowledge_retrieved").data(json));
-            } catch (Exception ex) {
-                log.debug("Failed to send knowledge_retrieved event: {}", ex.getMessage());
-            }
-        }
-
-        // 通知 Hook 长期记忆已启用, 由 Hook 在实际召回时发送事件
+        sendKnowledgeRetrievedEvent(emitter, retrieval.results());
         if (handle.longTermMemoryEnabled()) {
             handle.hook().setLongTermMemoryEnabled(true);
         }
 
-        Msg userMsg;
-        if (imageFiles.isEmpty()) {
-            // 纯文本路径 (无图片附件)
-            String enrichedMessage = buildMessageWithFiles(messageForAgent, nonImageFiles);
-            userMsg = Msg.builder()
-                    .textContent(enrichedMessage)
-                    .build();
-        } else {
-            // 多模态路径 (含图片附件)
-            userMsg = buildMultimodalMsg(messageForAgent, imageFiles, nonImageFiles);
-        }
-
-        handle.agent().stream(userMsg)
-                .doOnComplete(() -> onStreamComplete(sessionId, message, handle, emitter))
-                .doOnError(e -> {
-                    if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
-                        log.debug("Session {} Agent流处理中客户端已断开", sessionId);
-                    } else {
-                        log.error("Agent error: {}", e.getMessage(), e);
-                    }
-                    try {
-                        if (!handle.hook().isClientDisconnected()) {
-                            sendErrorEvent(emitter, e.getMessage());
-                        }
-                        emitter.completeWithError(e);
-                    } catch (Exception ex) {
-                        log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
-                    }
-                })
-                .doFinally(signal -> agentPool.release(sessionId))
-                .subscribe();
+        // 构建用户消息并启动 Agent 流
+        Msg userMsg = buildUserMsg(retrieval.augmentedMessage(), imageFiles, nonImageFiles);
+        subscribeAgentStream(handle, userMsg, sessionId, message, emitter);
 
         return emitter;
     }
@@ -277,21 +200,114 @@ public class ChatController {
         });
     }
 
+    private static final Set<String> DISCONNECT_KEYWORDS = Set.of(
+            "Broken pipe", "broken pipe", "disconnected client",
+            "Connection reset", "connection reset", "中止"
+    );
+
     private boolean isClientDisconnect(Throwable e) {
         Throwable cause = e;
         while (cause != null) {
             String msg = cause.getMessage();
-            if (msg != null && (msg.contains("Broken pipe")
-                    || msg.contains("broken pipe")
-                    || msg.contains("disconnected client")
-                    || msg.contains("Connection reset")
-                    || msg.contains("connection reset")
-                    || msg.contains("中止"))) {
+            if (msg != null && containsDisconnectKeyword(msg)) {
                 return true;
             }
             cause = cause.getCause();
         }
         return false;
+    }
+
+    private boolean containsDisconnectKeyword(String msg) {
+        for (String keyword : DISCONNECT_KEYWORDS) {
+            if (msg.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private record RetrievalContext(String augmentedMessage, List<RetrievalResultDto> results) {
+    }
+
+    private RetrievalContext performKnowledgeRetrieval(String message, String kbIds) {
+        String augmented = message;
+        List<RetrievalResultDto> results = List.of();
+        try {
+            boolean enabled = knowledgeRetrievalService.isEnabled(UserContext.getUserId());
+            log.info("知识库检索: enabled={}, userId={}, kbIds={}", enabled, UserContext.getUserId(), kbIds);
+            if (enabled) {
+                boolean needsRetrieval = retrievalIntentService.needsRetrieval(message);
+                if (needsRetrieval) {
+                    List<Long> parsedKbIds = parseKbIds(kbIds);
+                    results = knowledgeRetrievalService.retrieve(UserContext.getUserId(), message, parsedKbIds);
+                    log.info("知识库检索完成: 命中 {} 条", results.size());
+                    if (!results.isEmpty()) {
+                        augmented = knowledgeRetrievalService.buildAugmentedMessage(message, results);
+                    }
+                } else {
+                    log.info("AI 判断无需检索知识库, 跳过检索");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("知识检索异常, 降级为无检索模式: {}", e.getMessage(), e);
+        }
+        return new RetrievalContext(augmented, results);
+    }
+
+    private void sendKnowledgeRetrievedEvent(SseEmitter emitter, List<RetrievalResultDto> retrievalResults) {
+        if (retrievalResults.isEmpty()) {
+            return;
+        }
+        try {
+            List<Map<String, Object>> refs = retrievalResults.stream()
+                    .map(r -> Map.<String, Object>of(
+                            "documentName", r.documentName(),
+                            "score", Math.round(r.score() * 100) / 100.0,
+                            "chunkIndex", r.chunkIndex()
+                    )).toList();
+            List<String> sources = retrievalResults.stream()
+                    .map(RetrievalResultDto::documentName)
+                    .distinct().toList();
+            String json = OBJECT_MAPPER.writeValueAsString(Map.of(
+                    "count", retrievalResults.size(),
+                    "sources", sources,
+                    "references", refs
+            ));
+            emitter.send(SseEmitter.event().name("knowledge_retrieved").data(json));
+        } catch (Exception ex) {
+            log.debug("Failed to send knowledge_retrieved event: {}", ex.getMessage());
+        }
+    }
+
+    private Msg buildUserMsg(String message, List<FileResponse> imageFiles, List<FileResponse> nonImageFiles) {
+        if (imageFiles.isEmpty()) {
+            String enrichedMessage = buildMessageWithFiles(message, nonImageFiles);
+            return Msg.builder().textContent(enrichedMessage).build();
+        }
+        return buildMultimodalMsg(message, imageFiles, nonImageFiles);
+    }
+
+    private void subscribeAgentStream(AgentHandle handle, Msg userMsg,
+                                      String sessionId, String message, SseEmitter emitter) {
+        handle.agent().stream(userMsg)
+                .doOnComplete(() -> onStreamComplete(sessionId, message, handle, emitter))
+                .doOnError(e -> {
+                    if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
+                        log.debug("Session {} Agent流处理中客户端已断开", sessionId);
+                    } else {
+                        log.error("Agent error: {}", e.getMessage(), e);
+                    }
+                    try {
+                        if (!handle.hook().isClientDisconnected()) {
+                            sendErrorEvent(emitter, e.getMessage());
+                        }
+                        emitter.completeWithError(e);
+                    } catch (Exception ex) {
+                        log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
+                    }
+                })
+                .doFinally(signal -> agentPool.release(sessionId))
+                .subscribe();
     }
 
     private void onStreamComplete(String sessionId, String message, AgentHandle handle, SseEmitter emitter) {
@@ -368,7 +384,7 @@ public class ChatController {
         // 查找目标 assistant 消息
         ChatMessage targetMsg = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
-        if (!targetMsg.getSessionId().equals(sessionId) || !"assistant".equals(targetMsg.getRole())) {
+        if (!targetMsg.getSessionId().equals(sessionId) || !ROLE_ASSISTANT.equals(targetMsg.getRole())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "只能重新生成助手消息");
         }
 

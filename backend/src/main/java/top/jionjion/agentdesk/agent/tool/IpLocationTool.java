@@ -24,6 +24,7 @@ public class IpLocationTool {
     private static final Logger log = LoggerFactory.getLogger(IpLocationTool.class);
 
     private static final String API_URL = "https://ip9.com.cn/get";
+    private static final int HTTP_OK = 200;
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -69,7 +70,7 @@ public class IpLocationTool {
         JsonNode root = objectMapper.readTree(responseBody);
 
         int ret = root.has("ret") ? root.get("ret").asInt() : 0;
-        if (ret != 200) {
+        if (ret != HTTP_OK) {
             return "查询失败: 接口返回错误 ret=" + ret;
         }
 

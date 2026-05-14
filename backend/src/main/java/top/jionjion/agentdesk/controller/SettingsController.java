@@ -29,6 +29,8 @@ import java.util.Map;
 @RequestMapping("/api/settings")
 public class SettingsController {
 
+    private static final int MAX_TOP_K = 20;
+
     private final SettingsService settingsService;
     private final AgentPool agentPool;
     private final KnowledgeSettingsRepository knowledgeSettingsRepository;
@@ -133,20 +135,30 @@ public class SettingsController {
      */
     @PutMapping("/knowledge")
     public KnowledgeSettingsDto updateKnowledgeSettings(@RequestBody KnowledgeSettingsDto dto) {
-        if (dto.topK() != null && (dto.topK() < 1 || dto.topK() > 20)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "topK 范围: 1 ~ 20");
+        if (dto.topK() != null) {
+            if (dto.topK() < 1 || dto.topK() > MAX_TOP_K) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "topK 范围: 1 ~ 20");
+            }
         }
-        if (dto.scoreThreshold() != null && (dto.scoreThreshold() < 0.0 || dto.scoreThreshold() > 1.0)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scoreThreshold 范围: 0.0 ~ 1.0");
+        if (dto.scoreThreshold() != null) {
+            if (dto.scoreThreshold() < 0.0 || dto.scoreThreshold() > 1.0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scoreThreshold 范围: 0.0 ~ 1.0");
+            }
         }
 
         Long userId = UserContext.getUserId();
         KnowledgeSettings entity = knowledgeSettingsRepository.findById(userId)
                 .orElseGet(() -> new KnowledgeSettings(userId));
 
-        if (dto.enabled() != null) entity.setEnabled(dto.enabled());
-        if (dto.topK() != null) entity.setTopK(dto.topK());
-        if (dto.scoreThreshold() != null) entity.setScoreThreshold(dto.scoreThreshold());
+        if (dto.enabled() != null) {
+            entity.setEnabled(dto.enabled());
+        }
+        if (dto.topK() != null) {
+            entity.setTopK(dto.topK());
+        }
+        if (dto.scoreThreshold() != null) {
+            entity.setScoreThreshold(dto.scoreThreshold());
+        }
         entity.setUpdatedAt(System.currentTimeMillis());
 
         knowledgeSettingsRepository.save(entity);

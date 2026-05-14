@@ -23,6 +23,8 @@ import java.util.Map;
 @RequestMapping("/api/memory")
 public class MemoryController {
 
+    private static final int MAX_MEMORY_CONTENT_LENGTH = 2048;
+
     private final SettingsService settingsService;
     private final MemoryService memoryService;
     private final AgentPool agentPool;
@@ -70,7 +72,7 @@ public class MemoryController {
         if (request.content() == null || request.content().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "记忆内容不能为空");
         }
-        if (request.content().length() > 2048) {
+        if (request.content().length() > MAX_MEMORY_CONTENT_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "记忆内容最长2048字符");
         }
         memoryService.addMemory(UserContext.getUserId(), request.content());
@@ -95,7 +97,7 @@ public class MemoryController {
         if (request.content() == null || request.content().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "记忆内容不能为空");
         }
-        if (request.content().length() > 2048) {
+        if (request.content().length() > MAX_MEMORY_CONTENT_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "记忆内容最长2048字符");
         }
         memoryService.updateMemory(UserContext.getUserId(), memoryId, request.content());
