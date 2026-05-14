@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
 import top.jionjion.agentdesk.agent.tool.ApiCallTool;
+import top.jionjion.agentdesk.agent.tool.BatchWebResearchTool;
 import top.jionjion.agentdesk.agent.tool.IpLocationTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
@@ -70,6 +71,7 @@ public class AgentFactory {
 
             当用户需要搜索互联网、查询网页内容或获取最新资讯时，使用 web_researcher 子代理。
             当用户提出复杂问题需要多角度调研、交叉验证时，使用 deep_researcher 子代理。
+            当用户需要对某个主题进行广泛调研（如了解现状、对比方案、趋势分析）时，使用 batch_web_researcher 工具并行搜索多个角度。
             当用户需要翻译文本或文档时，使用 translator 子代理。
             当用户提交代码要求审查、分析、优化、找bug或看看有没有问题时，必须使用 code_reviewer 子代理。
             当用户需要对长文本、文档、日志、对话进行总结、提炼要点时，使用 summarizer 子代理。
@@ -346,6 +348,16 @@ public class AgentFactory {
                 log.info("已注册子代理: deep-researcher");
             } catch (Exception e) {
                 log.warn("注册联网子代理失败: {}", e.getMessage());
+            }
+
+            // batch_web_researcher 工具: 并行批量搜索
+            try {
+                DashScopeChatModel turboModel = chatModelFactory.createByModelName("qwen-turbo");
+                BatchWebResearchTool batchTool = new BatchWebResearchTool(tavilyApiKey, turboModel);
+                toolkit.registerTool(batchTool);
+                log.info("已注册工具: batch_web_researcher");
+            } catch (Exception e) {
+                log.warn("注册 batch_web_researcher 失败: {}", e.getMessage());
             }
         } else {
             log.info("未配置 Tavily API Key, 跳过联网子代理注册");

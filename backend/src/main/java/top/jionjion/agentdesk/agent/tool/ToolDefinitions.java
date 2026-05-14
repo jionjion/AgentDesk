@@ -66,4 +66,10 @@ public final class ToolDefinitions {
     public static final String PLANNER = "planner";
     public static final String PLANNER_DESC = "任务规划助手。当用户提出一个复杂目标、项目计划、学习路线、或需要拆解执行步骤时，" +
             "将任务委派给此子代理。子代理会输出结构化的步骤清单，包含优先级、依赖关系和注意事项。";
+
+    // ==================== 批量研究工具 ====================
+
+    public static final String BATCH_WEB_RESEARCHER = "batch_web_researcher";
+    public static final String BATCH_WEB_RESEARCHER_DESC = "批量并行联网研究工具。对一个研究主题自动拆解为多个子查询并行搜索，合并去重后返回精简结果。" +
+            "适用于开放性调研问题（如'XX的现状和趋势'），不适用于已知具体URL的抓取。";
 }
