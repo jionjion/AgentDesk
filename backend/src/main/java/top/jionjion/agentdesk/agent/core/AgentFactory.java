@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
 import top.jionjion.agentdesk.agent.tool.ApiCallTool;
+import top.jionjion.agentdesk.agent.tool.IpLocationTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
 import top.jionjion.agentdesk.agent.tool.WebTools;
@@ -145,6 +146,7 @@ public class AgentFactory {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
         toolkit.registerTool(new ApiCallTool());
+        toolkit.registerTool(new IpLocationTool());
 
         // 每个 Agent 独立的 Hook
         SseStreamingHook hook = new SseStreamingHook();

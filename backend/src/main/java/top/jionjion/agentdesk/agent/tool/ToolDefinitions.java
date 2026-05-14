@@ -28,6 +28,10 @@ public final class ToolDefinitions {
     public static final String API_CALL_DESC = "向第三方 API 发送 HTTP 请求。支持 GET、POST、PUT、DELETE 方法。" +
             "可自定义请求头和请求体。返回响应状态码和响应内容（截断到 4000 字符）。";
 
+    public static final String IP_LOCATION = "ip_location";
+    public static final String IP_LOCATION_DESC = "查询 IP 地址的地理位置信息。不传 IP 则查询当前服务器的公网 IP 位置。" +
+            "返回国家、省份、城市、区域、邮编、区号、运营商等信息。";
+
     // ==================== Web 工具（子代理使用） ====================
 
     public static final String WEB_SEARCH = "web_search";
