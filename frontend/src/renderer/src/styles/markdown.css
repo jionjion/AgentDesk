@@ -82,6 +82,7 @@
     position: relative;
     margin-top: 0.4em;
     margin-bottom: 0.4em;
+    min-width: 100%;
     max-width: 100%;
     overflow: hidden;
     border-radius: 0.5rem;
@@ -107,6 +108,8 @@
     background: #f6f6f6;
     font-size: 0.75em;
     border-bottom: 1px solid #e2e2e2;
+    cursor: pointer;
+    user-select: none;
 }
 
 .code-block-header .code-lang {

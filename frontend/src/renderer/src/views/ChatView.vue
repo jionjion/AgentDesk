@@ -43,12 +43,9 @@
             <MessageBubble
                 v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
                 :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
+                :execution-result="codeExecutionResults[msg.id]"
                 @run-code="(code) => handleRunCode(code, msg.id)"
             />
-            <!-- Python 代码执行结果 -->
-            <div v-if="codeExecutionResults[msg.id]" class="ml-11 mr-4 -mt-2 mb-2">
-              <ExecutionResult :result="codeExecutionResults[msg.id]"/>
-            </div>
           </template>
           <div ref="scrollAnchorRef"/>
         </div>
@@ -241,7 +238,6 @@ import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
 import KnowledgeIndicator from '@/components/chat/KnowledgeIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import ChatNavRail from '@/components/chat/ChatNavRail.vue'
-import ExecutionResult from '@/components/sandbox/ExecutionResult.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
 import {formatFileSize, isImageType} from '@/utils/file'

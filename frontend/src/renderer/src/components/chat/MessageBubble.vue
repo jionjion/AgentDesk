@@ -37,7 +37,7 @@
         <template v-else>你</template>
       </div>
       <!-- 消息内容 -->
-      <div class="min-w-0 group/bubble" :class="[isUser ? 'text-right max-w-[75%]' : hasToolCalls ? 'w-[75%]' : 'max-w-[75%]']">
+      <div class="min-w-0 group/bubble" :class="[isUser ? 'text-right max-w-[75%]' : (hasToolCalls || hasCodeBlock) ? 'w-[75%]' : 'max-w-[75%]']">
         <div
             class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words text-left"
             :class="[
@@ -143,6 +143,8 @@
               </button>
             </div>
           </div>
+          <!-- 代码执行结果 -->
+          <ExecutionResult v-if="executionResult" :result="executionResult" class="!mb-0 !mt-2 !rounded-t-none !border-t-0"/>
         </div>
         <!-- 知识库引用来源 -->
         <div
@@ -235,6 +237,8 @@ import hljs from 'highlight.js'
 import {api as viewerApi} from 'v-viewer'
 import {CheckCircle2, ChevronRight, Copy, Database, FileText, Loader2, RefreshCw, Settings2, Trash2, BookMarked} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
+import type {ExecuteResult} from '@/types/sandbox'
+import ExecutionResult from '@/components/sandbox/ExecutionResult.vue'
 import {useChatStore} from '@/stores/chat'
 import {useAppStore} from '@/stores/app'
 import {useSettingsStore} from '@/stores/settings'
@@ -259,7 +263,7 @@ marked.use({
       const runBtn = isPython
           ? `<button class="code-run-btn" data-code="${escaped}" title="运行"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`
           : ''
-      return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><div class="code-block-actions">${runBtn}<button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><button class="code-collapse-btn" title="折叠"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button></div></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
+      return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><div class="code-block-actions">${runBtn}<button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
     }
   }
 })
@@ -274,6 +278,8 @@ const props = defineProps<{
   subtaskCards?: Record<string, { name: string; outcome: string }>
   /** 工具调用消息，key 为 tool_call 消息 ID */
   toolCalls?: Record<string, ToolCallMessage>
+  /** 代码执行结果 */
+  executionResult?: ExecuteResult
 }>()
 
 const emit = defineEmits<{
@@ -432,6 +438,12 @@ const hasToolCalls = computed(() =>
     contentSegments.value.some(seg => seg.toolCall)
 )
 
+const hasCodeBlock = computed(() => {
+  if (isUser.value) return false
+  const content = (props.message as AssistantMessage).content || ''
+  return content.includes('```')
+})
+
 const uniqueKnowledgeRefs = computed(() => {
   const refs = (props.message as AssistantMessage).knowledgeRefs
   if (!refs?.length) return []
@@ -495,19 +507,12 @@ function handleBubbleClick(e: Event) {
     return
   }
 
-  // 折叠/展开按钮
-  const collapseBtn = target.closest('.code-collapse-btn') as HTMLButtonElement | null
-  if (collapseBtn) {
-    const wrapper = collapseBtn.closest('.code-block-wrapper') as HTMLElement | null
+  // 折叠/展开：点击 header 区域触发
+  const header = target.closest('.code-block-header') as HTMLElement | null
+  if (header && !target.closest('.code-copy-btn') && !target.closest('.code-run-btn')) {
+    const wrapper = header.closest('.code-block-wrapper') as HTMLElement | null
     if (!wrapper) return
-    const isCollapsed = wrapper.classList.toggle('collapsed')
-    if (isCollapsed) {
-      collapseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
-      collapseBtn.title = '展开'
-    } else {
-      collapseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
-      collapseBtn.title = '折叠'
-    }
+    wrapper.classList.toggle('collapsed')
     return
   }
 
