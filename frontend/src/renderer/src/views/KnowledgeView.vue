@@ -1,10 +1,10 @@
 <template>
-  <div class="flex-1 flex flex-col h-full overflow-hidden">
-    <!-- 顶部标题栏 -->
-    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+  <div class="h-full flex flex-col">
+    <!-- 顶部工具栏 -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
       <div>
         <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">知识库</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">管理本地文档, 聊天时自动检索相关知识</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">管理本地文档，聊天时自动检索相关知识</p>
       </div>
       <Button @click="showCreateDialog = true">
         <Plus :size="16" class="mr-1"/>
@@ -12,58 +12,74 @@
       </Button>
     </div>
 
-    <!-- 知识库列表 -->
-    <div class="flex-1 overflow-y-auto p-6">
-      <!-- 空状态 -->
-      <div v-if="!knowledgeStore.isLoading && knowledgeStore.bases.length === 0" class="flex flex-col items-center justify-center py-20">
-        <BookOpen :size="48" class="text-gray-300 dark:text-gray-600 mb-4"/>
-        <p class="text-gray-500 dark:text-gray-400 mb-2">暂无知识库</p>
-        <p class="text-sm text-gray-400 dark:text-gray-500 mb-4">创建一个知识库, 上传文档后即可在聊天中自动检索</p>
-        <Button variant="outline" @click="showCreateDialog = true">
-          <Plus :size="16" class="mr-1"/>
-          创建第一个知识库
-        </Button>
-      </div>
+    <!-- 内容区 -->
+    <ScrollArea class="flex-1">
+      <div class="px-6 py-6 max-w-5xl">
 
-      <!-- 知识库卡片网格 -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div
-            v-for="kb in knowledgeStore.bases"
-            :key="kb.id"
-            class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-violet-300 dark:hover:border-violet-700 transition-colors cursor-pointer group"
-            @click="openKnowledgeBase(kb)"
-        >
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <div class="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <BookOpen :size="18" class="text-violet-600 dark:text-violet-400"/>
+        <!-- 加载态 -->
+        <div v-if="knowledgeStore.isLoading" class="flex items-center justify-center py-16">
+          <Loader2 :size="24" class="animate-spin text-gray-400"/>
+        </div>
+
+        <!-- 空状态 -->
+        <EmptyState
+            v-else-if="knowledgeStore.bases.length === 0"
+            :icon="BookOpen"
+            title="暂无知识库"
+            description="创建一个知识库，上传文档后即可在聊天中自动检索"
+            action-label="创建第一个知识库"
+            :action-icon="Plus"
+            @action="showCreateDialog = true"
+        />
+
+        <!-- 知识库卡片网格 -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+              v-for="kb in knowledgeStore.bases"
+              :key="kb.id"
+              class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:shadow-sm transition-shadow cursor-pointer group"
+              @click="openKnowledgeBase(kb)"
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                  <BookOpen :size="18" class="text-violet-600 dark:text-violet-400"/>
+                </div>
+                <div>
+                  <h3 class="font-medium text-gray-900 dark:text-gray-100 text-sm">{{ kb.name }}</h3>
+                </div>
               </div>
-              <div>
-                <h3 class="font-medium text-gray-900 dark:text-gray-100 text-sm">{{ kb.name }}</h3>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <button
+                      class="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all"
+                      @click.stop
+                  >
+                    <MoreHorizontal :size="16"/>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem class="text-red-500 cursor-pointer" @click.stop="handleDeleteBase(kb)">
+                    <Trash2 :size="14" class="mr-2"/>删除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <button
-                class="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-all"
-                title="删除"
-                @click.stop="handleDeleteBase(kb)"
-            >
-              <Trash2 :size="14"/>
-            </button>
-          </div>
-          <p v-if="kb.description" class="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{{ kb.description }}</p>
-          <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
-            <span class="flex items-center gap-1">
-              <FileText :size="12"/>
-              {{ kb.docCount }} 篇文档
-            </span>
-            <span class="flex items-center gap-1">
-              <Layers :size="12"/>
-              {{ kb.chunkCount }} 个分块
-            </span>
+            <p v-if="kb.description" class="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{{ kb.description }}</p>
+            <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+              <span class="flex items-center gap-1">
+                <FileText :size="12"/>
+                {{ kb.docCount }} 篇文档
+              </span>
+              <span class="flex items-center gap-1">
+                <Layers :size="12"/>
+                {{ kb.chunkCount }} 个分块
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ScrollArea>
 
     <!-- 知识库详情面板 (文档列表) -->
     <Dialog v-model:open="showDetail">
@@ -91,7 +107,7 @@
         <!-- 文档列表 -->
         <div class="flex-1 overflow-y-auto mt-4 space-y-2">
           <div v-if="knowledgeStore.documents.length === 0" class="text-center py-8 text-sm text-gray-400">
-            暂无文档, 请上传文件
+            暂无文档，请上传文件
           </div>
           <div
               v-for="doc in knowledgeStore.documents"
@@ -152,7 +168,7 @@
     <AlertDialog v-model:open="deleteConfirmOpen">
       <AlertDialogContent class="max-w-sm">
         <AlertDialogTitle>确认删除</AlertDialogTitle>
-        <AlertDialogDescription>删除知识库后, 其中的所有文档和索引将永久丢失, 无法恢复。</AlertDialogDescription>
+        <AlertDialogDescription>删除知识库后，其中的所有文档和索引将永久丢失，无法恢复。</AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
           <AlertDialogAction @click="confirmDelete">删除</AlertDialogAction>
@@ -164,15 +180,18 @@
 
 <script setup lang="ts">
 import {onMounted, reactive, ref} from 'vue'
-import {BookOpen, FileText, Layers, Loader2, Plus, Trash2, Upload} from 'lucide-vue-next'
+import {BookOpen, FileText, Layers, Loader2, MoreHorizontal, Plus, Trash2, Upload} from 'lucide-vue-next'
 import {useKnowledgeStore} from '@/stores/knowledge'
 import type {KnowledgeBase} from '@/types/knowledge'
+import {ScrollArea} from '@/components/ui/scroll-area'
 import {Button} from '@/components/ui/button'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Textarea} from '@/components/ui/textarea'
 import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from '@/components/ui/dropdown-menu'
+import EmptyState from '@/components/ui/empty-state/EmptyState.vue'
 
 const knowledgeStore = useKnowledgeStore()
 

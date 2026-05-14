@@ -1,6 +1,6 @@
 <template>
   <div
-      class="my-1 mx-11 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors"
+      class="my-1 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-all hover:shadow-sm"
       :class="message.result ? 'bg-white dark:bg-gray-800' : 'bg-violet-50/50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800'"
   >
     <!-- 单行头部：点击展开 -->

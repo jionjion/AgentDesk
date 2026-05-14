@@ -85,8 +85,6 @@ export const useChatStore = defineStore('chat', () => {
 
     /** 创建新会话 */
     async function createNewSession(title?: string): Promise<string> {
-        // 自动沉淀到 Obsidian
-        autoExportCurrentSession()
         const res = await createSession(title)
         const session = res.data
         sessions.value.unshift(session)

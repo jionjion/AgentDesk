@@ -2,13 +2,15 @@
   <div class="h-full flex flex-col">
     <!-- 顶部工具栏 -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-      <div class="flex items-center gap-3">
-        <div class="relative w-60">
+      <div>
+        <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">技能</h1>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">管理技能，扩展 Agent 的能力</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="relative w-52">
           <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" :size="16"/>
           <Input v-model="skillsStore.searchQuery" placeholder="搜索技能" class="pl-8"/>
         </div>
-      </div>
-      <div class="flex items-center gap-2">
         <Button variant="outline" @click="handleInstallPackage">
           <Package :size="16" class="mr-1"/>
           安装技能包
@@ -27,10 +29,6 @@
     <!-- 内容区 -->
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">技能</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 font-normal">
-          管理技能，在对话中扩展 Agent 的能力。支持提示词技能和脚本化技能包（ZIP 安装）。
-        </p>
 
         <!-- 分类过滤 -->
         <div class="flex items-center gap-2 mb-4 flex-wrap">

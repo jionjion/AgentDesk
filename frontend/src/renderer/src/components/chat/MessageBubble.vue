@@ -1,11 +1,11 @@
 <template>
   <div>
     <!-- 子任务执行输出：以卡片形式展示 -->
-    <div v-if="subtaskOutput && subtaskName && !isUser" ref="bubbleRef" class="my-1 mx-11">
-      <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+    <div v-if="subtaskOutput && subtaskName && !isUser" ref="bubbleRef" class="my-1">
+      <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 hover:shadow-sm transition-shadow">
         <!-- 卡片头部：子任务名 + 状态 -->
         <div
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+            class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             @click="contentCollapsed = !contentCollapsed"
         >
           <CheckCircle2 v-if="subtaskDone" :size="14" class="shrink-0 text-green-500"/>
@@ -66,9 +66,9 @@
               <template v-for="(seg, segIdx) in contentSegments" :key="segIdx">
                 <div v-if="seg.html" class="markdown-body overflow-hidden" v-html="seg.html"/>
                 <!-- 子任务完成卡片 -->
-                <div v-if="seg.card" class="my-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
+                <div v-if="seg.card" class="my-2 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div
-                      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       @click="toggleFinishCard(seg.subtaskIdx!)"
                   >
                     <CheckCircle2 :size="13" class="shrink-0 text-green-500"/>
@@ -79,14 +79,14 @@
                         :class="expandedFinishCards.has(seg.subtaskIdx!) ? 'rotate-90' : ''"
                     />
                   </div>
-                  <div v-if="expandedFinishCards.has(seg.subtaskIdx!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50">
+                  <div v-if="expandedFinishCards.has(seg.subtaskIdx!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
                     <div class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{{ seg.card.outcome }}</div>
                   </div>
                 </div>
                 <!-- 工具调用卡片 -->
-                <div v-if="seg.toolCall" class="my-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
+                <div v-if="seg.toolCall" class="my-2 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div
-                      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       @click="toggleToolCall(seg.toolCallId!)"
                   >
                     <Settings2 :size="13" class="shrink-0 text-gray-500 dark:text-gray-400"/>
@@ -99,7 +99,7 @@
                         :class="expandedToolCalls.has(seg.toolCallId!) ? 'rotate-90' : ''"
                     />
                   </div>
-                  <div v-if="expandedToolCalls.has(seg.toolCallId!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-600 bg-white/50 dark:bg-gray-800/50 overflow-auto max-h-32">
+                  <div v-if="expandedToolCalls.has(seg.toolCallId!)" class="px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 overflow-auto max-h-32">
                     <div v-if="seg.toolCall.arguments && Object.keys(seg.toolCall.arguments).length > 0" class="mb-2">
                       <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">参数</div>
                       <pre class="p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-400">{{ JSON.stringify(seg.toolCall.arguments, null, 2) }}</pre>
@@ -121,7 +121,7 @@
               />
               <button
                   v-if="shouldCollapse"
-                  class="mt-1 text-xs text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
+                  class="mt-1 text-xs text-primary hover:text-primary/80 dark:text-violet-400 dark:hover:text-violet-300"
                   @click="contentCollapsed = !contentCollapsed"
               >
                 {{ contentCollapsed ? '展开全文...' : '收起' }}

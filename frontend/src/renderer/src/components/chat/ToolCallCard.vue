@@ -1,5 +1,5 @@
 <template>
-  <div class="my-2 mx-11 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+  <div class="my-2 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
     <!-- 头部 -->
     <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       <Settings2 :size="14" class="text-gray-500 dark:text-gray-400"/>

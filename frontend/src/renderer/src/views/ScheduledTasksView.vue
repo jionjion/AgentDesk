@@ -1,7 +1,11 @@
 <template>
   <div class="h-full flex flex-col">
     <!-- 顶部工具栏 -->
-    <div class="flex items-center justify-end px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+      <div>
+        <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">定时任务</h1>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">按计划自动执行任务，也可随时手动触发</p>
+      </div>
       <div class="flex items-center gap-2">
         <Button variant="ghost" size="icon" @click="handleRefresh">
           <RefreshCw :size="16"/>
@@ -16,10 +20,6 @@
     <!-- 内容区 -->
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">定时任务</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          按计划自动执行任务，也可随时手动触发。在任意对话中描述你想定期做的事，即可快速创建
-        </p>
 
         <!-- 标签页 + 排序 -->
         <div class="flex items-center justify-between mb-4">
