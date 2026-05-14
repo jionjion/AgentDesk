@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
 import top.jionjion.agentdesk.agent.tool.ApiCallTool;
 import top.jionjion.agentdesk.agent.tool.BatchWebResearchTool;
+import top.jionjion.agentdesk.agent.tool.DynamicAgentTool;
 import top.jionjion.agentdesk.agent.tool.IpLocationTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
@@ -40,7 +41,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -76,6 +79,7 @@ public class AgentFactory {
             当用户提交代码要求审查、分析、优化、找bug或看看有没有问题时，必须使用 code_reviewer 子代理。
             当用户需要对长文本、文档、日志、对话进行总结、提炼要点时，使用 summarizer 子代理。
             当用户提出复杂目标需要拆解步骤、制定计划、规划路线时，使用 planner 子代理。
+            当现有子代理都不适合当前任务时，可以使用 create_agent 工具动态创建一个临时子代理，自定义其角色、目标和工具组合来完成特定任务。
             传入清晰的任务描述即可，子代理会返回精简的结果。
 
             重要: 在调用任何工具或子代理之前，先用一句话告知用户你接下来要做什么。例如:
@@ -442,6 +446,29 @@ public class AgentFactory {
             log.info("已注册子代理: planner");
         } catch (Exception e) {
             log.warn("注册独立子代理失败: {}", e.getMessage());
+        }
+
+        // ─── 动态子代理工具 ───
+        try {
+            // 构建工具池: 子代理可选的工具实例
+            Map<String, Object> toolPool = new LinkedHashMap<>();
+            SimpleTools simpleToolsForPool = new SimpleTools(fileRecordRepository, ossService);
+            toolPool.put(ToolDefinitions.GET_CURRENT_TIME, simpleToolsForPool);
+            toolPool.put(ToolDefinitions.CALCULATE, simpleToolsForPool);
+            toolPool.put(ToolDefinitions.READ_FILE, simpleToolsForPool);
+            toolPool.put(ToolDefinitions.API_CALL, new ApiCallTool());
+            toolPool.put(ToolDefinitions.IP_LOCATION, new IpLocationTool());
+            if (tavilyApiKey != null) {
+                WebTools webToolsForPool = new WebTools(tavilyApiKey);
+                toolPool.put(ToolDefinitions.WEB_SEARCH, webToolsForPool);
+                toolPool.put(ToolDefinitions.URL_FETCH, webToolsForPool);
+            }
+
+            DynamicAgentTool dynamicAgentTool = new DynamicAgentTool(model, toolPool);
+            toolkit.registerTool(dynamicAgentTool);
+            log.info("已注册工具: create_agent (可用工具池: {})", toolPool.keySet());
+        } catch (Exception e) {
+            log.warn("注册 create_agent 工具失败: {}", e.getMessage());
         }
     }
 

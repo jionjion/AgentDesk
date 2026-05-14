@@ -67,6 +67,13 @@ public final class ToolDefinitions {
     public static final String PLANNER_DESC = "任务规划助手。当用户提出一个复杂目标、项目计划、学习路线、或需要拆解执行步骤时，" +
             "将任务委派给此子代理。子代理会输出结构化的步骤清单，包含优先级、依赖关系和注意事项。";
 
+    // ==================== 动态子代理工具 ====================
+
+    public static final String CREATE_AGENT = "create_agent";
+    public static final String CREATE_AGENT_DESC = "动态创建临时子代理。自定义 system prompt 和工具组合，执行指定任务后返回结果。" +
+            "适用于需要特定角色视角、专业分析、或组合多种工具完成复杂子任务的场景。" +
+            "可选工具: web_search, url_fetch, get_current_time, calculate, read_file, api_call, ip_location。";
+
     // ==================== 批量研究工具 ====================
 
     public static final String BATCH_WEB_RESEARCHER = "batch_web_researcher";
