@@ -153,6 +153,7 @@
           <KnowledgeSection v-else-if="activeSection === 'knowledge'"/>
           <ObsidianSection v-else-if="activeSection === 'obsidian'"/>
           <McpSection v-else-if="activeSection === 'mcp'"/>
+          <SandboxSection v-else-if="activeSection === 'sandbox'"/>
           <UpdateSection v-else-if="activeSection === 'update'"/>
           <AboutSection v-else-if="activeSection === 'about'"/>
           <div v-else class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
@@ -175,6 +176,7 @@ import MemorySection from '@/components/settings/MemorySection.vue'
 import ObsidianSection from '@/components/settings/ObsidianSection.vue'
 import McpSection from '@/components/settings/McpSection.vue'
 import KnowledgeSection from '@/components/settings/KnowledgeSection.vue'
+import SandboxSection from '@/components/settings/SandboxSection.vue'
 import UpdateSection from '@/components/settings/UpdateSection.vue'
 import AboutSection from '@/components/settings/AboutSection.vue'
 import {Button} from '@/components/ui/button'

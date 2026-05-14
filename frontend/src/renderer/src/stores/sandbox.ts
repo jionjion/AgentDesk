@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import type {
   EngineStatus,
   ExecuteRequest,
@@ -9,10 +9,50 @@ import type {
 } from '@/types/sandbox'
 import { usePythonEngine } from '@/composables/usePythonEngine'
 
-/** 空闲超时时间（30 分钟） */
-const IDLE_TIMEOUT = 30 * 60 * 1000
+// ── 沙箱配置 ──────────────────────────────────────
+export interface SandboxSettings {
+  /** 是否启用沙箱（关闭后代码块不显示运行按钮） */
+  enabled: boolean
+  /** 单次执行超时（秒） */
+  execTimeout: number
+  /** 空闲回收时间（分钟） */
+  idleTimeout: number
+  /** AI 返回代码块时是否自动执行 */
+  autoRun: boolean
+}
+
+const SETTINGS_KEY = 'sandbox_settings'
+
+const DEFAULT_SETTINGS: SandboxSettings = {
+  enabled: true,
+  execTimeout: 30,
+  idleTimeout: 30,
+  autoRun: false
+}
+
+function loadSettings(): SandboxSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+  } catch { /* ignore */ }
+  return { ...DEFAULT_SETTINGS }
+}
+
+function saveSettings(settings: SandboxSettings): void {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+}
 
 export const useSandboxStore = defineStore('sandbox', () => {
+  // === Settings ===
+  const settings = reactive<SandboxSettings>(loadSettings())
+
+  // 配置变更时自动持久化
+  watch(() => ({ ...settings }), (val) => {
+    saveSettings(val)
+  }, { deep: true })
+
+  const enabled = computed(() => settings.enabled)
+
   // === State ===
   const engineStatus = ref<EngineStatus>('idle')
   const activeSessionId = ref<string | null>(null)
@@ -128,6 +168,7 @@ export const useSandboxStore = defineStore('sandbox', () => {
 
   function resetIdleTimer() {
     clearIdleTimer()
+    const timeout = settings.idleTimeout * 60 * 1000
     idleTimer = setTimeout(() => {
       console.log('沙箱空闲超时，自动回收')
       if (engine) {
@@ -135,7 +176,7 @@ export const useSandboxStore = defineStore('sandbox', () => {
         engine = null
       }
       engineStatus.value = 'idle'
-    }, IDLE_TIMEOUT)
+    }, timeout)
   }
 
   function clearIdleTimer() {
@@ -162,6 +203,9 @@ export const useSandboxStore = defineStore('sandbox', () => {
   }
 
   return {
+    // Settings
+    settings,
+    enabled,
     // State
     engineStatus,
     activeSessionId,

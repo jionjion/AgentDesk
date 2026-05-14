@@ -242,6 +242,7 @@ import ExecutionResult from '@/components/sandbox/ExecutionResult.vue'
 import {useChatStore} from '@/stores/chat'
 import {useAppStore} from '@/stores/app'
 import {useSettingsStore} from '@/stores/settings'
+import {useSandboxStore} from '@/stores/sandbox'
 import aiIcon from '@/assets/icon_255.png'
 import {formatFileSize, isImageType} from '@/utils/file'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
@@ -260,7 +261,7 @@ marked.use({
       const escaped = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       // Python 代码块添加运行按钮
       const isPython = langLabel === 'python' || langLabel === 'py'
-      const runBtn = isPython
+      const runBtn = (isPython && sandboxStore.enabled)
           ? `<button class="code-run-btn" data-code="${escaped}" title="运行"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`
           : ''
       return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><div class="code-block-actions">${runBtn}<button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
@@ -289,6 +290,7 @@ const emit = defineEmits<{
 const chatStore = useChatStore()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
+const sandboxStore = useSandboxStore()
 
 const isUser = computed(() => props.message.role === 'user')
 const userAvatar = computed(() => appStore.currentUser.avatar)
