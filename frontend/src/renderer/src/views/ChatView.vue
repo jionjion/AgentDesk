@@ -43,6 +43,12 @@
             <MessageBubble
                 v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
                 :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
+                @run-code="handleRunCode"
+            />
+            <!-- Python 代码执行结果 -->
+            <ExecutionResult
+                v-if="codeExecutionResults[msg.id]"
+                :result="codeExecutionResults[msg.id]"
             />
           </template>
           <div ref="scrollAnchorRef"/>
@@ -236,19 +242,36 @@ import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
 import KnowledgeIndicator from '@/components/chat/KnowledgeIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import ChatNavRail from '@/components/chat/ChatNavRail.vue'
+import ExecutionResult from '@/components/sandbox/ExecutionResult.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
 import {formatFileSize, isImageType} from '@/utils/file'
 import type {PlanMessage, ToolCallMessage} from '@/types/chat'
+import type {ExecuteResult} from '@/types/sandbox'
+import {useSandboxStore} from '@/stores/sandbox'
 
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
+const sandboxStore = useSandboxStore()
 const route = useRoute()
 const {planState} = usePlanSubtasks()
 
 const planMessages = computed(() =>
     chatStore.currentMessages.filter((m): m is PlanMessage => m.role === 'plan')
 )
+
+// === Python 沙箱执行 ===
+const codeExecutionResults = ref<Record<string, ExecuteResult>>({})
+
+async function handleRunCode(code: string) {
+  const sessionId = chatStore.currentSessionId || 'default'
+  // 找到当前最后一条助手消息作为结果挂载点
+  const lastAssistantMsg = [...chatStore.currentMessages].reverse().find(m => m.role === 'assistant')
+  if (!lastAssistantMsg) return
+
+  const result = await sandboxStore.execute(sessionId, code)
+  codeExecutionResults.value[lastAssistantMsg.id] = result
+}
 
 /**
  * 获取 index 处的助手消息对应的子任务名称

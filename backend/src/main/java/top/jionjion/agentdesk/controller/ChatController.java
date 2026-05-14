@@ -35,10 +35,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 /**
@@ -74,6 +71,15 @@ public class ChatController {
                 t.setDaemon(true);
                 return t;
             });
+    /**
+     * SSE 心跳调度器, 定期发送注释事件防止连接被中间网络设备断开
+     */
+    private static final ScheduledExecutorService HEARTBEAT_SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "sse-heartbeat");
+        t.setDaemon(true);
+        return t;
+    });
+    private static final long HEARTBEAT_INTERVAL_SECONDS = 30;
 
     private final AgentPool agentPool;
     private final ChatMessageRepository chatMessageRepository;
@@ -179,16 +185,20 @@ public class ChatController {
     }
 
     private void configureSseCallbacks(SseEmitter emitter, String sessionId, AgentHandle handle) {
+        ScheduledFuture<?> heartbeat = startHeartbeat(emitter, sessionId);
         emitter.onTimeout(() -> {
             log.warn("Session {} SSE timeout", sessionId);
+            heartbeat.cancel(false);
             handle.hook().markDisconnected();
             agentPool.release(sessionId);
         });
         emitter.onCompletion(() -> {
             log.debug("Session {} SSE completed", sessionId);
+            heartbeat.cancel(false);
             handle.hook().setEmitter(null);
         });
         emitter.onError(e -> {
+            heartbeat.cancel(false);
             // 客户端断开连接是正常情况, 降级为 DEBUG
             if (isClientDisconnect(e)) {
                 log.debug("Session {} 客户端断开连接", sessionId);
@@ -198,6 +208,19 @@ public class ChatController {
             handle.hook().markDisconnected();
             agentPool.release(sessionId);
         });
+    }
+
+    /**
+     * 启动 SSE 心跳, 每 30 秒发送一个心跳事件保持连接活跃
+     */
+    private ScheduledFuture<?> startHeartbeat(SseEmitter emitter, String sessionId) {
+        return HEARTBEAT_SCHEDULER.scheduleAtFixedRate(() -> {
+            try {
+                emitter.send(SseEmitter.event().name("heartbeat").data(""));
+            } catch (Exception e) {
+                log.debug("Session {} 心跳发送失败, 连接可能已关闭: {}", sessionId, e.getMessage());
+            }
+        }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     private static final Set<String> DISCONNECT_KEYWORDS = Set.of(
