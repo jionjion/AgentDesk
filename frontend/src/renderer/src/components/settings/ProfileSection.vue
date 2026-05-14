@@ -67,7 +67,7 @@
 
 <script setup lang="ts">
 import {reactive, ref, watch} from 'vue'
-import {Camera as CameraIcon, Loader2, LogOut, User as UserIcon} from 'lucide-vue-next'
+import {Camera as CameraIcon, Loader2, User as UserIcon} from 'lucide-vue-next'
 import {useSettingsStore} from '@/stores/settings'
 import {useAuthStore} from '@/stores/auth'
 import {cacheAvatar} from '@/utils/avatar-cache'

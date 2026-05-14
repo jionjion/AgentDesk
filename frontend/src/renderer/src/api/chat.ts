@@ -27,7 +27,7 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
     const url = `${BASE_URL}/api/chat/stream`
 
     const listeners: Record<string, ((e: MessageEvent) => void)[]> = {}
-    let errorHandler: (() => void) | null = null
+    let errorHandler: (() => void) | null = null as (() => void) | null
     let abortController: AbortController | null = new AbortController()
 
     const instance: FetchSSE = {
