@@ -101,18 +101,41 @@ public class McpConnectionManager {
     }
 
     private McpClientWrapper buildStdioClient(String name, Map<String, Object> config) {
-        @SuppressWarnings("unchecked")
-        List<String> command = (List<String>) config.get("command");
-        if (command == null || command.isEmpty()) {
+        String program;
+        List<String> argList;
+
+        Object commandValue = config.get("command");
+        if (commandValue instanceof String cmd) {
+            // 标准格式: { "command": "uvx", "args": ["--from", "mcpdoc", ...] }
+            if (cmd.isBlank()) {
+                throw new IllegalArgumentException("StdIO 配置 command 不能为空");
+            }
+            program = cmd;
+            @SuppressWarnings("unchecked")
+            List<String> configArgs = (List<String>) config.get("args");
+            argList = (configArgs != null) ? configArgs : List.of();
+        } else if (commandValue instanceof List<?> cmdList) {
+            // 兼容格式: { "command": ["uvx", "--from", "mcpdoc", ...] }
+            if (cmdList.isEmpty()) {
+                throw new IllegalArgumentException("StdIO 配置缺少 command");
+            }
+            @SuppressWarnings("unchecked")
+            List<String> command = (List<String>) cmdList;
+            program = command.get(0);
+            argList = command.subList(1, command.size());
+        } else {
             throw new IllegalArgumentException("StdIO 配置缺少 command");
         }
 
-        String program = command.get(0);
-        String[] args = command.subList(1, command.size()).toArray(new String[0]);
-        McpClientBuilder builder = McpClientBuilder.create(name)
-                .stdioTransport(program, args)
-                .timeout(CONNECT_TIMEOUT);
+        // 环境变量
+        @SuppressWarnings("unchecked")
+        Map<String, String> env = (Map<String, String>) config.get("env");
 
+        McpClientBuilder builder = (env != null && !env.isEmpty())
+                ? McpClientBuilder.create(name).stdioTransport(program, argList, env)
+                : McpClientBuilder.create(name).stdioTransport(program, argList.toArray(new String[0]));
+
+        builder.timeout(CONNECT_TIMEOUT);
         return builder.buildAsync().block();
     }
 
