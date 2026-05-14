@@ -245,7 +245,7 @@ import PrecipitateDialog from '@/components/chat/PrecipitateDialog.vue'
 
 const marked = new Marked()
 
-// 自定义 code block 渲染，注入复制按钮 + 高亮
+// 自定义 code block 渲染，注入复制按钮 + 运行按钮 + 高亮
 marked.use({
   renderer: {
     code({text, lang}) {
@@ -254,7 +254,12 @@ marked.use({
           : hljs.highlightAuto(text).value
       const langLabel = lang || ''
       const escaped = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
+      // Python 代码块添加运行按钮
+      const isPython = langLabel === 'python' || langLabel === 'py'
+      const runBtn = isPython
+          ? `<button class="code-run-btn" data-code="${escaped}" title="运行"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`
+          : ''
+      return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><div class="code-block-actions">${runBtn}<button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><button class="code-collapse-btn" title="折叠"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button></div></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
     }
   }
 })
@@ -269,6 +274,10 @@ const props = defineProps<{
   subtaskCards?: Record<string, { name: string; outcome: string }>
   /** 工具调用消息，key 为 tool_call 消息 ID */
   toolCalls?: Record<string, ToolCallMessage>
+}>()
+
+const emit = defineEmits<{
+  'run-code': [code: string]
 }>()
 
 const chatStore = useChatStore()
@@ -475,6 +484,32 @@ const bubbleRef = ref<HTMLElement>()
 
 function handleBubbleClick(e: Event) {
   const target = e.target as HTMLElement
+
+  // 运行按钮
+  const runBtn = target.closest('.code-run-btn') as HTMLButtonElement | null
+  if (runBtn) {
+    const code = runBtn.getAttribute('data-code')
+        ?.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    if (!code) return
+    emit('run-code', code)
+    return
+  }
+
+  // 折叠/展开按钮
+  const collapseBtn = target.closest('.code-collapse-btn') as HTMLButtonElement | null
+  if (collapseBtn) {
+    const wrapper = collapseBtn.closest('.code-block-wrapper') as HTMLElement | null
+    if (!wrapper) return
+    const isCollapsed = wrapper.classList.toggle('collapsed')
+    if (isCollapsed) {
+      collapseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+      collapseBtn.title = '展开'
+    } else {
+      collapseBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+      collapseBtn.title = '折叠'
+    }
+    return
+  }
 
   // 复制按钮
   const copyBtn = target.closest('.code-copy-btn') as HTMLButtonElement | null

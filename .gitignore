@@ -18,3 +18,5 @@ frontend/docs
 backend/docs
 
 .env
+
+frontend/src/renderer/public/pyodide/

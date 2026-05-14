@@ -43,13 +43,12 @@
             <MessageBubble
                 v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
                 :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
-                @run-code="handleRunCode"
+                @run-code="(code) => handleRunCode(code, msg.id)"
             />
             <!-- Python 代码执行结果 -->
-            <ExecutionResult
-                v-if="codeExecutionResults[msg.id]"
-                :result="codeExecutionResults[msg.id]"
-            />
+            <div v-if="codeExecutionResults[msg.id]" class="ml-11 mr-4 -mt-2 mb-2">
+              <ExecutionResult :result="codeExecutionResults[msg.id]"/>
+            </div>
           </template>
           <div ref="scrollAnchorRef"/>
         </div>
@@ -263,14 +262,10 @@ const planMessages = computed(() =>
 // === Python 沙箱执行 ===
 const codeExecutionResults = ref<Record<string, ExecuteResult>>({})
 
-async function handleRunCode(code: string) {
+async function handleRunCode(code: string, msgId: string) {
   const sessionId = chatStore.currentSessionId || 'default'
-  // 找到当前最后一条助手消息作为结果挂载点
-  const lastAssistantMsg = [...chatStore.currentMessages].reverse().find(m => m.role === 'assistant')
-  if (!lastAssistantMsg) return
-
   const result = await sandboxStore.execute(sessionId, code)
-  codeExecutionResults.value[lastAssistantMsg.id] = result
+  codeExecutionResults.value[msgId] = result
 }
 
 /**

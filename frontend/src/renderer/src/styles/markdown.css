@@ -136,6 +136,69 @@
     color: #333;
 }
 
+/* 按钮组容器 */
+.code-block-header .code-block-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* 折叠按钮 */
+.code-block-header .code-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6em;
+    height: 1.6em;
+    padding: 0;
+    font-size: 0.85em;
+    color: #888;
+    background: transparent;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.code-block-header .code-collapse-btn:hover {
+    background: #e0e0e0;
+    color: #333;
+}
+
+/* 折叠状态 */
+.code-block-wrapper.collapsed pre {
+    max-height: 0;
+    padding: 0 0.2em;
+    overflow: hidden;
+    transition: max-height 0.2s ease, padding 0.2s ease;
+}
+
+.code-block-wrapper pre {
+    transition: max-height 0.2s ease, padding 0.2s ease;
+}
+
+/* 运行按钮 */
+.code-block-header .code-run-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6em;
+    height: 1.6em;
+    padding: 0;
+    font-size: 0.85em;
+    color: #22c55e;
+    background: transparent;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.code-block-header .code-run-btn:hover {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
 /* 代码块内的 pre */
 .markdown-body .code-block-wrapper pre {
     margin-top: 0;
@@ -275,6 +338,24 @@
 .dark .code-block-header .code-copy-btn:hover {
     background: #444;
     color: #ddd;
+}
+
+.dark .code-block-header .code-collapse-btn {
+    color: #999;
+}
+
+.dark .code-block-header .code-collapse-btn:hover {
+    background: #444;
+    color: #ddd;
+}
+
+.dark .code-block-header .code-run-btn {
+    color: #4ade80;
+}
+
+.dark .code-block-header .code-run-btn:hover {
+    background: #166534;
+    color: #86efac;
 }
 
 /* 代码块背景 */
