@@ -14,21 +14,27 @@ function postMsg(msg: WorkerResponse) {
   self.postMessage(msg)
 }
 
-/** 注入到 Pyodide 的辅助 Python 代码 */
+/** 注入到 Pyodide 的辅助 Python 代码（所有内部变量使用 __ 前缀防止用户代码访问） */
 const SETUP_CODE = `
 import sys
 from io import StringIO, BytesIO
 import re
+from js import self as __js_self, Object as __js_Object
+from pyodide.ffi import to_js as __to_js
 
 # stdout/stderr 捕获
-class OutputCapture:
-    def __init__(self, max_size=1024*1024):
+class __OutputCapture:
+    def __init__(self, max_size=1024*1024, stream_callback=None):
         self.buffer = StringIO()
         self.max_size = max_size
+        self.stream_callback = stream_callback
 
     def write(self, text):
         if self.buffer.tell() < self.max_size:
             self.buffer.write(text)
+        # 实时流式回传
+        if self.stream_callback and text:
+            self.stream_callback(text)
 
     def flush(self):
         pass
@@ -39,13 +45,16 @@ class OutputCapture:
     def reset(self):
         self.buffer = StringIO()
 
-_stdout_capture = OutputCapture()
-_stderr_capture = OutputCapture()
+def __send_stdout(text):
+    __js_self.postMessage(__to_js({"type": "stdout", "data": text}, dict_converter=__js_Object.fromEntries))
+
+__stdout_capture = __OutputCapture(stream_callback=__send_stdout)
+__stderr_capture = __OutputCapture()
 
 # matplotlib 图表捕获
-_figures = []
+__figures = []
 
-def _setup_matplotlib():
+def __setup_matplotlib():
     try:
         import matplotlib
         matplotlib.use('agg')
@@ -58,7 +67,7 @@ def _setup_matplotlib():
                 buf = BytesIO()
                 fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
                 buf.seek(0)
-                _figures.append(base64.b64encode(buf.read()).decode())
+                __figures.append(base64.b64encode(buf.read()).decode())
             plt.close('all')
 
         plt.show = _capture_show
@@ -66,16 +75,18 @@ def _setup_matplotlib():
         pass
 
 # 不支持操作的友好提示
-_UNSUPPORTED_MODULES = {
+__UNSUPPORTED_MODULES = {
     'requests': '沙箱环境不支持网络请求（requests）',
     'urllib3': '沙箱环境不支持网络请求（urllib3）',
     'httpx': '沙箱环境不支持网络请求（httpx）',
     'subprocess': '沙箱环境不支持调用系统命令（subprocess）',
     'socket': '沙箱环境不支持网络连接（socket）',
+    'ctypes': '沙箱环境不支持底层 C 调用（ctypes）',
+    'multiprocessing': '沙箱环境不支持多进程（multiprocessing）',
 }
 
 # 错误信息过滤
-def _format_error(exc):
+def __format_error(exc):
     import traceback
     tb_lines = traceback.format_exception(type(exc), exc, exc.__traceback__)
     filtered = [line for line in tb_lines
@@ -83,6 +94,14 @@ def _format_error(exc):
                 and 'pyodide/_base' not in line
                 and 'pyodide/code' not in line]
     return ''.join(filtered) if filtered else ''.join(tb_lines)
+
+# 用户代码的隔离全局命名空间（只暴露标准内置和安全模块）
+__user_globals = {'__builtins__': __builtins__}
+
+# 确保输出目录存在
+import os as _os
+_os.makedirs('/data/output', exist_ok=True)
+del _os
 `
 
 /** Pyodide 包 CDN 地址 */
@@ -159,7 +178,7 @@ async def _auto_import(code):
     import re
     imports = re.findall(r'^(?:import|from)\\s+(\\w+)', code, re.MULTILINE)
     for pkg in imports:
-        if pkg in _UNSUPPORTED_MODULES:
+        if pkg in __UNSUPPORTED_MODULES:
             continue
         try:
             __import__(pkg)
@@ -179,45 +198,56 @@ async def _auto_import(code):
 function buildExecuteCode(userCode: string): string {
   return `
 import sys
-_stdout_capture.reset()
-_stderr_capture.reset()
-_figures.clear()
-sys.stdout = _stdout_capture
-sys.stderr = _stderr_capture
+__stdout_capture.reset()
+__stderr_capture.reset()
+__figures.clear()
+sys.stdout = __stdout_capture
+sys.stderr = __stderr_capture
 
 _exec_result = None
+_output_files = {}
 try:
     await _auto_import(${JSON.stringify(userCode)})
-    _setup_matplotlib()
+    __setup_matplotlib()
 
     # 检查不支持的模块
     import re as _re
     _imports = _re.findall(r'^(?:import|from)\\s+(\\w+)', ${JSON.stringify(userCode)}, _re.MULTILINE)
     for _mod in _imports:
-        if _mod in _UNSUPPORTED_MODULES:
-            raise ImportError(_UNSUPPORTED_MODULES[_mod])
+        if _mod in __UNSUPPORTED_MODULES:
+            raise ImportError(__UNSUPPORTED_MODULES[_mod])
 
     _code_to_run = ${JSON.stringify(userCode)}
     _compiled = compile(_code_to_run, '<sandbox>', 'exec')
-    _local_ns = {}
-    exec(_compiled, globals(), _local_ns)
+    exec(_compiled, __user_globals)
 
     # 捕获 result 变量
-    if 'result' in _local_ns:
-        _exec_result = _local_ns['result']
-    globals().update(_local_ns)
+    if 'result' in __user_globals:
+        _exec_result = __user_globals['result']
+
+    # 收集输出文件（/data/output/ 目录）
+    import os as _os
+    _output_dir = '/data/output'
+    if _os.path.isdir(_output_dir):
+        for _fname in _os.listdir(_output_dir):
+            _fpath = _os.path.join(_output_dir, _fname)
+            if _os.path.isfile(_fpath):
+                import base64 as _b64
+                with open(_fpath, 'rb') as _f:
+                    _output_files[_fname] = _b64.b64encode(_f.read()).decode()
 except Exception as _e:
-    sys.stderr.write(_format_error(_e))
+    sys.stderr.write(__format_error(_e))
 finally:
     sys.stdout = sys.__stdout__
     sys.stderr = sys.__stderr__
 
 {
-    "success": _stderr_capture.getvalue() == "",
+    "success": __stderr_capture.getvalue() == "",
     "result": _exec_result,
-    "stdout": _stdout_capture.getvalue(),
-    "stderr": _stderr_capture.getvalue(),
-    "figures": list(_figures),
+    "stdout": __stdout_capture.getvalue(),
+    "stderr": __stderr_capture.getvalue(),
+    "figures": list(__figures),
+    "outputFiles": _output_files if _output_files else None,
 }
 `
 }
@@ -249,7 +279,7 @@ async function initPyodide(pyodideUrl: string) {
 }
 
 /** 执行 Python 代码 */
-async function executeCode(id: string, code: string, files?: Record<string, ArrayBuffer>, _timeout?: number) {
+async function executeCode(id: string, code: string, files?: Record<string, ArrayBuffer>, globals?: Record<string, unknown>, _timeout?: number) {
   if (!pyodide) {
     postMsg({ type: 'error', id, error: '沙箱未初始化' })
     return
@@ -263,13 +293,15 @@ async function executeCode(id: string, code: string, files?: Record<string, Arra
     if (files) {
       for (const [name, data] of Object.entries(files)) {
         const path = `/data/${name}`
-        // 确保目录存在
-        const dir = path.substring(0, path.lastIndexOf('/'))
-        pyodide.runPython(`
-import os
-os.makedirs('${dir}', exist_ok=True)
-`)
+        ensureDir(path)
         pyodide.FS.writeFile(path, new Uint8Array(data))
+      }
+    }
+
+    // 注入全局变量到用户命名空间
+    if (globals) {
+      for (const [key, value] of Object.entries(globals)) {
+        pyodide.globals.get('__user_globals').set(key, pyodide.toPy(value))
       }
     }
 
@@ -284,6 +316,7 @@ os.makedirs('${dir}', exist_ok=True)
       stdout: result.stdout || '',
       stderr: result.stderr || '',
       figures: result.figures?.length > 0 ? Array.from(result.figures) : undefined,
+      outputFiles: result.outputFiles ? Object.fromEntries(Object.entries(result.outputFiles)) : undefined,
       duration: Date.now() - startTime
     }
 
@@ -301,15 +334,26 @@ os.makedirs('${dir}', exist_ok=True)
   }
 }
 
+/** 通过 Pyodide FS API 确保目录存在（避免路径注入） */
+function ensureDir(filePath: string) {
+  if (!pyodide) return
+  const parts = filePath.substring(1).split('/') // 去掉开头的 /
+  parts.pop() // 去掉文件名
+  let current = ''
+  for (const part of parts) {
+    current += '/' + part
+    try {
+      pyodide.FS.mkdir(current)
+    } catch {
+      // 目录已存在，忽略
+    }
+  }
+}
+
 /** 写入文件到 MEMFS */
 function writeFileToMemfs(path: string, data: ArrayBuffer) {
   if (!pyodide) return
-
-  const dir = path.substring(0, path.lastIndexOf('/'))
-  pyodide.runPython(`
-import os
-os.makedirs('${dir}', exist_ok=True)
-`)
+  ensureDir(path)
   pyodide.FS.writeFile(path, new Uint8Array(data))
 }
 
@@ -322,13 +366,10 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       await initPyodide(msg.pyodideUrl)
       break
     case 'execute':
-      await executeCode(msg.id, msg.code, msg.files, msg.timeout)
+      await executeCode(msg.id, msg.code, msg.files, msg.globals, msg.timeout)
       break
     case 'writeFile':
       writeFileToMemfs(msg.path, msg.data)
-      break
-    case 'cancel':
-      // Worker 级别无法中断正在执行的 WASM，需要 terminate 重建
       break
   }
 }

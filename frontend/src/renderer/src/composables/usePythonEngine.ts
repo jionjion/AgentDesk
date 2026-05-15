@@ -13,6 +13,9 @@ interface QueueItem {
   reject: (error: Error) => void
 }
 
+/** 初始化最大等待时间（毫秒） */
+const INIT_TIMEOUT = 60_000
+
 export function usePythonEngine() {
   const status: Ref<EngineStatus> = ref('idle')
   const isRunning = ref(false)
@@ -29,10 +32,8 @@ export function usePythonEngine() {
   /** 获取 Pyodide 资源的绝对 URL */
   function getPyodideUrl(): string {
     if (import.meta.env.DEV) {
-      // 开发环境：Vite dev server
       return `${window.location.origin}/pyodide`
     }
-    // 生产环境（Electron file:// 协议）：相对于 index.html 的路径
     return new URL('./pyodide', window.location.href).href
   }
 
@@ -80,18 +81,37 @@ export function usePythonEngine() {
     worker.onerror = (error) => {
       console.error('Worker error:', error)
       status.value = 'error'
+      // 拒绝所有等待中的请求，避免 Promise 泄漏
+      for (const [, pending] of pendingRequests) {
+        pending.resolve({
+          success: false,
+          stdout: '',
+          stderr: `Worker 异常: ${error.message || '未知错误'}`,
+          duration: 0
+        })
+      }
+      pendingRequests.clear()
     }
 
     // 发送初始化消息
     const initMsg: WorkerMessage = { type: 'init', pyodideUrl: getPyodideUrl() }
     worker.postMessage(initMsg)
 
-    // 等待初始化完成
+    // 等待初始化完成（带超时上限）
     return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (status.value !== 'ready') {
+          status.value = 'error'
+          reject(new Error(`Pyodide 初始化超时（${INIT_TIMEOUT / 1000}秒）`))
+        }
+      }, INIT_TIMEOUT)
+
       const checkReady = () => {
         if (status.value === 'ready') {
+          clearTimeout(timeout)
           resolve()
         } else if (status.value === 'error') {
+          clearTimeout(timeout)
           reject(new Error('Pyodide 初始化失败'))
         } else {
           setTimeout(checkReady, 100)
@@ -116,6 +136,18 @@ export function usePythonEngine() {
 
     while (queue.length > 0) {
       const item = queue.shift()!
+
+      // 检查引擎状态，非 ready 时直接返回错误
+      if (!worker || status.value !== 'ready') {
+        item.resolve({
+          success: false,
+          stdout: '',
+          stderr: '沙箱未就绪，请等待初始化完成或重启内核',
+          duration: 0
+        })
+        continue
+      }
+
       try {
         const result = await doExecute(item.request)
         item.resolve(result)
@@ -141,33 +173,39 @@ export function usePythonEngine() {
     const id = String(++currentId)
     currentOutput.value = ''
 
-    return new Promise((resolve, reject) => {
-      pendingRequests.set(id, { resolve, reject })
+    return new Promise((resolve) => {
+      let settled = false
+      const timeout = request.timeout || 30000
+
+      const settle = (result: ExecuteResult) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        pendingRequests.delete(id)
+        resolve(result)
+      }
 
       // 超时处理
-      const timeout = request.timeout || 30000
       const timer = setTimeout(() => {
-        pendingRequests.delete(id)
-        // 超时需要 terminate 并重建 Worker
-        cancel()
-        resolve({
+        settle({
           success: false,
           stdout: currentOutput.value,
           stderr: `执行超时（${timeout / 1000}秒）`,
           duration: timeout
         })
+        // 超时后 terminate 并重建 Worker
+        cancel()
       }, timeout)
 
-      // 监听结果后清除超时
-      const originalResolve = resolve
       pendingRequests.set(id, {
-        resolve: (result) => {
-          clearTimeout(timer)
-          originalResolve(result)
-        },
-        reject: (error) => {
-          clearTimeout(timer)
-          reject(error)
+        resolve: settle,
+        reject: () => {
+          settle({
+            success: false,
+            stdout: '',
+            stderr: '执行被中断',
+            duration: 0
+          })
         }
       })
 
@@ -184,6 +222,7 @@ export function usePythonEngine() {
         id,
         code: request.code,
         files: request.files,
+        globals: request.globals,
         timeout: request.timeout
       }
 
@@ -207,16 +246,37 @@ export function usePythonEngine() {
     if (worker) {
       worker.terminate()
       worker = null
-      status.value = 'idle'
-      isRunning.value = false
-      pendingRequests.clear()
     }
+    status.value = 'idle'
+    isRunning.value = false
+
+    // 拒绝所有等待中的请求
+    for (const [, pending] of pendingRequests) {
+      pending.resolve({
+        success: false,
+        stdout: '',
+        stderr: '执行已取消',
+        duration: 0
+      })
+    }
+    pendingRequests.clear()
+
+    // 清空队列，reject 所有排队中的请求
+    while (queue.length > 0) {
+      const item = queue.shift()!
+      item.resolve({
+        success: false,
+        stdout: '',
+        stderr: '执行已取消',
+        duration: 0
+      })
+    }
+    processing = false
   }
 
   /** 销毁引擎 */
   function destroy() {
     cancel()
-    queue.length = 0
   }
 
   return {

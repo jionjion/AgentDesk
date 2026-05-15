@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, watchEffect } from 'vue'
 import type {
   EngineStatus,
   ExecuteRequest,
   ExecuteResult,
-  ExecutionRecord,
-  SandboxInstance
+  ExecutionRecord
 } from '@/types/sandbox'
 import { usePythonEngine } from '@/composables/usePythonEngine'
 
@@ -57,7 +56,6 @@ export const useSandboxStore = defineStore('sandbox', () => {
   const engineStatus = ref<EngineStatus>('idle')
   const activeSessionId = ref<string | null>(null)
   const currentOutput = ref('')
-  const instances = ref<Map<string, SandboxInstance>>(new Map())
 
   // 全局引擎实例（当前活跃的）
   let engine: ReturnType<typeof usePythonEngine> | null = null
@@ -73,13 +71,17 @@ export const useSandboxStore = defineStore('sandbox', () => {
     if (engine) return
 
     engine = usePythonEngine()
-    engineStatus.value = 'loading'
+
+    // 自动同步引擎状态到 store
+    watchEffect(() => {
+      if (engine) {
+        engineStatus.value = engine.status.value
+      }
+    })
 
     try {
       await engine.init()
-      engineStatus.value = 'ready'
     } catch (error) {
-      engineStatus.value = 'error'
       console.error('沙箱初始化失败:', error)
     }
   }
@@ -102,7 +104,6 @@ export const useSandboxStore = defineStore('sandbox', () => {
 
     // 更新活跃会话
     activeSessionId.value = sessionId
-    engineStatus.value = 'running'
     currentOutput.value = ''
 
     // 重置空闲计时器
@@ -114,7 +115,6 @@ export const useSandboxStore = defineStore('sandbox', () => {
     // 记录执行历史
     addHistory(sessionId, code, result)
 
-    engineStatus.value = 'ready'
     return result
   }
 
@@ -160,7 +160,6 @@ export const useSandboxStore = defineStore('sandbox', () => {
     }
     clearIdleTimer()
     engineStatus.value = 'idle'
-    instances.value.clear()
   }
 
   // === 空闲超时管理 ===

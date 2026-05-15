@@ -49,26 +49,8 @@ export type WorkerResponse =
 /** 主线程发送给 Worker 的消息 */
 export type WorkerMessage =
   | { type: 'init'; pyodideUrl: string }
-  | { type: 'execute'; id: string; code: string; files?: Record<string, ArrayBuffer>; timeout?: number }
+  | { type: 'execute'; id: string; code: string; files?: Record<string, ArrayBuffer>; globals?: Record<string, unknown>; timeout?: number }
   | { type: 'writeFile'; path: string; data: ArrayBuffer }
-  | { type: 'cancel' }
-
-/** 沙箱实例 */
-export interface SandboxInstance {
-  sessionId: string
-  worker: Worker
-  status: EngineStatus
-  /** 执行历史 */
-  history: ExecutionRecord[]
-  /** 内存使用估算（字节） */
-  memoryUsage: number
-  createdAt: number
-  lastActiveAt: number
-  /** 空闲计时器 */
-  idleTimer?: ReturnType<typeof setTimeout>
-  /** 变量是否已过期（超时销毁后） */
-  variablesExpired: boolean
-}
 
 /** 执行记录 */
 export interface ExecutionRecord {
