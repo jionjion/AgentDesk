@@ -79,4 +79,13 @@ public final class ToolDefinitions {
     public static final String BATCH_WEB_RESEARCHER = "batch_web_researcher";
     public static final String BATCH_WEB_RESEARCHER_DESC = "批量并行联网研究工具。对一个研究主题自动拆解为多个子查询并行搜索，合并去重后返回精简结果。" +
             "适用于开放性调研问题（如'XX的现状和趋势'），不适用于已知具体URL的抓取。";
+
+    // ==================== 远程执行工具 ====================
+
+    public static final String REMOTE_EXEC = "remote_exec";
+    public static final String REMOTE_EXEC_DESC = "在用户的本地机器上执行 shell 命令并返回结果。" +
+            "命令会通过网络发送到用户的桌面客户端执行, 适用于需要访问用户本地文件系统、运行项目命令、查看系统状态等场景。" +
+            "重要: 执行结果会包含客户端操作系统信息, 请根据目标系统使用正确的命令语法 " +
+            "(Windows 使用 cmd/PowerShell 命令如 dir, type, del; macOS/Linux 使用 Unix 命令如 ls, cat, rm)。" +
+            "低风险命令（如 ls/dir, cat/type, git status）会自动执行, 高风险命令（如 rm/del, npm install, git push）需要用户确认。";
 }

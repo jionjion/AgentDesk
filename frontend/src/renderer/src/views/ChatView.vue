@@ -40,6 +40,7 @@
             <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
             <template v-else-if="msg.role === 'tool_call'"/>
             <template v-else-if="msg.role === 'plan'"/>
+            <CommandApprovalBubble v-else-if="msg.role === 'command_approval'" :message="msg"/>
             <MessageBubble
                 v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
                 :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
@@ -228,6 +229,7 @@ import {Button} from '@/components/ui/button'
 import {Textarea} from '@/components/ui/textarea'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
+import CommandApprovalBubble from '@/components/chat/CommandApprovalBubble.vue'
 import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'

@@ -16,19 +16,19 @@
       "description": "技能包存储根目录（用户安装的技能解压到此目录）."
     },
     {
-      "name": "agentdesk.skills.code-execution.enabled",
+      "name": "agentdesk.remote-exec.enabled",
       "type": "java.lang.Boolean",
-      "description": "是否启用技能代码执行沙箱."
+      "description": "是否启用远程命令执行功能."
     },
     {
-      "name": "agentdesk.skills.code-execution.work-dir",
-      "type": "java.lang.String",
-      "description": "代码执行工作目录."
+      "name": "agentdesk.remote-exec.command-timeout",
+      "type": "java.lang.Long",
+      "description": "远程命令执行超时时间（毫秒）."
     },
     {
-      "name": "agentdesk.skills.code-execution.allowed-commands",
+      "name": "agentdesk.remote-exec.allowed-origins",
       "type": "java.lang.String",
-      "description": "允许执行的命令白名单（逗号分隔）."
+      "description": "WebSocket 允许的 Origin 模式（逗号分隔）."
     }
   ]
 }

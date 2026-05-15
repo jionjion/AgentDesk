@@ -66,6 +66,21 @@ export interface PlanMessage {
     result?: string
 }
 
+/** 命令审批消息 */
+export interface CommandApprovalMessage {
+    id: string
+    role: 'command_approval'
+    requestId: string
+    sessionId: string
+    command: string
+    workingDir: string
+    riskLevel: 'LOW' | 'HIGH'
+    timeoutMs: number
+    receivedAt: number
+    status: 'pending' | 'approved' | 'rejected' | 'timeout' | 'cancelled'
+    timestamp: number
+}
+
 /** 子任务 */
 export interface Subtask {
     name: string
@@ -80,7 +95,7 @@ export interface PlanState {
 }
 
 /** 聊天消息联合类型 */
-export type ChatMessage = UserMessage | AssistantMessage | ToolCallMessage | ThinkingMessage | PlanMessage
+export type ChatMessage = UserMessage | AssistantMessage | ToolCallMessage | ThinkingMessage | PlanMessage | CommandApprovalMessage
 
 /** 后端返回的聊天消息 */
 export interface BackendChatMessage {

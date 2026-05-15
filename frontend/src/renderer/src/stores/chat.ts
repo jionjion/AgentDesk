@@ -640,6 +640,14 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    /** 注入外部消息到指定会话（如命令审批气泡） */
+    function injectMessage(sessionId: string, message: ChatMessage) {
+        if (!messagesBySession.value[sessionId]) {
+            messagesBySession.value[sessionId] = []
+        }
+        messagesBySession.value[sessionId].push(message)
+    }
+
     return {
         // state
         sessions,
@@ -672,6 +680,7 @@ export const useChatStore = defineStore('chat', () => {
         deleteMessage,
         regenerateMessage,
         exportSession,
-        archiveToObsidian
+        archiveToObsidian,
+        injectMessage
     }
 })

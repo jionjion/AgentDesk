@@ -43,11 +43,6 @@ agentdesk:
   # 技能包存储目录（用户安装的技能解压到此目录）
   skills:
     base-dir: ${AGENTDESK_SKILLS_DIR:${user.home}/.agentdesk/skills}
-    # 代码执行沙箱配置
-    code-execution:
-      enabled: true
-      work-dir: ${AGENTDESK_SKILLS_WORKDIR:${user.home}/.agentdesk/workspace}
-      allowed-commands: python3,python,node,npm,pip
   # 联网搜索工具配置
   tools:
     web-search:
@@ -71,3 +66,13 @@ agentdesk:
       default-top-k: 5
       default-score-threshold: 0.8
       max-context-tokens: 2000
+  # 远程命令执行配置
+  remote-exec:
+    enabled: ${AGENTDESK_REMOTE_EXEC_ENABLED:true}
+    command-timeout: 120000
+    max-pending-commands: 10
+    heartbeat-interval: 30
+    heartbeat-timeout: 10
+    max-result-size: 10240
+    low-risk-commands: ls,cat,head,tail,find,grep,wc,pwd,echo,date,whoami,which,env,printenv,type,file
+    allowed-origins: ${AGENTDESK_WS_ALLOWED_ORIGINS:http://localhost:*}

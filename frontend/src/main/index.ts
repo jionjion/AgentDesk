@@ -236,6 +236,7 @@ app.whenReady().then(() => {
 
     // 允许加载外部图片（如 OSS 头像）
     const apiBaseUrl: string = __API_BASE_URL__
+    const wsBaseUrl: string = apiBaseUrl.replace(/^http/, 'ws')
 
     // 生产模式下 file:// 协议的 Origin 为 null，删除 Origin 头让后端视为非浏览器请求（跳过 CORS 检查）
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
@@ -251,7 +252,7 @@ app.whenReady().then(() => {
             responseHeaders: {
                 ...details.responseHeaders,
                 'Content-Security-Policy': [
-                    `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; connect-src 'self' ${apiBaseUrl} https:; font-src 'self' data:; worker-src 'self' blob:`
+                    `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; connect-src 'self' ${apiBaseUrl} ${wsBaseUrl} https:; font-src 'self' data:; worker-src 'self' blob:`
                 ]
             }
         })

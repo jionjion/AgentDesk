@@ -1,0 +1,141 @@
+package top.jionjion.agentdesk.agent.tool;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import top.jionjion.agentdesk.websocket.dto.CommandRequest;
+
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 命令风险分级器: 根据命令内容判断风险等级。
+ * <p>
+ * LOW 风险命令自动执行, HIGH 风险命令需要用户确认。
+ * 未在白名单中的命令默认为 HIGH（安全优先）。
+ *
+ * @author Jion
+ */
+@Component
+public class CommandRiskClassifier {
+
+    private final Set<String> lowRiskCommands;
+
+    public CommandRiskClassifier(
+            @Value("${agentdesk.remote-exec.low-risk-commands:ls,cat,head,tail,find,grep,wc,pwd,echo,date,whoami,which,env,printenv,type,file,dir,where,hostname,ver,systeminfo,set,cd,tree}") String lowRiskCommandsStr) {
+        this.lowRiskCommands = Arrays.stream(lowRiskCommandsStr.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 对命令进行风险分级
+     *
+     * @param command 完整的 shell 命令字符串
+     * @return LOW 或 HIGH
+     */
+    public String classify(String command) {
+        if (command == null || command.isBlank()) {
+            return CommandRequest.RISK_HIGH;
+        }
+
+        String trimmed = command.trim();
+
+        // 包含管道、重定向、命令链接符的复合命令, 默认 HIGH
+        if (containsShellOperators(trimmed)) {
+            return CommandRequest.RISK_HIGH;
+        }
+
+        // 提取第一个 token（命令名）
+        String firstToken = extractFirstToken(trimmed);
+
+        // 检查是否在低风险白名单中
+        if (lowRiskCommands.contains(firstToken)) {
+            // 额外检查: 即使命令在白名单中, 某些参数组合仍然是高风险
+            if (hasHighRiskArgs(firstToken, trimmed)) {
+                return CommandRequest.RISK_HIGH;
+            }
+            return CommandRequest.RISK_LOW;
+        }
+
+        // 特殊处理: git 子命令
+        if ("git".equals(firstToken)) {
+            return classifyGitCommand(trimmed);
+        }
+
+        // 特殊处理: npm/pip 子命令
+        if ("npm".equals(firstToken) || "pip".equals(firstToken) || "pip3".equals(firstToken)) {
+            return classifyPackageManagerCommand(trimmed);
+        }
+
+        // 特殊处理: python/node 版本查询
+        if (isVersionQuery(trimmed)) {
+            return CommandRequest.RISK_LOW;
+        }
+
+        // 默认 HIGH
+        return CommandRequest.RISK_HIGH;
+    }
+
+    private boolean containsShellOperators(String command) {
+        // 检查管道、重定向、后台执行、命令链接
+        return command.contains("|") || command.contains(">") || command.contains("<")
+                || command.contains("&&") || command.contains("||") || command.contains(";")
+                || command.contains("`") || command.contains("$(");
+    }
+
+    private String extractFirstToken(String command) {
+        // 跳过环境变量前缀 (如 KEY=value cmd)
+        String[] parts = command.split("\\s+");
+        for (String part : parts) {
+            if (!part.contains("=")) {
+                return part;
+            }
+        }
+        return parts[0];
+    }
+
+    private boolean hasHighRiskArgs(String command, String fullCommand) {
+        // find 命令带 -delete 或 -exec 是高风险
+        if ("find".equals(command)) {
+            return fullCommand.contains("-delete") || fullCommand.contains("-exec");
+        }
+        return false;
+    }
+
+    private String classifyGitCommand(String command) {
+        // git 只读命令: status, log, diff, branch, show, remote -v, tag
+        String[] parts = command.split("\\s+");
+        if (parts.length < 2) {
+            return CommandRequest.RISK_LOW;
+        }
+        String subCommand = parts[1];
+        Set<String> readOnlyGitCommands = Set.of(
+                "status", "log", "diff", "branch", "show", "remote", "tag",
+                "stash", "blame", "shortlog", "describe", "rev-parse"
+        );
+        if (readOnlyGitCommands.contains(subCommand)) {
+            return CommandRequest.RISK_LOW;
+        }
+        return CommandRequest.RISK_HIGH;
+    }
+
+    private String classifyPackageManagerCommand(String command) {
+        String[] parts = command.split("\\s+");
+        if (parts.length < 2) {
+            return CommandRequest.RISK_LOW;
+        }
+        String subCommand = parts[1];
+        // 只读子命令
+        Set<String> readOnlyCommands = Set.of("list", "show", "info", "search", "outdated", "ls", "view", "help");
+        if (readOnlyCommands.contains(subCommand)) {
+            return CommandRequest.RISK_LOW;
+        }
+        return CommandRequest.RISK_HIGH;
+    }
+
+    private boolean isVersionQuery(String command) {
+        return command.endsWith("--version") || command.endsWith("-v") || command.endsWith("-V");
+    }
+}

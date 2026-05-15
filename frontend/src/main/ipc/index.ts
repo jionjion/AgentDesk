@@ -1,5 +1,7 @@
 import {app, dialog, ipcMain, shell} from 'electron'
 import {readdir, readFile, writeFile} from 'fs/promises'
+import {spawn} from 'child_process'
+import os from 'os'
 
 export function registerIpcHandlers(): void {
     // 文件对话框
@@ -43,8 +45,87 @@ export function registerIpcHandlers(): void {
         await shell.openExternal(url)
     })
 
+    // Shell 命令执行（远程执行功能）
+    ipcMain.handle('shell:execute', async (_event, command: string, workingDir?: string) => {
+        return executeShellCommand(command, workingDir)
+    })
+
     // 应用信息
     ipcMain.handle('app:getVersion', () => {
         return app.getVersion()
     })
+
+    // 系统平台信息（供远程执行上报）
+    ipcMain.handle('system:getPlatformInfo', () => {
+        return {
+            platform: process.platform,       // 'win32' | 'darwin' | 'linux'
+            arch: process.arch,               // 'x64' | 'arm64' 等
+            release: os.release(),            // 如 '10.0.26200'
+            hostname: os.hostname()
+        }
+    })
 }
+
+/**
+ * 执行 shell 命令并返回结果
+ */
+function executeShellCommand(command: string, workingDir?: string): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> {
+    return new Promise((resolve) => {
+        const startTime = Date.now()
+        const isWindows = process.platform === 'win32'
+        const shellCmd = isWindows ? 'cmd' : '/bin/sh'
+        // Windows: 先切换代码页到 UTF-8 (65001)，避免中文输出乱码
+        const actualCommand = isWindows ? `chcp 65001 >nul && ${command}` : command
+        const shellArgs = isWindows ? ['/c', actualCommand] : ['-c', command]
+
+        // 构建环境变量: 在 Windows 上注入 UTF-8 相关环境变量，
+        // 让尽可能多的外部程序（git, python, java 等）以 UTF-8 输出
+        const env = { ...process.env }
+        if (isWindows) {
+            env.PYTHONIOENCODING = env.PYTHONIOENCODING || 'utf-8'
+            env.PYTHONUTF8 = env.PYTHONUTF8 || '1'
+            env.JAVA_TOOL_OPTIONS = env.JAVA_TOOL_OPTIONS || '-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8'
+            env.NODE_OPTIONS = env.NODE_OPTIONS || ''
+            env.LANG = env.LANG || 'en_US.UTF-8'
+            env.LC_ALL = env.LC_ALL || 'en_US.UTF-8'
+            // Git 中文输出
+            env.LESSCHARSET = env.LESSCHARSET || 'utf-8'
+        }
+
+        const child = spawn(shellCmd, shellArgs, {
+            cwd: workingDir || undefined,
+            env,
+            windowsHide: true
+        })
+
+        let stdout = ''
+        let stderr = ''
+
+        child.stdout.on('data', (data: Buffer) => {
+            stdout += data.toString()
+        })
+
+        child.stderr.on('data', (data: Buffer) => {
+            stderr += data.toString()
+        })
+
+        child.on('close', (code) => {
+            resolve({
+                exitCode: code ?? -1,
+                stdout,
+                stderr,
+                durationMs: Date.now() - startTime
+            })
+        })
+
+        child.on('error', (err) => {
+            resolve({
+                exitCode: -1,
+                stdout: '',
+                stderr: err.message,
+                durationMs: Date.now() - startTime
+            })
+        })
+    })
+}
+

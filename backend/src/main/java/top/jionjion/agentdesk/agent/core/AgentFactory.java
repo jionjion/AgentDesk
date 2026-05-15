@@ -11,7 +11,6 @@ import io.agentscope.core.skill.SkillBox;
 import io.agentscope.core.skill.repository.ClasspathSkillRepository;
 import io.agentscope.core.skill.repository.FileSystemSkillRepository;
 import io.agentscope.core.tool.Toolkit;
-import io.agentscope.core.tool.coding.ShellCommandTool;
 import io.agentscope.core.tool.subagent.SubAgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,8 +19,10 @@ import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.hook.SseStreamingHook;
 import top.jionjion.agentdesk.agent.tool.ApiCallTool;
 import top.jionjion.agentdesk.agent.tool.BatchWebResearchTool;
+import top.jionjion.agentdesk.agent.tool.CommandRiskClassifier;
 import top.jionjion.agentdesk.agent.tool.DynamicAgentTool;
 import top.jionjion.agentdesk.agent.tool.IpLocationTool;
+import top.jionjion.agentdesk.agent.tool.RemoteExecTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
 import top.jionjion.agentdesk.agent.tool.WebTools;
@@ -35,12 +36,12 @@ import top.jionjion.agentdesk.service.McpServerService;
 import top.jionjion.agentdesk.service.OssService;
 import top.jionjion.agentdesk.service.SettingsService;
 import top.jionjion.agentdesk.service.SkillService;
+import top.jionjion.agentdesk.websocket.RemoteExecBridge;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,7 @@ import java.util.stream.Collectors;
  * 使用 AgentScope SkillBox 系统进行技能管理:
  * - 内置技能通过 ClasspathSkillRepository 加载
  * - 用户安装的技能通过 FileSystemSkillRepository 加载
- * - 启用沙箱化代码执行 (ShellCommandTool)
+ * - 远程命令执行通过 RemoteExecTool (WebSocket) 实现
  *
  * @author Jion
  */
@@ -103,13 +104,13 @@ public class AgentFactory {
     private final SkillService skillService;
     private final McpServerService mcpServerService;
     private final McpConnectionManager mcpConnectionManager;
+    private final RemoteExecBridge remoteExecBridge;
+    private final CommandRiskClassifier commandRiskClassifier;
     private final String mem0BaseUrl;
     private final String mem0ApiKey;
     private final String skillsBaseDir;
-    private final String codeExecutionWorkDir;
-    private final boolean codeExecutionEnabled;
-    private final Set<String> allowedCommands;
     private final String tavilyApiKey;
+    private final boolean remoteExecEnabled;
 
     public AgentFactory(ChatModelFactory chatModelFactory,
                         FileRecordRepository fileRecordRepository,
@@ -118,13 +119,13 @@ public class AgentFactory {
                         SkillService skillService,
                         McpServerService mcpServerService,
                         McpConnectionManager mcpConnectionManager,
+                        RemoteExecBridge remoteExecBridge,
+                        CommandRiskClassifier commandRiskClassifier,
                         @Value("${agentdesk.mem0.base-url}") String mem0BaseUrl,
                         @Value("${agentdesk.mem0.api-key:}") String mem0ApiKey,
                         @Value("${agentdesk.skills.base-dir}") String skillsBaseDir,
-                        @Value("${agentdesk.skills.code-execution.work-dir}") String codeExecutionWorkDir,
-                        @Value("${agentdesk.skills.code-execution.enabled:true}") boolean codeExecutionEnabled,
-                        @Value("${agentdesk.skills.code-execution.allowed-commands:python3,python,node}") String allowedCommandsStr,
-                        @Value("${agentdesk.tools.web-search.api-key:}") String tavilyApiKey) {
+                        @Value("${agentdesk.tools.web-search.api-key:}") String tavilyApiKey,
+                        @Value("${agentdesk.remote-exec.enabled:false}") boolean remoteExecEnabled) {
         this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
@@ -132,16 +133,13 @@ public class AgentFactory {
         this.skillService = skillService;
         this.mcpServerService = mcpServerService;
         this.mcpConnectionManager = mcpConnectionManager;
+        this.remoteExecBridge = remoteExecBridge;
+        this.commandRiskClassifier = commandRiskClassifier;
         this.mem0BaseUrl = mem0BaseUrl.endsWith("/") ? mem0BaseUrl.substring(0, mem0BaseUrl.length() - 1) : mem0BaseUrl;
         this.mem0ApiKey = (mem0ApiKey == null || mem0ApiKey.isBlank()) ? null : mem0ApiKey;
         this.skillsBaseDir = skillsBaseDir;
-        this.codeExecutionWorkDir = codeExecutionWorkDir;
-        this.codeExecutionEnabled = codeExecutionEnabled;
-        this.allowedCommands = Arrays.stream(allowedCommandsStr.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet());
         this.tavilyApiKey = (tavilyApiKey == null || tavilyApiKey.isBlank()) ? null : tavilyApiKey;
+        this.remoteExecEnabled = remoteExecEnabled;
     }
 
     /**
@@ -187,6 +185,19 @@ public class AgentFactory {
                 mcpConnectionManager.connectAndRegister(toolkit, mcpServers);
                 log.info("已为会话 {} 注册 {} 个 MCP 服务器", sessionId, mcpServers.size());
             }
+        }
+
+        // 远程执行工具: 始终注册（工具内部会检查客户端连接状态）
+        if (remoteExecEnabled && userId != null) {
+            RemoteExecTool remoteExecTool = new RemoteExecTool(remoteExecBridge, commandRiskClassifier, userId, sessionId);
+            toolkit.registerTool(remoteExecTool);
+            // 将客户端 OS 信息注入系统提示词, 让 Agent 知道目标平台
+            String clientPlatform = remoteExecBridge.getClientPlatform(userId);
+            if (clientPlatform != null) {
+                sysPrompt += "\n\n[远程执行环境] 用户客户端操作系统: " + remoteExecTool.getOsDescription()
+                        + "。请确保 remote_exec 工具中使用的命令与该操作系统兼容。";
+            }
+            log.info("已为会话 {} 注册远程执行工具 (userId={}, platform={})", sessionId, userId, clientPlatform);
         }
 
         // 子代理集成: 注册 web-researcher 子代理（通过 Agent as Tool 模式）
@@ -282,21 +293,6 @@ public class AgentFactory {
                 } catch (Exception e) {
                     log.warn("加载用户技能失败 (userId={}): {}", userId, e.getMessage());
                 }
-            }
-        }
-
-        // 3. 启用代码执行沙箱（受限的 Shell 命令）
-        if (codeExecutionEnabled) {
-            try {
-                skillBox.codeExecution()
-                        .workDir(codeExecutionWorkDir)
-                        .withShell(new ShellCommandTool(null, allowedCommands, null))
-                        .withRead()
-                        .withWrite()
-                        .enable();
-                log.info("技能代码执行沙箱已启用, workDir={}, 允许命令={}", codeExecutionWorkDir, allowedCommands);
-            } catch (Exception e) {
-                log.warn("启用代码执行沙箱失败: {}", e.getMessage());
             }
         }
 

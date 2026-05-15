@@ -17,10 +17,14 @@ const electronAPI = {
     },
     shell: {
         openExternal: (url: string): Promise<void> =>
-            ipcRenderer.invoke('shell:openExternal', url)
+            ipcRenderer.invoke('shell:openExternal', url),
+        execute: (command: string, workingDir?: string): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> =>
+            ipcRenderer.invoke('shell:execute', command, workingDir)
     },
     app: {
         getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+        getPlatformInfo: (): Promise<{ platform: string; arch: string; release: string; hostname: string }> =>
+            ipcRenderer.invoke('system:getPlatformInfo'),
         getCloseAction: (): Promise<'ask' | 'minimize' | 'quit'> =>
             ipcRenderer.invoke('app:getCloseAction'),
         setCloseAction: (action: 'ask' | 'minimize' | 'quit'): Promise<void> =>

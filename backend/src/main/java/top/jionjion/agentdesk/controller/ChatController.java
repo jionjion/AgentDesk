@@ -339,18 +339,22 @@ public class ChatController {
             if (reply != null && !reply.isEmpty()) {
                 ChatMessage saved = chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
                 // 发送 message_saved 事件, 携带数据库消息ID, 供前端更新本地ID
-                try {
-                    String json = OBJECT_MAPPER.writeValueAsString(Map.of("messageId", saved.getId()));
-                    emitter.send(SseEmitter.event().name("message_saved").data(json));
-                } catch (Exception ex) {
-                    log.debug("Failed to send message_saved event: {}", ex.getMessage());
+                if (!handle.hook().isClientDisconnected()) {
+                    try {
+                        String json = OBJECT_MAPPER.writeValueAsString(Map.of("messageId", saved.getId()));
+                        emitter.send(SseEmitter.event().name("message_saved").data(json));
+                    } catch (Exception ex) {
+                        log.debug("Failed to send message_saved event: {}", ex.getMessage());
+                    }
                 }
             }
             agentPool.save(sessionId);
             sessionService.touch(sessionId);
-            emitter.complete();
+            if (!handle.hook().isClientDisconnected()) {
+                emitter.complete();
+            }
         } catch (Exception e) {
-            log.warn("Error completing SSE: {}", e.getMessage());
+            log.debug("Session {} SSE complete 时客户端已断开: {}", sessionId, e.getMessage());
         }
 
         // 首次对话时异步生成标题 (emitter 已关闭, 不再通过 SSE 推送)
