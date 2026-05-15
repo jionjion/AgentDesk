@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useChatStore } from '@/stores/chat'
 import type {
   RemoteExecStatus,
   RemoteExecSettings,
@@ -10,7 +9,6 @@ import type {
   CommandRequestPayload,
   CommandResult
 } from '@/types/remote-exec'
-import type { CommandApprovalMessage } from '@/types/chat'
 import { WS_MESSAGE_TYPES } from '@/types/remote-exec'
 
 // ── 配置持久化 ──────────────────────────────────────
@@ -186,16 +184,21 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     if (payload.riskLevel === 'LOW' && settings.value.autoExecuteLowRisk) {
       await executeCommand(pending)
     } else {
-      // 高风险或未开启自动执行 → 加入待审批队列并注入聊天气泡
+      // 高风险或未开启自动执行 → 加入待审批队列，ToolCallCard 会检测并显示按钮
       pendingCommands.value.push(pending)
-      injectApprovalMessage(pending)
+      // 超时自动拒绝
+      setTimeout(() => {
+        const still = pendingCommands.value.find(c => c.requestId === pending.requestId)
+        if (still) {
+          rejectCommand(pending.requestId, 'timeout')
+        }
+      }, pending.timeoutMs)
     }
   }
 
   function handleCommandCancel(msg: WsMessage) {
     if (!msg.requestId) return
     pendingCommands.value = pendingCommands.value.filter(c => c.requestId !== msg.requestId)
-    updateApprovalMessageStatus(msg.requestId, 'cancelled')
   }
 
   // === 命令执行 ===
@@ -242,7 +245,6 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
 
   function rejectCommand(requestId: string, reason: string = 'user_denied') {
     pendingCommands.value = pendingCommands.value.filter(c => c.requestId !== requestId)
-    updateApprovalMessageStatus(requestId, 'rejected')
     sendMessage({
       type: WS_MESSAGE_TYPES.COMMAND_REJECTED,
       requestId,
@@ -255,57 +257,9 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
   async function approveCommand(requestId: string) {
     const cmd = pendingCommands.value.find(c => c.requestId === requestId)
     if (cmd) {
-      updateApprovalMessageStatus(requestId, 'approved')
+      pendingCommands.value = pendingCommands.value.filter(c => c.requestId !== requestId)
       await executeCommand(cmd)
     }
-  }
-
-  // === 审批消息注入 ===
-
-  function injectApprovalMessage(pending: PendingCommand) {
-    const chatStore = useChatStore()
-    const approvalMsg: CommandApprovalMessage = {
-      id: `approval-${pending.requestId}`,
-      role: 'command_approval',
-      requestId: pending.requestId,
-      sessionId: pending.sessionId,
-      command: pending.command,
-      workingDir: pending.workingDir,
-      riskLevel: pending.riskLevel,
-      timeoutMs: pending.timeoutMs,
-      receivedAt: pending.receivedAt,
-      status: 'pending',
-      timestamp: Date.now()
-    }
-
-    // 注入到对应会话的消息列表
-    chatStore.injectMessage(pending.sessionId, approvalMsg)
-
-    // 超时自动拒绝
-    setTimeout(() => {
-      const msg = findApprovalMessage(pending.requestId)
-      if (msg && msg.status === 'pending') {
-        updateApprovalMessageStatus(pending.requestId, 'timeout')
-        rejectCommand(pending.requestId, 'timeout')
-      }
-    }, pending.timeoutMs)
-  }
-
-  function updateApprovalMessageStatus(requestId: string, newStatus: 'approved' | 'rejected' | 'timeout' | 'cancelled') {
-    const msg = findApprovalMessage(requestId)
-    if (msg) {
-      msg.status = newStatus
-    }
-  }
-
-  function findApprovalMessage(requestId: string): CommandApprovalMessage | null {
-    const chatStore = useChatStore()
-    const allMessages = chatStore.messagesBySession
-    for (const msgs of Object.values(allMessages)) {
-      const found = msgs.find(m => m.role === 'command_approval' && (m as CommandApprovalMessage).requestId === requestId)
-      if (found) return found as CommandApprovalMessage
-    }
-    return null
   }
 
   // === 工具方法 ===

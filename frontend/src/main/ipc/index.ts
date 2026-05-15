@@ -73,22 +73,31 @@ function executeShellCommand(command: string, workingDir?: string): Promise<{ ex
     return new Promise((resolve) => {
         const startTime = Date.now()
         const isWindows = process.platform === 'win32'
-        const shellCmd = isWindows ? 'cmd' : '/bin/sh'
-        // Windows: 先切换代码页到 UTF-8 (65001)，避免中文输出乱码
-        const actualCommand = isWindows ? `chcp 65001 >nul && ${command}` : command
-        const shellArgs = isWindows ? ['/c', actualCommand] : ['-c', command]
 
-        // 构建环境变量: 在 Windows 上注入 UTF-8 相关环境变量，
-        // 让尽可能多的外部程序（git, python, java 等）以 UTF-8 输出
+        let shellCmd: string
+        let shellArgs: string[]
+
+        if (isWindows) {
+            // 使用 PowerShell 执行，原生 UTF-8 支持，中文路径不乱码
+            shellCmd = 'powershell.exe'
+            shellArgs = [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                // 强制输出编码为 UTF-8
+                `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`
+            ]
+        } else {
+            shellCmd = '/bin/sh'
+            shellArgs = ['-c', command]
+        }
+
+        // 构建环境变量
         const env = { ...process.env }
         if (isWindows) {
             env.PYTHONIOENCODING = env.PYTHONIOENCODING || 'utf-8'
             env.PYTHONUTF8 = env.PYTHONUTF8 || '1'
             env.JAVA_TOOL_OPTIONS = env.JAVA_TOOL_OPTIONS || '-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8'
-            env.NODE_OPTIONS = env.NODE_OPTIONS || ''
-            env.LANG = env.LANG || 'en_US.UTF-8'
-            env.LC_ALL = env.LC_ALL || 'en_US.UTF-8'
-            // Git 中文输出
             env.LESSCHARSET = env.LESSCHARSET || 'utf-8'
         }
 

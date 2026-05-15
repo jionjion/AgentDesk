@@ -80,7 +80,7 @@ public class RemoteExecTool {
         }
         String p = platform.toLowerCase();
         if (p.contains("win")) {
-            return "Windows (请使用 cmd/PowerShell 语法, 如 dir, type, del 等)";
+            return "Windows (使用 PowerShell 语法, 如 Get-ChildItem, Get-Content, Remove-Item; 也兼容 cmd 命令如 dir, type, del)";
         } else if (p.contains("mac") || p.contains("darwin")) {
             return "macOS (请使用 Unix shell 语法)";
         } else if (p.contains("linux")) {

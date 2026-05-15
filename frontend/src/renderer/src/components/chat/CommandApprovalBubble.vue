@@ -1,40 +1,31 @@
 <template>
-  <div class="my-1.5 flex justify-start">
-    <div class="max-w-[85%] rounded-lg border px-3 py-2 transition-colors" :class="borderClass">
-      <!-- 单行: 图标 + 命令 + 按钮 -->
-      <div class="flex items-center gap-2">
-        <ShieldAlert :size="14" class="shrink-0" :class="message.riskLevel === 'HIGH' ? 'text-amber-500' : 'text-blue-500'" />
-        <code class="flex-1 min-w-0 truncate text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1.5 py-0.5 text-zinc-700 dark:text-zinc-300">{{ message.command }}</code>
-
-        <!-- Actions (pending) -->
-        <template v-if="message.status === 'pending'">
-          <Button variant="ghost" size="icon" class="h-6 w-6 shrink-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950" @click="handleReject">
-            <X :size="14" />
-          </Button>
-          <Button variant="ghost" size="icon" class="h-6 w-6 shrink-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" @click="handleApprove">
-            <Check :size="14" />
-          </Button>
-        </template>
-
-        <!-- Status badge (after action) -->
-        <span v-else class="shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium" :class="statusBadgeClass">
-          <component :is="statusIcon" :size="10" class="mr-0.5" />
-          {{ statusLabel }}
-        </span>
+  <div class="my-2 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+    <!-- 头部: 跟 ToolCallCard 一致的灰色背景 -->
+    <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <Terminal :size="14" class="text-gray-500 dark:text-gray-400"/>
+      <span class="text-xs font-medium text-gray-700 dark:text-gray-300">remote_exec</span>
+      <!-- 待审批: 按钮 -->
+      <div v-if="message.status === 'pending'" class="ml-auto flex items-center gap-1">
+        <button class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                @click="handleReject">
+          拒绝
+        </button>
+        <button class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                @click="handleApprove">
+          允许
+        </button>
       </div>
-
-      <!-- 工作目录（仅在有值时显示，小字） -->
-      <div v-if="message.workingDir" class="mt-0.5 text-[11px] text-muted-foreground pl-5 truncate">
-        {{ message.workingDir }}
-      </div>
+    </div>
+    <!-- 命令内容 -->
+    <div class="px-3 py-2">
+      <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-auto max-h-20">$ {{ message.command }}</pre>
+      <div v-if="message.workingDir" class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">{{ message.workingDir }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Button } from '@/components/ui/button'
-import { ShieldAlert, Check, X, Clock, Ban } from 'lucide-vue-next'
+import { Terminal } from 'lucide-vue-next'
 import { useRemoteExecStore } from '@/stores/remoteExec'
 import type { CommandApprovalMessage } from '@/types/chat'
 
@@ -43,46 +34,6 @@ const props = defineProps<{
 }>()
 
 const remoteExecStore = useRemoteExecStore()
-
-const borderClass = computed(() => {
-  if (props.message.status === 'pending') {
-    return props.message.riskLevel === 'HIGH'
-        ? 'border-amber-400/60 bg-amber-50/5'
-        : 'border-blue-400/60 bg-blue-50/5'
-  }
-  if (props.message.status === 'approved') return 'border-green-400/40 bg-green-50/5'
-  return 'border-zinc-300/50 dark:border-zinc-600/50'
-})
-
-const statusBadgeClass = computed(() => {
-  switch (props.message.status) {
-    case 'approved': return 'text-green-600 dark:text-green-400'
-    case 'rejected': return 'text-red-600 dark:text-red-400'
-    case 'timeout': return 'text-zinc-500'
-    case 'cancelled': return 'text-zinc-500'
-    default: return ''
-  }
-})
-
-const statusLabel = computed(() => {
-  switch (props.message.status) {
-    case 'approved': return '已执行'
-    case 'rejected': return '已拒绝'
-    case 'timeout': return '超时'
-    case 'cancelled': return '取消'
-    default: return ''
-  }
-})
-
-const statusIcon = computed(() => {
-  switch (props.message.status) {
-    case 'approved': return Check
-    case 'rejected': return X
-    case 'timeout': return Clock
-    case 'cancelled': return Ban
-    default: return X
-  }
-})
 
 function handleApprove() {
   remoteExecStore.approveCommand(props.message.requestId)
