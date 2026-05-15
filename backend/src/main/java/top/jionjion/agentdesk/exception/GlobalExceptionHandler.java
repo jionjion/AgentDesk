@@ -138,10 +138,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAll(Exception ex, HttpServletRequest request) {
-        // SSE 请求中的 IO 异常 (Broken pipe 等) 降级为 WARN, 不输出完整堆栈
-        String contentType = request.getHeader("Accept");
-        if (isSseRequest(contentType) && isBrokenPipe(ex)) {
-            log.debug("SSE客户端断开连接: {} {}", request.getMethod(), request.getRequestURI());
+        // SSE / 流式请求中的 IO 异常 (Broken pipe 等) 降级为 DEBUG, 不输出完整堆栈
+        if (isBrokenPipe(ex)) {
+            log.debug("客户端断开连接: {} {}", request.getMethod(), request.getRequestURI());
             return ResponseEntity.noContent().build();
         }
 
