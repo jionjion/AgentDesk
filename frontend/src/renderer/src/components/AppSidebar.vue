@@ -4,9 +4,11 @@
     <div class="px-3 pt-3 pb-1">
       <button
           class="flex items-center gap-2 px-2 py-1.5 text-sm rounded-md w-full"
-          :class="isNewTaskActive
-            ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
-            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
+          :class="[
+            isNewTaskActive
+              ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+          ]"
           @click="handleNewSession"
       >
         <Plus :size="16" :class="isNewTaskActive ? 'text-violet-600' : 'text-gray-400 dark:text-gray-500'"/>
@@ -32,6 +34,7 @@
             :to="item.path"
             class="nav-item flex items-center gap-2 px-2 py-1.5 text-sm rounded-md"
             :class="[isActive(item.path) ? 'bg-gray-200/80 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800']"
+            @click.capture="handleNavClick"
         >
           <component :is="item.icon" :size="16" :class="isActive(item.path) ? 'text-violet-600 dark:text-violet-400' : ''"/>
           <span>{{ item.label }}</span>
@@ -138,8 +141,8 @@
                 <div
                     class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer"
                     :class="chatStore.currentSessionId === session.id
-                  ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
+                      ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
                     :title="session.title"
                     @click="handleSwitchSession(session.id)"
                 >
@@ -297,8 +300,16 @@ const isNewTaskActive = computed(() => {
 })
 
 function handleNewSession() {
+  if (chatStore.isStreaming) return
   chatStore.currentSessionId = null
   router.push('/chat')
+}
+
+function handleNavClick(e: Event) {
+  if (chatStore.isStreaming) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
 }
 
 function enterBatchMode() {
@@ -336,6 +347,7 @@ async function handleBatchDelete() {
 }
 
 function handleSwitchSession(id: string) {
+  if (chatStore.isStreaming) return
   chatStore.switchSession(id)
   router.push(`/chat/${id}`)
 }
@@ -391,10 +403,12 @@ function confirmRename() {
 }
 
 function handleOpenSettings() {
+  if (chatStore.isStreaming) return
   router.push('/settings')
 }
 
 function handleOpenProfile() {
+  if (chatStore.isStreaming) return
   router.push('/settings?tab=profile')
 }
 

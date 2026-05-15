@@ -91,7 +91,22 @@
                   >
                     <Settings2 :size="13" class="shrink-0 text-gray-500 dark:text-gray-400"/>
                     <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ seg.toolCall.toolName }}</span>
-                    <Loader2 v-if="seg.toolCall.status === 'calling'" :size="12" class="shrink-0 animate-spin text-violet-500"/>
+                    <!-- remote_exec 审批按钮 -->
+                    <template v-if="getRemoteExecPending(seg.toolCall)">
+                      <button class="shrink-0 rounded px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                              @click.stop="handleRejectCommand(seg.toolCall)">
+                        拒绝
+                      </button>
+                      <button class="shrink-0 rounded px-1.5 py-0.5 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                              @click.stop="handleApproveCommand(seg.toolCall)">
+                        允许
+                      </button>
+                      <button class="shrink-0 rounded px-1.5 py-0.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors"
+                              @click.stop="handleApproveSession(seg.toolCall)">
+                        全部允许
+                      </button>
+                    </template>
+                    <Loader2 v-else-if="seg.toolCall.status === 'calling'" :size="12" class="shrink-0 animate-spin text-violet-500"/>
                     <CheckCircle2 v-else :size="13" class="shrink-0 text-green-500"/>
                     <ChevronRight
                         :size="11"
@@ -243,6 +258,7 @@ import {useChatStore} from '@/stores/chat'
 import {useAppStore} from '@/stores/app'
 import {useSettingsStore} from '@/stores/settings'
 import {useSandboxStore} from '@/stores/sandbox'
+import {useRemoteExecStore} from '@/stores/remoteExec'
 import aiIcon from '@/assets/icon_255.png'
 import {formatFileSize, isImageType} from '@/utils/file'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
@@ -291,6 +307,7 @@ const chatStore = useChatStore()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
 const sandboxStore = useSandboxStore()
+const remoteExecStore = useRemoteExecStore()
 
 const isUser = computed(() => props.message.role === 'user')
 const userAvatar = computed(() => appStore.currentUser.avatar)
@@ -364,6 +381,32 @@ function toggleToolCall(id: string) {
     expandedToolCalls.value.add(id)
   }
   expandedToolCalls.value = new Set(expandedToolCalls.value)
+}
+
+/** remote_exec 审批: 查找匹配的 pending command */
+function getRemoteExecPending(toolCall: ToolCallMessage) {
+  if (toolCall.toolName !== 'remote_exec' || toolCall.status !== 'calling') return null
+  const cmd = toolCall.arguments?.command as string
+  if (cmd) {
+    const exact = remoteExecStore.pendingCommands.find(p => p.command === cmd)
+    if (exact) return exact
+  }
+  return remoteExecStore.pendingCommands.length > 0 ? remoteExecStore.pendingCommands[0] : null
+}
+
+function handleApproveCommand(toolCall: ToolCallMessage) {
+  const pending = getRemoteExecPending(toolCall)
+  if (pending) remoteExecStore.approveCommand(pending.requestId)
+}
+
+function handleRejectCommand(toolCall: ToolCallMessage) {
+  const pending = getRemoteExecPending(toolCall)
+  if (pending) remoteExecStore.rejectCommand(pending.requestId)
+}
+
+function handleApproveSession(toolCall: ToolCallMessage) {
+  const pending = getRemoteExecPending(toolCall)
+  if (pending) remoteExecStore.approveSession(pending.sessionId)
 }
 
 const CURSOR_HTML = '<span class="inline-block w-1.5 h-4 bg-violet-500 ml-0.5 animate-pulse align-middle"></span>'

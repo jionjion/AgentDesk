@@ -42,18 +42,48 @@ public class CommandRiskClassifier {
 
         String trimmed = command.trim();
 
-        // 包含管道、重定向、命令链接符的复合命令, 默认 HIGH
-        if (containsShellOperators(trimmed)) {
+        // 包含管道、重定向、后台执行、子shell 的命令, 默认 HIGH
+        if (containsDangerousOperators(trimmed)) {
             return CommandRequest.RISK_HIGH;
         }
 
+        // 包含命令链接符 (&&, ||, ;) 时, 拆分每个子命令单独判断
+        if (containsChainOperators(trimmed)) {
+            return classifyChainedCommand(trimmed);
+        }
+
+        return classifySingleCommand(trimmed);
+    }
+
+    /**
+     * 拆分链式命令, 每个子命令都是 LOW 才返回 LOW
+     */
+    private String classifyChainedCommand(String command) {
+        // 按 &&, ||, ; 拆分
+        String[] subCommands = command.split("&&|\\|\\||;");
+        for (String sub : subCommands) {
+            String trimmedSub = sub.trim();
+            if (trimmedSub.isEmpty()) continue;
+            if (containsDangerousOperators(trimmedSub)) {
+                return CommandRequest.RISK_HIGH;
+            }
+            if (!CommandRequest.RISK_LOW.equals(classifySingleCommand(trimmedSub))) {
+                return CommandRequest.RISK_HIGH;
+            }
+        }
+        return CommandRequest.RISK_LOW;
+    }
+
+    /**
+     * 对单个命令（不含链接符）进行分级
+     */
+    private String classifySingleCommand(String command) {
         // 提取第一个 token（命令名）
-        String firstToken = extractFirstToken(trimmed);
+        String firstToken = extractFirstToken(command);
 
         // 检查是否在低风险白名单中
         if (lowRiskCommands.contains(firstToken)) {
-            // 额外检查: 即使命令在白名单中, 某些参数组合仍然是高风险
-            if (hasHighRiskArgs(firstToken, trimmed)) {
+            if (hasHighRiskArgs(firstToken, command)) {
                 return CommandRequest.RISK_HIGH;
             }
             return CommandRequest.RISK_LOW;
@@ -61,16 +91,16 @@ public class CommandRiskClassifier {
 
         // 特殊处理: git 子命令
         if ("git".equals(firstToken)) {
-            return classifyGitCommand(trimmed);
+            return classifyGitCommand(command);
         }
 
         // 特殊处理: npm/pip 子命令
         if ("npm".equals(firstToken) || "pip".equals(firstToken) || "pip3".equals(firstToken)) {
-            return classifyPackageManagerCommand(trimmed);
+            return classifyPackageManagerCommand(command);
         }
 
         // 特殊处理: python/node 版本查询
-        if (isVersionQuery(trimmed)) {
+        if (isVersionQuery(command)) {
             return CommandRequest.RISK_LOW;
         }
 
@@ -78,11 +108,19 @@ public class CommandRiskClassifier {
         return CommandRequest.RISK_HIGH;
     }
 
-    private boolean containsShellOperators(String command) {
-        // 检查管道、重定向、后台执行、命令链接
+    /**
+     * 危险操作符: 管道、重定向、后台执行、子shell（这些无法安全拆分）
+     */
+    private boolean containsDangerousOperators(String command) {
         return command.contains("|") || command.contains(">") || command.contains("<")
-                || command.contains("&&") || command.contains("||") || command.contains(";")
                 || command.contains("`") || command.contains("$(");
+    }
+
+    /**
+     * 链接操作符: &&, ||, ; （可以安全拆分为子命令）
+     */
+    private boolean containsChainOperators(String command) {
+        return command.contains("&&") || command.contains("||") || command.contains(";");
     }
 
     private String extractFirstToken(String command) {

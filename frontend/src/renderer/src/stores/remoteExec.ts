@@ -46,7 +46,8 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
   const status = ref<RemoteExecStatus>('disconnected')
   const pendingCommands = ref<PendingCommand[]>([])
   const executionHistory = ref<Array<{ command: string; result: CommandResult; timestamp: number }>>([])
-
+  /** 已授权"本次全部允许"的会话 ID 集合（内存态，刷新重置） */
+  const autoApprovedSessions = ref<Set<string>>(new Set())
   // WebSocket 实例（非响应式）
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -183,6 +184,9 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     // 低风险 + 自动执行 → 直接执行
     if (payload.riskLevel === 'LOW' && settings.value.autoExecuteLowRisk) {
       await executeCommand(pending)
+    } else if (autoApprovedSessions.value.has(pending.sessionId)) {
+      // 该会话已授权"全部允许" → 直接执行
+      await executeCommand(pending)
     } else {
       // 高风险或未开启自动执行 → 加入待审批队列，ToolCallCard 会检测并显示按钮
       pendingCommands.value.push(pending)
@@ -262,6 +266,17 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     }
   }
 
+  /** 本次会话全部允许: 标记 sessionId 并立即执行该会话所有 pending 命令 */
+  async function approveSession(sessionId: string) {
+    autoApprovedSessions.value = new Set([...autoApprovedSessions.value, sessionId])
+    // 立即执行该会话所有待审批命令
+    const sessionPending = pendingCommands.value.filter(c => c.sessionId === sessionId)
+    pendingCommands.value = pendingCommands.value.filter(c => c.sessionId !== sessionId)
+    for (const cmd of sessionPending) {
+      await executeCommand(cmd)
+    }
+  }
+
   // === 工具方法 ===
 
   function sendMessage(msg: WsMessage) {
@@ -295,6 +310,7 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     connect,
     disconnect,
     approveCommand,
+    approveSession,
     rejectCommand,
     updateSettings
   }
