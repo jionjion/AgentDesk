@@ -23,6 +23,7 @@ import top.jionjion.agentdesk.agent.tool.CommandRiskClassifier;
 import top.jionjion.agentdesk.agent.tool.DynamicAgentTool;
 import top.jionjion.agentdesk.agent.tool.IpLocationTool;
 import top.jionjion.agentdesk.agent.tool.RemoteExecTool;
+import top.jionjion.agentdesk.agent.tool.SandboxExecTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
 import top.jionjion.agentdesk.agent.tool.WebTools;
@@ -189,8 +190,9 @@ public class AgentFactory {
         }
 
         // 远程执行工具: 始终注册（工具内部会检查客户端连接状态）
+        RemoteExecTool remoteExecTool = null;
         if (remoteExecEnabled && userId != null) {
-            RemoteExecTool remoteExecTool = new RemoteExecTool(remoteExecBridge, commandRiskClassifier, userId, sessionId);
+            remoteExecTool = new RemoteExecTool(remoteExecBridge, commandRiskClassifier, userId, sessionId);
             toolkit.registerTool(remoteExecTool);
             // 将客户端 OS 信息注入系统提示词, 让 Agent 知道目标平台
             String clientPlatform = remoteExecBridge.getClientPlatform(userId);
@@ -199,6 +201,11 @@ public class AgentFactory {
                         + "。请确保 remote_exec 工具中使用的命令与该操作系统兼容。";
             }
             log.info("已为会话 {} 注册远程执行工具 (userId={}, platform={})", sessionId, userId, clientPlatform);
+
+            // 沙箱执行工具: 当客户端连接时始终注册
+            SandboxExecTool sandboxExecTool = new SandboxExecTool(remoteExecBridge, userId, sessionId);
+            toolkit.registerTool(sandboxExecTool);
+            log.info("已为会话 {} 注册沙箱执行工具", sessionId);
         }
 
         // 子代理集成: 注册 web-researcher 子代理（通过 Agent as Tool 模式）
@@ -221,7 +228,7 @@ public class AgentFactory {
                 .memory(memory)
                 .enablePlan()
                 .hook(hook)
-                .maxIters(10);
+                .maxIters(30);
 
         // 如果启用了长期记忆, 注入 Mem0LongTermMemory
         boolean ltmEnabled = false;
@@ -246,7 +253,7 @@ public class AgentFactory {
 
         ReActAgent agent = builder.build();
 
-        return new AgentHandle(agent, hook, ltmEnabled);
+        return new AgentHandle(agent, hook, ltmEnabled, remoteExecTool);
     }
 
     /**

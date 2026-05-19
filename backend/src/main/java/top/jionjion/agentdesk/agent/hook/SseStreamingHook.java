@@ -171,6 +171,15 @@ public class SseStreamingHook implements Hook {
                     String reason = finalMsg != null && finalMsg.getGenerateReason() != null
                             ? finalMsg.getGenerateReason().name() : "MODEL_STOP";
                     lastReply = content;
+
+                    // 达到最大迭代次数时，追加提示信息告知用户
+                    if ("MAX_ITERATIONS".equals(reason)) {
+                        String hint = "\n\n⚠️ 已达到最大执行轮次限制，任务被中断。如需继续，请再次发送请求。";
+                        content = (content != null ? content : "") + hint;
+                        lastReply = content;
+                        log.warn("Agent 达到最大迭代次数限制, 会话已中断");
+                    }
+
                     sendEvent("agent_complete", ChatEventDto.agentComplete(content, reason, null));
                 }
 

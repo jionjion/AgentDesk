@@ -241,6 +241,20 @@ export function usePythonEngine() {
     worker.postMessage(msg, [data])
   }
 
+  /** 加载工具代码到沙箱 */
+  function loadTools(code: string) {
+    if (!worker) return
+    const msg: WorkerMessage = { type: 'loadTools', code }
+    worker.postMessage(msg)
+  }
+
+  /** 清理 /data/ 目录下的文件 */
+  function clearData() {
+    if (!worker) return
+    const msg: WorkerMessage = { type: 'clearData' }
+    worker.postMessage(msg)
+  }
+
   /** 取消当前执行（terminate Worker） */
   function cancel() {
     if (worker) {
@@ -286,6 +300,8 @@ export function usePythonEngine() {
     init,
     execute,
     writeFile,
+    loadTools,
+    clearData,
     cancel,
     destroy
   }

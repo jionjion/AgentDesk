@@ -9,6 +9,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import top.jionjion.agentdesk.websocket.dto.CommandRequest;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
+import top.jionjion.agentdesk.websocket.dto.SandboxResult;
 import top.jionjion.agentdesk.websocket.dto.WsMessage;
 
 import java.io.IOException;
@@ -53,6 +54,11 @@ public class RemoteExecBridge {
      * requestId → CompletableFuture 映射（等待客户端响应）
      */
     private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingRequests = new ConcurrentHashMap<>();
+
+    /**
+     * requestId → CompletableFuture 映射（沙箱执行等待）
+     */
+    private final ConcurrentHashMap<String, CompletableFuture<SandboxResult>> pendingSandboxRequests = new ConcurrentHashMap<>();
 
     public RemoteExecBridge(ObjectMapper objectMapper,
                             @Value("${agentdesk.remote-exec.command-timeout:120000}") long commandTimeout,
@@ -217,6 +223,60 @@ public class RemoteExecBridge {
         if (future != null) {
             future.completeExceptionally(new RemoteExecException("用户拒绝执行该命令" +
                     (reason != null && !reason.isBlank() ? ": " + reason : "")));
+        }
+    }
+
+    // ==================== 沙箱执行 ====================
+
+    /**
+     * 向客户端发送 Python 代码，在浏览器端 Pyodide 沙箱中执行并等待结果
+     */
+    public SandboxResult executeSandbox(Long userId, String sessionId, String code) throws RemoteExecException {
+        WebSocketSession ws = connections.get(userId);
+        if (ws == null || !ws.isOpen()) {
+            throw new RemoteExecException("客户端未连接, 无法执行沙箱代码。");
+        }
+
+        String requestId = UUID.randomUUID().toString();
+        CompletableFuture<SandboxResult> future = new CompletableFuture<>();
+        pendingSandboxRequests.put(requestId, future);
+
+        try {
+            WsMessage msg = WsMessage.of(
+                    WsMessage.TYPE_SANDBOX_EXEC_REQUEST,
+                    requestId,
+                    sessionId,
+                    Map.of("code", code)
+            );
+
+            String json = objectMapper.writeValueAsString(msg);
+            ws.sendMessage(new TextMessage(json));
+            log.info("已向用户 {} 发送沙箱代码执行请求, requestId={}", userId, requestId);
+
+            // 沙箱执行超时用 commandTimeout（默认 120s）
+            return future.get(commandTimeout, TimeUnit.MILLISECONDS);
+
+        } catch (TimeoutException e) {
+            throw new RemoteExecException("沙箱代码执行超时 (" + (commandTimeout / 1000) + "秒)");
+        } catch (Exception e) {
+            if (e.getCause() instanceof RemoteExecException re) {
+                throw re;
+            }
+            throw new RemoteExecException("沙箱执行异常: " + e.getMessage());
+        } finally {
+            pendingSandboxRequests.remove(requestId);
+        }
+    }
+
+    /**
+     * 处理客户端返回的沙箱执行结果
+     */
+    public void onSandboxResult(String requestId, SandboxResult result) {
+        CompletableFuture<SandboxResult> future = pendingSandboxRequests.get(requestId);
+        if (future != null) {
+            future.complete(result);
+        } else {
+            log.warn("收到未知 requestId 的沙箱结果: {}", requestId);
         }
     }
 

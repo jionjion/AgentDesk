@@ -83,6 +83,7 @@ __UNSUPPORTED_MODULES = {
     'socket': '沙箱环境不支持网络连接（socket）',
     'ctypes': '沙箱环境不支持底层 C 调用（ctypes）',
     'multiprocessing': '沙箱环境不支持多进程（multiprocessing）',
+    'tools': '请勿 import tools，tools 已作为全局变量预装，直接使用 tools.xxx() 即可',
 }
 
 # 错误信息过滤
@@ -189,7 +190,7 @@ async def _auto_import(code):
                     await _install_cdn_pkg(actual_pkg)
                 else:
                     import micropip
-                    await micropip.install(actual_pkg)
+                    await micropip.install(actual_pkg, index_urls=['https://pypi.tuna.tsinghua.edu.cn/simple', 'https://pypi.org/simple'])
             except Exception:
                 pass
 `
@@ -266,6 +267,18 @@ async function initPyodide(pyodideUrl: string) {
 
     // micropip 和 packaging 从本地加载（已复制到 public/pyodide/）
     await pyodide.loadPackage(['micropip', 'packaging'])
+
+    // 预装常用包（已下载到本地 public/pyodide/，无需网络）
+    try {
+      await pyodide.loadPackage([
+        'numpy', 'pandas', 'matplotlib', 'scipy', 'statsmodels', 'patsy',
+        'openpyxl', 'et-xmlfile', 'xlrd', 'pypdf',
+        'lxml', 'beautifulsoup4', 'soupsieve',
+        'chardet', 'tabulate', 'python-docx'
+      ])
+    } catch (e) {
+      console.warn('预装本地包部分失败（非致命）:', e)
+    }
 
     // 注入辅助代码
     await pyodide.runPythonAsync(SETUP_CODE)
@@ -357,6 +370,45 @@ function writeFileToMemfs(path: string, data: ArrayBuffer) {
   pyodide.FS.writeFile(path, new Uint8Array(data))
 }
 
+/** 加载工具代码到沙箱 */
+async function loadTools(code: string) {
+  if (!pyodide || !code) return
+  try {
+    await pyodide.runPythonAsync(code)
+    // 将 tools 注入到用户命名空间，使用户代码可以直接访问
+    await pyodide.runPythonAsync(`__user_globals['tools'] = tools`)
+  } catch (error: any) {
+    console.error('工具注入失败:', error.message || error)
+  }
+}
+
+/** 清理 /data/ 目录下的所有文件和子目录（保留 /data/output/） */
+function clearDataFiles() {
+  if (!pyodide) return
+  try {
+    removeRecursive('/data', true)
+  } catch { /* /data may not exist yet */ }
+}
+
+/** 递归删除目录内容。isRoot=true 时保留目录本身和 output 子目录 */
+function removeRecursive(dirPath: string, isRoot: boolean) {
+  const entries = pyodide.FS.readdir(dirPath)
+  for (const entry of entries) {
+    if (entry === '.' || entry === '..') continue
+    if (isRoot && entry === 'output') continue
+    const fullPath = `${dirPath}/${entry}`
+    try {
+      const stat = pyodide.FS.stat(fullPath)
+      if (pyodide.FS.isDir(stat.mode)) {
+        removeRecursive(fullPath, false)
+        pyodide.FS.rmdir(fullPath)
+      } else {
+        pyodide.FS.unlink(fullPath)
+      }
+    } catch { /* ignore */ }
+  }
+}
+
 /** 消息处理 */
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const msg = event.data
@@ -370,6 +422,12 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       break
     case 'writeFile':
       writeFileToMemfs(msg.path, msg.data)
+      break
+    case 'loadTools':
+      await loadTools(msg.code)
+      break
+    case 'clearData':
+      clearDataFiles()
       break
   }
 }

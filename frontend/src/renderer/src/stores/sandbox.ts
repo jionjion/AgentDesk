@@ -7,6 +7,7 @@ import type {
   ExecutionRecord
 } from '@/types/sandbox'
 import { usePythonEngine } from '@/composables/usePythonEngine'
+import { useSandboxToolsStore } from '@/stores/sandbox-tools'
 
 // ── 沙箱配置 ──────────────────────────────────────
 export interface SandboxSettings {
@@ -57,12 +58,19 @@ export const useSandboxStore = defineStore('sandbox', () => {
   const activeSessionId = ref<string | null>(null)
   const currentOutput = ref('')
 
+  /** 当前工作目录（用户选择的，沙箱只能访问此目录下的文件） */
+  const workdir = ref<string | null>(null)
+
+  /** 已同步到 MEMFS 的文件列表 */
+  const syncedFiles = ref<string[]>([])
+
   // 全局引擎实例（当前活跃的）
   let engine: ReturnType<typeof usePythonEngine> | null = null
 
   // === Computed ===
   const isReady = computed(() => engineStatus.value === 'ready')
   const isRunning = computed(() => engineStatus.value === 'running')
+  const hasWorkdir = computed(() => !!workdir.value)
 
   // === Actions ===
 
@@ -81,6 +89,12 @@ export const useSandboxStore = defineStore('sandbox', () => {
 
     try {
       await engine.init()
+      // 注入沙箱工具
+      const toolsStore = useSandboxToolsStore()
+      const toolsCode = toolsStore.getEnabledToolsCode()
+      if (toolsCode) {
+        engine.loadTools(toolsCode)
+      }
     } catch (error) {
       console.error('沙箱初始化失败:', error)
     }
@@ -109,7 +123,11 @@ export const useSandboxStore = defineStore('sandbox', () => {
     // 重置空闲计时器
     resetIdleTimer()
 
-    const request: ExecuteRequest = { code, files }
+    const request: ExecuteRequest = {
+      code,
+      files,
+      timeout: settings.execTimeout * 1000
+    }
     const result = await engine.execute(request)
 
     // 记录执行历史
@@ -118,23 +136,83 @@ export const useSandboxStore = defineStore('sandbox', () => {
     return result
   }
 
-  /** 同步工作目录文件到沙箱 */
-  async function syncWorkdir(workdir: string) {
-    if (!engine || !window.electronAPI) return
+  /** 设置工作目录 */
+  async function setWorkdir(dir: string) {
+    workdir.value = dir
+    syncedFiles.value = []
+    // 确保引擎已初始化再同步文件
+    if (!engine || engineStatus.value === 'idle') {
+      await initEngine()
+    }
+    // 清理旧的 /data/ 文件，避免切换工作目录后旧文件残留
+    if (engine) {
+      engine.clearData()
+    }
+    await syncWorkdir(dir)
+  }
 
-    const dataExts = ['.xlsx', '.xls', '.csv', '.json', '.txt', '.parquet']
+  /** 清除工作目录（同时清理沙箱中的文件） */
+  function clearWorkdir() {
+    workdir.value = null
+    syncedFiles.value = []
+    if (engine) {
+      engine.clearData()
+    }
+  }
+
+  /** 检查文件路径是否在工作目录内 */
+  function isPathAllowed(filePath: string): boolean {
+    if (!workdir.value) return false
+    // 规范化路径分隔符
+    const normalizedWorkdir = workdir.value.replace(/\\/g, '/').toLowerCase()
+    const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase()
+    return normalizedPath.startsWith(normalizedWorkdir + '/') || normalizedPath === normalizedWorkdir
+  }
+
+  /** 将本地文件同步到沙箱（带权限检查） */
+  async function syncFile(filePath: string): Promise<{ success: boolean; error?: string }> {
+    if (!workdir.value) {
+      return { success: false, error: '未设置工作目录，请先选择一个工作目录' }
+    }
+    if (!isPathAllowed(filePath)) {
+      return { success: false, error: `文件不在工作目录内，拒绝访问。工作目录: ${workdir.value}` }
+    }
+    if (!engine || !window.electronAPI) {
+      return { success: false, error: '沙箱未就绪' }
+    }
 
     try {
-      const fileNames = await window.electronAPI.fs.readDirectory(workdir)
+      const data = await window.electronAPI.fs.readFile(filePath)
+      const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+      const fileName = filePath.replace(/\\/g, '/').split('/').pop()!
+      engine.writeFile(`/data/${fileName}`, buffer)
+      if (!syncedFiles.value.includes(fileName)) {
+        syncedFiles.value.push(fileName)
+      }
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: `文件读取失败: ${error.message || error}` }
+    }
+  }
 
-      for (const fileName of fileNames) {
-        const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase()
-        if (!dataExts.includes(ext)) continue
+  /** 同步工作目录文件到沙箱（递归子目录） */
+  async function syncWorkdir(dir: string) {
+    if (!engine || !window.electronAPI) return
 
-        const data = await window.electronAPI.fs.readFile(`${workdir}/${fileName}`)
-        // Uint8Array → ArrayBuffer
+    const dataExts = ['.xlsx', '.xls', '.csv', '.json', '.txt', '.parquet', '.pdf', '.docx']
+
+    try {
+      // 递归获取所有匹配扩展名的文件（相对路径）
+      const relativePaths = await window.electronAPI.fs.readDirectoryRecursive(dir, dataExts)
+      syncedFiles.value = []
+
+      for (const relPath of relativePaths) {
+        const fullPath = `${dir}/${relPath}`
+        const data = await window.electronAPI.fs.readFile(fullPath)
         const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-        engine.writeFile(`/data/${fileName}`, buffer)
+        // 保持目录结构写入沙箱: /data/子目录/文件名
+        engine.writeFile(`/data/${relPath}`, buffer)
+        syncedFiles.value.push(relPath)
       }
     } catch (error) {
       console.error('工作目录同步失败:', error)
@@ -201,6 +279,16 @@ export const useSandboxStore = defineStore('sandbox', () => {
     }
   }
 
+  /** 获取沙箱上下文（发消息时附带给后端） */
+  function getSandboxContext(): { tools: string; files: string[] } | null {
+    if (!settings.enabled) return null
+    const toolsStore = useSandboxToolsStore()
+    return {
+      tools: toolsStore.getToolDescriptions(),
+      files: syncedFiles.value
+    }
+  }
+
   return {
     // Settings
     settings,
@@ -210,14 +298,22 @@ export const useSandboxStore = defineStore('sandbox', () => {
     activeSessionId,
     currentOutput,
     history,
+    workdir,
+    syncedFiles,
     // Computed
     isReady,
     isRunning,
+    hasWorkdir,
     // Actions
     initEngine,
     execute,
+    setWorkdir,
+    clearWorkdir,
+    isPathAllowed,
+    syncFile,
     syncWorkdir,
     restart,
-    destroy
+    destroy,
+    getSandboxContext
   }
 })

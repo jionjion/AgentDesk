@@ -129,6 +129,7 @@ public class ChatController {
         String message = chatRequest.message();
         String fileIds = chatRequest.fileIds();
         String kbIds = chatRequest.kbIds();
+        ChatRequest.SandboxContext sandboxContext = chatRequest.sandboxContext();
 
         validateSessionId(sessionId);
         if (message == null || message.isBlank()) {
@@ -145,6 +146,11 @@ public class ChatController {
         SseEmitter emitter = new SseEmitter(300_000L);
         handle.hook().setEmitter(emitter);
 
+        // 注入前端传入的工作目录到 RemoteExecTool
+        if (handle.remoteExecTool() != null && chatRequest.workingDir() != null) {
+            handle.remoteExecTool().setWorkingDir(chatRequest.workingDir());
+        }
+
         // 解析文件并持久化用户消息
         List<Long> parsedFileIds = parseFileIds(fileIds);
         List<FileResponse> files = parsedFileIds.isEmpty()
@@ -157,6 +163,9 @@ public class ChatController {
         // 知识库检索增强
         RetrievalContext retrieval = performKnowledgeRetrieval(message, kbIds);
 
+        // 沙箱上下文增强
+        String augmentedMessage = buildSandboxAugmentedMessage(retrieval.augmentedMessage(), sandboxContext);
+
         configureSseCallbacks(emitter, sessionId, handle);
         sendKnowledgeRetrievedEvent(emitter, retrieval.results());
         if (handle.longTermMemoryEnabled()) {
@@ -164,7 +173,7 @@ public class ChatController {
         }
 
         // 构建用户消息并启动 Agent 流
-        Msg userMsg = buildUserMsg(retrieval.augmentedMessage(), imageFiles, nonImageFiles);
+        Msg userMsg = buildUserMsg(augmentedMessage, imageFiles, nonImageFiles);
         subscribeAgentStream(handle, userMsg, sessionId, message, emitter);
 
         return emitter;
@@ -255,6 +264,13 @@ public class ChatController {
     private RetrievalContext performKnowledgeRetrieval(String message, String kbIds) {
         String augmented = message;
         List<RetrievalResultDto> results = List.of();
+
+        // 只有用户主动勾选知识库（传入 kbIds）时才进行检索
+        if (kbIds == null || kbIds.isBlank()) {
+            log.info("未指定知识库, 跳过检索");
+            return new RetrievalContext(augmented, results);
+        }
+
         try {
             boolean enabled = knowledgeRetrievalService.isEnabled(UserContext.getUserId());
             log.info("知识库检索: enabled={}, userId={}, kbIds={}", enabled, UserContext.getUserId(), kbIds);
@@ -586,6 +602,46 @@ public class ChatController {
      */
     private boolean isImageFile(String contentType) {
         return contentType != null && IMAGE_CONTENT_TYPES.contains(contentType.toLowerCase());
+    }
+
+    /**
+     * 将沙箱上下文（工具描述 + 文件列表）拼入用户消息
+     */
+    private String buildSandboxAugmentedMessage(String message, ChatRequest.SandboxContext sandboxContext) {
+        if (sandboxContext == null) {
+            return message;
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        // 注入文件列表
+        if (sandboxContext.files() != null && !sandboxContext.files().isEmpty()) {
+            sb.append("[本地 Python 沙箱文件]\n");
+            sb.append("以下文件已加载到用户本地的 Python 沙箱 /data/ 目录中，可通过 sandbox_exec 工具执行代码访问：\n");
+            for (String file : sandboxContext.files()) {
+                sb.append("- /data/").append(file).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        // 注入工具描述
+        if (sandboxContext.tools() != null && !sandboxContext.tools().isBlank()) {
+            sb.append("[沙箱中可用的 Python 工具函数]\n");
+            sb.append(sandboxContext.tools()).append("\n\n");
+        }
+
+        // 使用指南
+        if (!sb.isEmpty()) {
+            sb.append("[使用方式]\n");
+            sb.append("当需要处理上述文件或进行数据分析时，使用 sandbox_exec 工具执行 Python 代码。\n");
+            sb.append("代码中可直接使用 tools.* 函数和 /data/ 下的文件。\n");
+            sb.append("将需要展示的结果赋值给 result 变量。\n");
+            sb.append("示例：sandbox_exec(code=\"pages = tools.read_pdf('/data/xx.pdf')\\nresult = pages[0][:200]\")\n\n");
+            sb.append("---\n\n");
+        }
+
+        sb.append(message);
+        return sb.toString();
     }
 
     /**

@@ -1,7 +1,8 @@
 import {app, dialog, ipcMain, shell} from 'electron'
-import {readdir, readFile, writeFile} from 'fs/promises'
+import {readdir, readFile, stat, writeFile} from 'fs/promises'
 import {spawn} from 'child_process'
 import os from 'os'
+import path from 'path'
 
 export function registerIpcHandlers(): void {
     // 文件对话框
@@ -38,6 +39,39 @@ export function registerIpcHandlers(): void {
     ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
         const entries = await readdir(dirPath)
         return entries
+    })
+
+    // 递归读取目录，返回相对路径列表（仅文件）
+    ipcMain.handle('fs:readDirectoryRecursive', async (_event, dirPath: string, exts?: string[]) => {
+        const results: string[] = []
+        const MAX_FILES = 200
+        const MAX_DEPTH = 5
+
+        async function walk(currentDir: string, relativePath: string, depth: number) {
+            if (depth > MAX_DEPTH || results.length >= MAX_FILES) return
+            const entries = await readdir(currentDir)
+            for (const entry of entries) {
+                if (results.length >= MAX_FILES) break
+                if (entry.startsWith('.')) continue // 跳过隐藏文件/目录
+                const fullPath = path.join(currentDir, entry)
+                const relPath = relativePath ? `${relativePath}/${entry}` : entry
+                try {
+                    const s = await stat(fullPath)
+                    if (s.isDirectory()) {
+                        await walk(fullPath, relPath, depth + 1)
+                    } else if (s.isFile()) {
+                        if (exts && exts.length > 0) {
+                            const ext = path.extname(entry).toLowerCase()
+                            if (!exts.includes(ext)) continue
+                        }
+                        results.push(relPath)
+                    }
+                } catch { /* 跳过无权限文件 */ }
+            }
+        }
+
+        await walk(dirPath, '', 0)
+        return results
     })
 
     // Shell 操作

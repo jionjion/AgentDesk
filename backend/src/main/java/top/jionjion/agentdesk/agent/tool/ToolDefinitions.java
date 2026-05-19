@@ -88,4 +88,15 @@ public final class ToolDefinitions {
             "重要: 执行结果会包含客户端操作系统信息, 请根据目标系统使用正确的命令语法 " +
             "(Windows 使用 cmd/PowerShell 命令如 dir, type, del; macOS/Linux 使用 Unix 命令如 ls, cat, rm)。" +
             "低风险命令（如 ls/dir, cat/type, git status）会自动执行, 高风险命令（如 rm/del, npm install, git push）需要用户确认。";
+
+    // ==================== 沙箱执行工具 ====================
+
+    public static final String SANDBOX_EXEC = "sandbox_exec";
+    public static final String SANDBOX_EXEC_DESC = "在用户浏览器端的 Python 沙箱（Pyodide/WASM）中执行 Python 代码。" +
+            "沙箱中预装了 pandas、numpy、matplotlib 等数据分析包，以及 tools.* 命名空间的工具函数。" +
+            "代码执行后可获取 stdout、stderr、返回值（result 变量）、matplotlib 图表。" +
+            "重要：沙箱的文件系统是虚拟的（MEMFS），工作目录文件挂载在 /data/ 下，输出文件保存到 /data/output/。" +
+            "不要用 remote_exec 来执行沙箱代码，也不要在沙箱中使用网络请求。" +
+            "限制：沙箱只能安装纯 Python 包，不支持带 C 扩展的包（如 scipy、scikit-learn、PyTorch、opencv-python、lxml 等），" +
+            "遇到这类需求请改用 remote_exec 在用户本机执行。";
 }

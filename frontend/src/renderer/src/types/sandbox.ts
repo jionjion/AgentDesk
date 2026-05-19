@@ -51,6 +51,8 @@ export type WorkerMessage =
   | { type: 'init'; pyodideUrl: string }
   | { type: 'execute'; id: string; code: string; files?: Record<string, ArrayBuffer>; globals?: Record<string, unknown>; timeout?: number }
   | { type: 'writeFile'; path: string; data: ArrayBuffer }
+  | { type: 'loadTools'; code: string }
+  | { type: 'clearData' }
 
 /** 执行记录 */
 export interface ExecutionRecord {

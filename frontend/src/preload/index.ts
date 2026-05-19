@@ -13,7 +13,9 @@ const electronAPI = {
         writeFile: (filePath: string, data: Uint8Array): Promise<void> =>
             ipcRenderer.invoke('fs:writeFile', filePath, data),
         readDirectory: (dirPath: string): Promise<string[]> =>
-            ipcRenderer.invoke('fs:readDirectory', dirPath)
+            ipcRenderer.invoke('fs:readDirectory', dirPath),
+        readDirectoryRecursive: (dirPath: string, exts?: string[]): Promise<string[]> =>
+            ipcRenderer.invoke('fs:readDirectoryRecursive', dirPath, exts)
     },
     shell: {
         openExternal: (url: string): Promise<void> =>

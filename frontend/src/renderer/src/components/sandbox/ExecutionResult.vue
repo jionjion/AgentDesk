@@ -49,13 +49,30 @@
             alt="图表输出"
         />
       </div>
+
+      <!-- 输出文件 -->
+      <div v-if="result.outputFiles && Object.keys(result.outputFiles).length" class="px-3 py-1">
+        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">生成文件</div>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+              v-for="(content, fileName) in result.outputFiles"
+              :key="fileName"
+              class="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              :title="`下载 ${fileName}`"
+              @click="downloadFile(fileName as string, content as string)"
+          >
+            <FileDown :size="12"/>
+            {{ fileName }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import {ref} from 'vue'
-import {Terminal, Copy} from 'lucide-vue-next'
+import {Terminal, Copy, FileDown} from 'lucide-vue-next'
 import type {ExecuteResult} from '@/types/sandbox'
 
 const props = defineProps<{
@@ -82,5 +99,20 @@ function copyAll() {
     text += (text ? '\n' : '') + formatResult(props.result.result)
   }
   navigator.clipboard.writeText(text)
+}
+
+function downloadFile(fileName: string, base64Content: string) {
+  const binary = atob(base64Content)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  const blob = new Blob([bytes])
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(url)
 }
 </script>
