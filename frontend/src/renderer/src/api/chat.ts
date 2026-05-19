@@ -22,7 +22,7 @@ export interface FetchSSE {
     set onerror(handler: (() => void) | null)
 }
 
-export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[]): FetchSSE {
+export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[], sandboxContext?: { tools: string; files: string[] } | null, workingDir?: string): FetchSSE {
     const token = localStorage.getItem('auth_token') || ''
     const url = `${BASE_URL}/api/chat/stream`
 
@@ -50,7 +50,8 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
             const body: Record<string, unknown> = {sessionId, message}
             if (fileIds && fileIds.length > 0) body.fileIds = fileIds.join(',')
             if (kbIds && kbIds.length > 0) body.kbIds = kbIds.join(',')
-
+            if (sandboxContext) body.sandboxContext = sandboxContext
+            if (workingDir) body.workingDir = workingDir
             const headers: Record<string, string> = {'Content-Type': 'application/json'}
             if (token) headers['Authorization'] = `Bearer ${token}`
 

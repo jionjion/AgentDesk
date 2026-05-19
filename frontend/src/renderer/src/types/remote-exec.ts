@@ -57,6 +57,8 @@ export const WS_MESSAGE_TYPES = {
   COMMAND_RESULT: 'command_result',
   COMMAND_REJECTED: 'command_rejected',
   COMMAND_CANCEL: 'command_cancel',
+  SANDBOX_EXEC_REQUEST: 'sandbox_exec_request',
+  SANDBOX_EXEC_RESULT: 'sandbox_exec_result',
   PING: 'ping',
   PONG: 'pong',
   CONNECTED: 'connected',

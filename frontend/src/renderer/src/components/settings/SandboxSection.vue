@@ -69,6 +69,15 @@
           </Button>
         </div>
       </div>
+
+      <!-- 沙箱工具 -->
+      <div class="space-y-2">
+        <Label>沙箱工具</Label>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          预装到沙箱的工具函数，AI 生成代码时可通过 tools.* 直接调用
+        </p>
+        <SandboxToolsSection/>
+      </div>
     </template>
   </div>
 </template>
@@ -81,6 +90,7 @@ import {Switch} from '@/components/ui/switch'
 import {Slider} from '@/components/ui/slider'
 import {Button} from '@/components/ui/button'
 import {useSandboxStore} from '@/stores/sandbox'
+import SandboxToolsSection from '@/components/settings/SandboxToolsSection.vue'
 
 const sandboxStore = useSandboxStore()
 const settings = sandboxStore.settings

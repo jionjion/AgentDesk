@@ -20,3 +20,6 @@ backend/docs
 .env
 
 frontend/src/renderer/public/pyodide/
+
+
+test-space/

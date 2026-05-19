@@ -5,6 +5,7 @@ import {batchDeleteSessions, createSession, deleteSession, getSession, getSessio
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
+import {useSandboxStore} from '@/stores/sandbox'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -90,6 +91,11 @@ export const useChatStore = defineStore('chat', () => {
         sessions.value.unshift(session)
         currentSessionId.value = session.id
         messagesBySession.value[session.id] = []
+
+        // 新建会话时清空沙箱工作目录
+        const sandboxStore = useSandboxStore()
+        sandboxStore.clearWorkdir()
+
         return session.id
     }
 
@@ -493,7 +499,15 @@ export const useChatStore = defineStore('chat', () => {
 
         // 4. 创建 SSE 连接
         isStreaming.value = true
-        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds)
+        const sandboxStore = useSandboxStore()
+        const sandboxContext = sandboxStore.getSandboxContext()
+
+        // 获取当前工作目录（优先用 remoteExec 的 defaultWorkDir，其次用 sandbox 的 workdir）
+        const { useRemoteExecStore } = await import('@/stores/remoteExec')
+        const remoteExecStore = useRemoteExecStore()
+        const workingDir = remoteExecStore.settings.defaultWorkDir || sandboxStore.workdir || undefined
+
+        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, sandboxContext, workingDir)
         eventSource.value = es
 
         // 5. 设置监听

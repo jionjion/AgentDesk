@@ -154,6 +154,10 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
         handleCommandRequest(msg)
         break
 
+      case WS_MESSAGE_TYPES.SANDBOX_EXEC_REQUEST:
+        handleSandboxExecRequest(msg)
+        break
+
       case WS_MESSAGE_TYPES.COMMAND_CANCEL:
         handleCommandCancel(msg)
         break
@@ -203,6 +207,52 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
   function handleCommandCancel(msg: WsMessage) {
     if (!msg.requestId) return
     pendingCommands.value = pendingCommands.value.filter(c => c.requestId !== msg.requestId)
+  }
+
+  /** 处理沙箱代码执行请求（自动执行，无需审批） */
+  async function handleSandboxExecRequest(msg: WsMessage) {
+    const payload = msg.payload as { code: string } | null
+    if (!payload || !payload.code || !msg.requestId) return
+
+    try {
+      // 动态导入沙箱 store（避免循环依赖）
+      const { useSandboxStore } = await import('@/stores/sandbox')
+      const sandboxStore = useSandboxStore()
+
+      const sessionId = msg.sessionId || 'default'
+      const result = await sandboxStore.execute(sessionId, payload.code)
+
+      // 回传执行结果
+      sendMessage({
+        type: WS_MESSAGE_TYPES.SANDBOX_EXEC_RESULT,
+        requestId: msg.requestId,
+        sessionId: msg.sessionId,
+        timestamp: Date.now(),
+        payload: {
+          success: result.success,
+          stdout: result.stdout || '',
+          stderr: result.stderr || '',
+          result: result.result != null ? String(result.result) : '',
+          figureCount: result.figures?.length || 0,
+          durationMs: result.duration
+        }
+      })
+    } catch (e: any) {
+      sendMessage({
+        type: WS_MESSAGE_TYPES.SANDBOX_EXEC_RESULT,
+        requestId: msg.requestId,
+        sessionId: msg.sessionId,
+        timestamp: Date.now(),
+        payload: {
+          success: false,
+          stdout: '',
+          stderr: e.message || '沙箱执行失败',
+          result: '',
+          figureCount: 0,
+          durationMs: 0
+        }
+      })
+    }
   }
 
   // === 命令执行 ===

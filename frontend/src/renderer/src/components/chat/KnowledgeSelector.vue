@@ -17,19 +17,6 @@
         <p class="text-xs text-gray-500 dark:text-gray-400">选择检索的知识库</p>
       </div>
       <div class="max-h-48 overflow-y-auto py-1">
-        <!-- 全部知识库 -->
-        <div
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            :class="{'bg-violet-50 dark:bg-violet-900/20': selectedIds.length === 0}"
-            @click="selectAll"
-        >
-          <div class="w-4 h-4 rounded border flex items-center justify-center"
-               :class="selectedIds.length === 0 ? 'bg-violet-500 border-violet-500' : 'border-gray-300 dark:border-gray-600'">
-            <Check v-if="selectedIds.length === 0" :size="10" class="text-white"/>
-          </div>
-          <span class="text-sm flex-1">全部知识库</span>
-        </div>
-        <!-- 各知识库 -->
         <div
             v-for="kb in bases" :key="kb.id"
             class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -75,10 +62,6 @@ watch(open, (val) => {
     knowledgeStore.loadBases()
   }
 })
-
-function selectAll() {
-  selectedIds.value = []
-}
 
 function toggle(id: number) {
   const idx = selectedIds.value.indexOf(id)

@@ -177,9 +177,9 @@
           />
           <div class="flex items-center justify-between mt-3">
             <div class="flex items-center gap-2">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" @click="handleSelectWorkdir">
                 <FolderOpen :size="14" class="mr-1"/>
-                <span class="text-xs text-gray-500 dark:text-gray-400">选择工作目录</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ sandboxStore.workdir ? sandboxStore.workdir.split(/[/\\]/).pop() : '选择工作目录' }}</span>
               </Button>
               <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
                 <Paintbrush :size="16"/>
@@ -263,6 +263,13 @@ async function handleRunCode(code: string, msgId: string) {
   const sessionId = chatStore.currentSessionId || 'default'
   const result = await sandboxStore.execute(sessionId, code)
   codeExecutionResults.value[msgId] = result
+}
+
+async function handleSelectWorkdir() {
+  const dir = await window.electronAPI?.dialog.openDirectory()
+  if (dir) {
+    await sandboxStore.setWorkdir(dir)
+  }
 }
 
 /**
