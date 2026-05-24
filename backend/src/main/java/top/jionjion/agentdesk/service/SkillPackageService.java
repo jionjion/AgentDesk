@@ -337,9 +337,23 @@ public class SkillPackageService {
 
     // ─── 内部记录 ───
 
+    /**
+     * 技能安装结果
+     *
+     * @param id          技能ID
+     * @param name        技能名称
+     * @param description 技能描述
+     * @param resources   资源文件列表
+     */
     public record SkillInstallResult(String id, String name, String description, List<String> resources) {
     }
 
+    /**
+     * 技能元数据
+     *
+     * @param name        技能名称
+     * @param description 技能描述
+     */
     private record SkillMetadata(String name, String description) {
     }
 }

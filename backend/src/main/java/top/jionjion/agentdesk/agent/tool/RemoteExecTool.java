@@ -20,6 +20,18 @@ public class RemoteExecTool {
 
     private static final Logger log = LoggerFactory.getLogger(RemoteExecTool.class);
 
+    private static final String CHAIN_AND = "&&";
+    private static final String CHAIN_SEMICOLON = ";";
+    private static final String PIPE = "|";
+    private static final String CMD_CD = "cd ";
+    private static final String CMD_SET_LOCATION = "Set-Location ";
+    private static final String QUOTE_DOUBLE = "\"";
+    private static final String QUOTE_SINGLE = "'";
+    private static final String PLATFORM_WIN = "win";
+    private static final String PLATFORM_DARWIN = "darwin";
+    private static final String PLATFORM_MAC = "mac";
+    private static final String PLATFORM_LINUX = "linux";
+
     private final RemoteExecBridge bridge;
     private final CommandRiskClassifier riskClassifier;
     private final Long userId;
@@ -110,14 +122,16 @@ public class RemoteExecTool {
     private String extractCdTarget(String command) {
         String trimmed = command.trim();
         // 仅匹配纯 cd 命令, 不处理组合命令（如 cd /path && ls）
-        if (trimmed.contains("&&") || trimmed.contains(";") || trimmed.contains("|")) {
+        if (trimmed.contains(CHAIN_AND) || trimmed.contains(CHAIN_SEMICOLON) || trimmed.contains(PIPE)) {
             return null;
         }
-        if (trimmed.startsWith("cd ") || trimmed.startsWith("Set-Location ")) {
-            String target = trimmed.startsWith("cd ") ? trimmed.substring(3).trim() : trimmed.substring(13).trim();
+        if (trimmed.startsWith(CMD_CD) || trimmed.startsWith(CMD_SET_LOCATION)) {
+            String target = trimmed.startsWith(CMD_CD)
+                    ? trimmed.substring(CMD_CD.length()).trim()
+                    : trimmed.substring(CMD_SET_LOCATION.length()).trim();
             // 去掉引号
-            if ((target.startsWith("\"") && target.endsWith("\"")) ||
-                    (target.startsWith("'") && target.endsWith("'"))) {
+            if ((target.startsWith(QUOTE_DOUBLE) && target.endsWith(QUOTE_DOUBLE))
+                    || (target.startsWith(QUOTE_SINGLE) && target.endsWith(QUOTE_SINGLE))) {
                 target = target.substring(1, target.length() - 1);
             }
             return target.isEmpty() ? null : target;
@@ -141,11 +155,11 @@ public class RemoteExecTool {
             return null;
         }
         String p = platform.toLowerCase();
-        if (p.contains("win")) {
+        if (p.contains(PLATFORM_WIN)) {
             return "Windows (使用 PowerShell 语法, 如 Get-ChildItem, Get-Content, Remove-Item; 也兼容 cmd 命令如 dir, type, del)";
-        } else if (p.contains("mac") || p.contains("darwin")) {
+        } else if (p.contains(PLATFORM_MAC) || p.contains(PLATFORM_DARWIN)) {
             return "macOS (请使用 Unix shell 语法)";
-        } else if (p.contains("linux")) {
+        } else if (p.contains(PLATFORM_LINUX)) {
             return "Linux (请使用 Unix shell 语法)";
         }
         return "平台: " + platform;

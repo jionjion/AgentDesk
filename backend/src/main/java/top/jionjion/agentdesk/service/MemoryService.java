@@ -81,7 +81,7 @@ public class MemoryService {
         String json;
         try {
             var messages = List.of(Map.of("role", "user", "content", content));
-            json = MAPPER.writeValueAsString(new AddMemoryBody(messages, String.valueOf(userId)));
+            json = MAPPER.writeValueAsString(new AddMemoryRequest(messages, String.valueOf(userId)));
         } catch (JsonProcessingException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "序列化失败");
         }
@@ -218,7 +218,13 @@ public class MemoryService {
     /**
      * Mem0 添加记忆的请求体
      */
-    private record AddMemoryBody(List<Map<String, String>> messages,
-                                    @JsonProperty("user_id") String userId) {
+    /**
+     * Mem0 添加记忆的请求体
+     *
+     * @param messages 消息列表
+     * @param userId   用户ID
+     */
+    private record AddMemoryRequest(List<Map<String, String>> messages,
+                                     @JsonProperty("user_id") String userId) {
     }
 }

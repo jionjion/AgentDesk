@@ -110,6 +110,7 @@ public class ApiCallTool {
                 }
                 default -> throw new IllegalArgumentException("不支持的 HTTP 方法: " + upperMethod);
             }
+            // 注意：ALLOWED_METHODS 已经校验过方法，switch 覆盖所有可能值，default 理论上不可达
 
             Request request = requestBuilder.build();
             log.info("api_call: {} {}", upperMethod, url);

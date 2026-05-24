@@ -12,7 +12,19 @@ import java.util.List;
  */
 public interface ScheduledTaskLogRepository extends JpaRepository<ScheduledTaskLog, Long> {
 
+    /**
+     * 根据用户ID按开始时间倒序查询任务执行日志
+     *
+     * @param userId 用户ID
+     * @return 任务执行日志列表
+     */
     List<ScheduledTaskLog> findByUserIdOrderByStartedAtDesc(Long userId);
 
+    /**
+     * 根据任务ID按开始时间倒序查询任务执行日志
+     *
+     * @param taskId 任务ID
+     * @return 任务执行日志列表
+     */
     List<ScheduledTaskLog> findByTaskIdOrderByStartedAtDesc(Long taskId);
 }

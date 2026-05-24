@@ -19,6 +19,16 @@ import java.util.stream.Collectors;
 @Component
 public class CommandRiskClassifier {
 
+    private static final String CMD_GIT = "git";
+    private static final String CMD_NPM = "npm";
+    private static final String CMD_PIP = "pip";
+    private static final String CMD_PIP3 = "pip3";
+    private static final String CMD_FIND = "find";
+    private static final String ARG_DELETE = "-delete";
+    private static final String ARG_EXEC = "-exec";
+    private static final int MIN_GIT_PARTS = 2;
+    private static final int MIN_PKG_PARTS = 2;
+
     private final Set<String> lowRiskCommands;
 
     public CommandRiskClassifier(
@@ -63,7 +73,9 @@ public class CommandRiskClassifier {
         String[] subCommands = command.split("&&|\\|\\||;");
         for (String sub : subCommands) {
             String trimmedSub = sub.trim();
-            if (trimmedSub.isEmpty()) continue;
+            if (trimmedSub.isEmpty()) {
+                continue;
+            }
             if (containsDangerousOperators(trimmedSub)) {
                 return CommandRequest.RISK_HIGH;
             }
@@ -90,12 +102,12 @@ public class CommandRiskClassifier {
         }
 
         // 特殊处理: git 子命令
-        if ("git".equals(firstToken)) {
+        if (CMD_GIT.equals(firstToken)) {
             return classifyGitCommand(command);
         }
 
         // 特殊处理: npm/pip 子命令
-        if ("npm".equals(firstToken) || "pip".equals(firstToken) || "pip3".equals(firstToken)) {
+        if (CMD_NPM.equals(firstToken) || CMD_PIP.equals(firstToken) || CMD_PIP3.equals(firstToken)) {
             return classifyPackageManagerCommand(command);
         }
 
@@ -136,8 +148,8 @@ public class CommandRiskClassifier {
 
     private boolean hasHighRiskArgs(String command, String fullCommand) {
         // find 命令带 -delete 或 -exec 是高风险
-        if ("find".equals(command)) {
-            return fullCommand.contains("-delete") || fullCommand.contains("-exec");
+        if (CMD_FIND.equals(command)) {
+            return fullCommand.contains(ARG_DELETE) || fullCommand.contains(ARG_EXEC);
         }
         return false;
     }
@@ -145,7 +157,7 @@ public class CommandRiskClassifier {
     private String classifyGitCommand(String command) {
         // git 只读命令: status, log, diff, branch, show, remote -v, tag
         String[] parts = command.split("\\s+");
-        if (parts.length < 2) {
+        if (parts.length < MIN_GIT_PARTS) {
             return CommandRequest.RISK_LOW;
         }
         String subCommand = parts[1];
@@ -161,7 +173,7 @@ public class CommandRiskClassifier {
 
     private String classifyPackageManagerCommand(String command) {
         String[] parts = command.split("\\s+");
-        if (parts.length < 2) {
+        if (parts.length < MIN_PKG_PARTS) {
             return CommandRequest.RISK_LOW;
         }
         String subCommand = parts[1];

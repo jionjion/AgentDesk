@@ -14,11 +14,18 @@ public interface KnowledgeDocumentRepository extends JpaRepository<KnowledgeDocu
 
     /**
      * 按创建时间倒序查询知识库下的文档列表
+     *
+     * @param kbId 知识库ID
+     * @return 文档列表
      */
     List<KnowledgeDocument> findByKbIdOrderByCreatedAtDesc(Long kbId);
 
     /**
      * 统计知识库中指定状态的文档数量
+     *
+     * @param kbId   知识库ID
+     * @param status 状态
+     * @return 文档数量
      */
     long countByKbIdAndStatus(Long kbId, String status);
 }

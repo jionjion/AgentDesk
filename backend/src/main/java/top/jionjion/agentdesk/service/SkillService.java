@@ -38,6 +38,11 @@ public class SkillService {
     private static final Set<String> ALLOWED_TOOLS = Set.of("FileTools", "CalculateTools");
     private static final int MAX_ENABLED_SKILLS = 20;
     private static final int MAX_ITERS = 10;
+    private static final String SKILL_TYPE_PACKAGE = "package";
+    private static final String SKILL_TYPE_PROMPT = "prompt";
+    private static final String SKILL_ID_PATTERN = "^[a-z0-9-]+$";
+    private static final int MAX_SKILL_ID_LENGTH = 64;
+    private static final int MAX_SYS_PROMPT_LENGTH = 8192;
 
     private final SkillRepository skillRepository;
     private final UserSkillPreferenceRepository preferenceRepository;
@@ -110,7 +115,7 @@ public class SkillService {
             }
             skill.setName(name != null ? name : skill.getName());
             skill.setDescription(description != null ? description : skill.getDescription());
-            skill.setSkillType("package");
+            skill.setSkillType(SKILL_TYPE_PACKAGE);
             skill.setInstallPath(Path.of(skillsBaseDir, String.valueOf(userId), skillId).toString());
             skill.setUpdatedAt(now);
         } else {
@@ -126,7 +131,7 @@ public class SkillService {
             skill.setSysPrompt("");
             skill.setMaxIters(5);
             skill.setTools(List.of());
-            skill.setSkillType("package");
+            skill.setSkillType(SKILL_TYPE_PACKAGE);
             skill.setInstallPath(Path.of(skillsBaseDir, String.valueOf(userId), skillId).toString());
             skill.setBuiltin(false);
             skill.setUserId(userId);
@@ -171,7 +176,7 @@ public class SkillService {
             skill = new Skill();
             skill.setId(dto.id());
             updateSkillFromDto(skill, dto);
-            skill.setSkillType("prompt");
+            skill.setSkillType(SKILL_TYPE_PROMPT);
             skill.setBuiltin(false);
             skill.setUserId(userId);
             skill.setCreatedAt(now);
@@ -234,7 +239,7 @@ public class SkillService {
         skillRepository.delete(skill);
 
         // 如果是 package 型, 同时删除文件系统上的技能目录
-        if ("package".equals(skill.getSkillType())) {
+        if (SKILL_TYPE_PACKAGE.equals(skill.getSkillType())) {
             Path skillDir = Path.of(skillsBaseDir, String.valueOf(userId), skillId);
             if (Files.exists(skillDir)) {
                 try {
@@ -254,7 +259,7 @@ public class SkillService {
     }
 
     private void validateSkillDefinition(SkillDefinitionDto dto) {
-        if (dto.id() == null || !dto.id().matches("^[a-z0-9-]+$") || dto.id().length() > 64) {
+        if (dto.id() == null || !dto.id().matches(SKILL_ID_PATTERN) || dto.id().length() > MAX_SKILL_ID_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "技能 ID 只能包含小写字母、数字和连字符, 最长 64 字符");
         }
@@ -267,7 +272,7 @@ public class SkillService {
         if (dto.systemPrompt() == null || dto.systemPrompt().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "系统提示词不能为空");
         }
-        if (dto.systemPrompt().length() > 8192) {
+        if (dto.systemPrompt().length() > MAX_SYS_PROMPT_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "系统提示词最长 8192 字符");
         }
         if (dto.maxIters() != null && (dto.maxIters() < 1 || dto.maxIters() > MAX_ITERS)) {

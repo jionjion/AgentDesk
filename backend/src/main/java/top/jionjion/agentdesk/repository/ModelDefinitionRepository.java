@@ -14,6 +14,8 @@ public interface ModelDefinitionRepository extends JpaRepository<ModelDefinition
 
     /**
      * 查询所有启用的模型, 按排序权重升序
+     *
+     * @return 模型定义列表
      */
     List<ModelDefinitionEntity> findByEnabledTrueOrderBySortOrderAsc();
 }
