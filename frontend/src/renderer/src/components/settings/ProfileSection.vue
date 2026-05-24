@@ -4,20 +4,26 @@
     <div class="flex items-center gap-4">
       <div class="relative cursor-pointer group" @click="avatarInputRef?.click()">
         <div
-            class="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-          <img v-if="avatarPreview || (form.avatar && !avatarError)"
+            class="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden"
+>
+          <img
+v-if="avatarPreview || (form.avatar && !avatarError)"
                :src="avatarPreview || form.avatar"
                alt="头像"
                class="h-full w-full object-cover"
-               @error="onImgError"/>
+               @error="onImgError"
+/>
           <UserIcon v-else :size="28" class="text-gray-400"/>
         </div>
         <div
-            class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+>
           <CameraIcon :size="18" class="text-white"/>
         </div>
-        <Loader2 v-if="uploadingAvatar" :size="18"
-                 class="absolute inset-0 m-auto text-white animate-spin"/>
+        <Loader2
+v-if="uploadingAvatar" :size="18"
+                 class="absolute inset-0 m-auto text-white animate-spin"
+/>
       </div>
       <div class="space-y-0.5">
         <p class="text-sm font-medium text-gray-900 dark:text-gray-100">头像</p>
@@ -35,9 +41,11 @@
     <!-- 昵称 -->
     <div class="space-y-2">
       <Label>昵称</Label>
-      <Input v-model="form.nickname"
+      <Input
+v-model="form.nickname"
              :placeholder="settingsStore.profile?.nickname || '输入你的昵称'"
-             @blur="handleNicknameBlur"/>
+             @blur="handleNicknameBlur"
+/>
     </div>
 
     <!-- 密码 -->
@@ -54,8 +62,10 @@
     <!-- 退出登录 -->
     <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
       <p class="text-xs text-gray-500 dark:text-gray-400">退出后需重新登录</p>
-      <Button variant="outline" size="sm" class="w-24 text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
-              @click="handleLogout">
+      <Button
+variant="outline" size="sm" class="w-24 text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
+              @click="handleLogout"
+>
         退出登录
       </Button>
     </div>

@@ -6,12 +6,16 @@
       <span class="text-xs font-medium text-gray-700 dark:text-gray-300">remote_exec</span>
       <!-- 待审批: 按钮 -->
       <div v-if="message.status === 'pending'" class="ml-auto flex items-center gap-1">
-        <button class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                @click="handleReject">
+        <button
+class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                @click="handleReject"
+>
           拒绝
         </button>
-        <button class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                @click="handleApprove">
+        <button
+class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                @click="handleApprove"
+>
           允许
         </button>
       </div>

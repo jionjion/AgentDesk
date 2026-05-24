@@ -22,8 +22,10 @@
             class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             @click="toggle(kb.id)"
         >
-          <div class="w-4 h-4 rounded border flex items-center justify-center"
-               :class="selectedIds.includes(kb.id) ? 'bg-violet-500 border-violet-500' : 'border-gray-300 dark:border-gray-600'">
+          <div
+class="w-4 h-4 rounded border flex items-center justify-center"
+               :class="selectedIds.includes(kb.id) ? 'bg-violet-500 border-violet-500' : 'border-gray-300 dark:border-gray-600'"
+>
             <Check v-if="selectedIds.includes(kb.id)" :size="10" class="text-white"/>
           </div>
           <span class="text-sm flex-1 truncate">{{ kb.name }}</span>

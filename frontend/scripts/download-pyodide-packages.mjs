@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PYODIDE_DIR = path.join(__dirname, '..', 'src', 'renderer', 'public', 'pyodide')
 
 const CDN_BASE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
-const PYPI_BASE = 'https://pypi.tuna.tsinghua.edu.cn/simple/'
+// const PYPI_BASE = 'https://pypi.tuna.tsinghua.edu.cn/simple/'
 
 // Pyodide CDN 上的包（WASM 构建）
 const CDN_PACKAGES = {
@@ -212,7 +212,7 @@ async function updateLockFile() {
   const fullLock = await response.json()
 
   // 添加 CDN 包到 lock 文件
-  for (const [name, whl] of Object.entries(CDN_PACKAGES)) {
+  for (const [name, _whl] of Object.entries(CDN_PACKAGES)) {
     if (fullLock.packages[name]) {
       lockContent.packages[name] = fullLock.packages[name]
     }

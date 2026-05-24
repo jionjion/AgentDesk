@@ -155,7 +155,7 @@ tools.save_file(df, 'result.csv')
   function exportTool(id: string): string | null {
     const tool = tools.value.find(t => t.id === id)
     if (!tool) return null
-    const { builtin, createdAt, updatedAt, ...exportData } = tool
+    const { builtin: _builtin, createdAt: _createdAt, updatedAt: _updatedAt, ...exportData } = tool
     return JSON.stringify(exportData, null, 2)
   }
 

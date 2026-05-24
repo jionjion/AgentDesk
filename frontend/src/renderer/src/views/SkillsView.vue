@@ -29,8 +29,7 @@
     <!-- 内容区 -->
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
-
-        <!-- 分类过滤 -->
+<!-- 分类过滤 -->
         <div class="flex items-center gap-2 mb-4 flex-wrap">
           <Badge
               :variant="!skillsStore.selectedCategory ? 'default' : 'secondary'"

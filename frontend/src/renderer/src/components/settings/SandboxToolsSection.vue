@@ -26,8 +26,8 @@
             </button>
             <Switch
                 :checked="tool.enabled"
-                @update:checked="(v: boolean) => toolsStore.toggleTool(tool.id, v)"
                 class="scale-75"
+                @update:checked="(v: boolean) => toolsStore.toggleTool(tool.id, v)"
             />
           </div>
         </div>
@@ -91,8 +91,8 @@
             </button>
             <Switch
                 :checked="tool.enabled"
-                @update:checked="(v: boolean) => toolsStore.toggleTool(tool.id, v)"
                 class="scale-75"
+                @update:checked="(v: boolean) => toolsStore.toggleTool(tool.id, v)"
             />
           </div>
         </div>

@@ -15,8 +15,7 @@
     <!-- 内容区 -->
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
-
-        <!-- 加载态 -->
+<!-- 加载态 -->
         <div v-if="knowledgeStore.isLoading" class="flex items-center justify-center py-16">
           <Loader2 :size="24" class="animate-spin text-gray-400"/>
         </div>
@@ -92,11 +91,11 @@
         <!-- 上传区域 -->
         <div
             class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-violet-400 dark:hover:border-violet-600 transition-colors cursor-pointer"
+            :class="dragOver ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/10' : ''"
             @click="triggerFileInput"
             @dragover.prevent="dragOver = true"
             @dragleave.prevent="dragOver = false"
             @drop.prevent="handleDrop"
-            :class="dragOver ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/10' : ''"
         >
           <Upload :size="24" class="mx-auto text-gray-400 mb-2"/>
           <p class="text-sm text-gray-500 dark:text-gray-400">点击或拖拽文件上传</p>
@@ -159,7 +158,7 @@
         </div>
         <DialogFooter class="gap-2 mt-4">
           <Button variant="outline" @click="showCreateDialog = false">取消</Button>
-          <Button @click="handleCreate" :disabled="!createForm.name.trim()">创建</Button>
+          <Button :disabled="!createForm.name.trim()" @click="handleCreate">创建</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

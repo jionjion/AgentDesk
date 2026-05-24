@@ -6,7 +6,7 @@ import pluginVue from 'eslint-plugin-vue'
 export default tseslint.config(
     // 全局忽略
     {
-        ignores: ['out/**', 'dist/**', 'node_modules/**', '*.d.ts']
+        ignores: ['out/**', 'dist/**', 'node_modules/**', '*.d.ts', '**/public/pyodide/**']
     },
 
     // JS 推荐规则

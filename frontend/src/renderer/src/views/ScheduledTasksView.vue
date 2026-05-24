@@ -20,8 +20,7 @@
     <!-- 内容区 -->
     <ScrollArea class="flex-1">
       <div class="px-6 py-6 max-w-5xl">
-
-        <!-- 标签页 + 排序 -->
+<!-- 标签页 + 排序 -->
         <div class="flex items-center justify-between mb-4">
           <Tabs v-model="store.activeTab">
             <TabsList>

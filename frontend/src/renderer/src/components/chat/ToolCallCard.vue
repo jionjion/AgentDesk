@@ -8,12 +8,16 @@
       <!-- remote_exec 审批按钮 -->
       <template v-if="pendingCommand">
         <div class="ml-auto flex items-center gap-1">
-          <button class="rounded px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  @click="handleReject">
+          <button
+class="rounded px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  @click="handleReject"
+>
             拒绝
           </button>
-          <button class="rounded px-1.5 py-0.5 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                  @click="handleApprove">
+          <button
+class="rounded px-1.5 py-0.5 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                  @click="handleApprove"
+>
             允许
           </button>
         </div>

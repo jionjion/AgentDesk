@@ -93,16 +93,22 @@
                     <span class="text-xs font-medium text-gray-700 dark:text-gray-300 flex-1 truncate">{{ seg.toolCall.toolName }}</span>
                     <!-- remote_exec 审批按钮 -->
                     <template v-if="getRemoteExecPending(seg.toolCall)">
-                      <button class="shrink-0 rounded px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                              @click.stop="handleRejectCommand(seg.toolCall)">
+                      <button
+class="shrink-0 rounded px-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                              @click.stop="handleRejectCommand(seg.toolCall)"
+>
                         拒绝
                       </button>
-                      <button class="shrink-0 rounded px-1.5 py-0.5 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                              @click.stop="handleApproveCommand(seg.toolCall)">
+                      <button
+class="shrink-0 rounded px-1.5 py-0.5 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                              @click.stop="handleApproveCommand(seg.toolCall)"
+>
                         允许
                       </button>
-                      <button class="shrink-0 rounded px-1.5 py-0.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors"
-                              @click.stop="handleApproveSession(seg.toolCall)">
+                      <button
+class="shrink-0 rounded px-1.5 py-0.5 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors"
+                              @click.stop="handleApproveSession(seg.toolCall)"
+>
                         全部允许
                       </button>
                     </template>
@@ -168,11 +174,11 @@
         >
           <Database :size="12" class="text-emerald-500 shrink-0"/>
           <span
-              v-for="(ref, idx) in uniqueKnowledgeRefs" :key="idx"
+              v-for="(item, idx) in uniqueKnowledgeRefs" :key="idx"
               class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
           >
-            {{ ref.documentName }}
-            <span class="text-emerald-400 dark:text-emerald-500">{{ (ref.score * 100).toFixed(0) }}%</span>
+            {{ item.documentName }}
+            <span class="text-emerald-400 dark:text-emerald-500">{{ (item.score * 100).toFixed(0) }}%</span>
           </span>
         </div>
         <!-- 图片附件（气泡外部） -->
