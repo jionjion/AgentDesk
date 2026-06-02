@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { SandboxTool, SandboxToolFormData } from '@/types/sandbox-tools'
+import type { SandboxTool, SandboxToolFormData, SandboxToolMeta } from '@/types/sandbox-tools'
 import { BUILTIN_TOOLS } from '@/constants/sandbox-builtin-tools'
 
 const STORAGE_KEY = 'sandbox_custom_tools'
@@ -151,6 +151,14 @@ tools.save_file(df, 'result.csv')
 \`\`\``
   }
 
+  /** 获取启用工具的结构化元数据（发送给后端组装 prompt） */
+  function getToolMetadata(): SandboxToolMeta[] {
+    return enabledTools.value.map(t => ({
+      signature: t.signature,
+      description: t.description
+    }))
+  }
+
   /** 导出工具为 JSON */
   function exportTool(id: string): string | null {
     const tool = tools.value.find(t => t.id === id)
@@ -193,6 +201,7 @@ tools.save_file(df, 'result.csv')
     toggleTool,
     getEnabledToolsCode,
     getToolDescriptions,
+    getToolMetadata,
     exportTool,
     importTool
   }

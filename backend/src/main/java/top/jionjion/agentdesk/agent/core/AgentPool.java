@@ -10,7 +10,7 @@ import top.jionjion.agentdesk.entity.SessionMetadata;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Agent 池: 管理 per-session 的 Agent 生命周期
@@ -27,13 +27,17 @@ public class AgentPool {
     private final SessionRepository sessionRepository;
 
     private final ConcurrentHashMap<String, AgentHandle> agents = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, AtomicBoolean> busyFlags = new ConcurrentHashMap<>();
+    /**
+     * 会话锁: 持有者 token。null 表示空闲, 非 null 表示被某次请求占用。
+     * 释放时校验 token 一致, 避免延迟回调误放他人已重新获取的锁。
+     */
+    private final ConcurrentHashMap<String, AtomicReference<Object>> busyFlags = new ConcurrentHashMap<>();
 
     public AgentPool(AgentFactory agentFactory, Session session, SessionRepository sessionRepository) {
         this.agentFactory = agentFactory;
         this.session = session;
         this.sessionRepository = sessionRepository;
-        log.info("Agent 会话状态存储: PostgreSQL (DatabaseSession)");
+        log.info("Agent 会话状态存储实现: {}", session.getClass().getSimpleName());
     }
 
     /**
@@ -55,14 +59,14 @@ public class AgentPool {
     }
 
     /**
-     * 保存会话状态到数据库
+     * 保存会话状态
      */
     public void save(String sessionId) {
         AgentHandle handle = agents.get(sessionId);
         if (handle != null) {
             try {
                 handle.agent().saveTo(session, sessionId);
-                log.debug("已保存会话 {} 的状态到数据库", sessionId);
+                log.debug("已保存会话 {} 的状态", sessionId);
             } catch (Exception e) {
                 log.warn("保存会话 {} 状态失败: {}", sessionId, e.getMessage());
             }
@@ -78,9 +82,9 @@ public class AgentPool {
         if (handle != null) {
             try {
                 session.delete(io.agentscope.core.state.SimpleSessionKey.of(sessionId));
-                log.info("已删除会话 {} 的 Agent 和数据库状态", sessionId);
+                log.info("已删除会话 {} 的 Agent 和持久化状态", sessionId);
             } catch (Exception e) {
-                log.warn("删除会话 {} 数据库状态失败: {}", sessionId, e.getMessage());
+                log.warn("删除会话 {} 持久化状态失败: {}", sessionId, e.getMessage());
             }
         }
     }
@@ -115,20 +119,22 @@ public class AgentPool {
     }
 
     /**
-     * 尝试获取会话锁（防止并发调用同一 Agent）
+     * 尝试获取会话锁（防止并发调用同一 Agent）。
+     * 获取成功返回持有者 token, 释放时需回传该 token; 获取失败返回 null。
      */
-    public boolean tryAcquire(String sessionId) {
-        AtomicBoolean flag = busyFlags.computeIfAbsent(sessionId, key -> new AtomicBoolean(false));
-        return flag.compareAndSet(false, true);
+    public Object tryAcquire(String sessionId) {
+        AtomicReference<Object> flag = busyFlags.computeIfAbsent(sessionId, key -> new AtomicReference<>());
+        Object token = new Object();
+        return flag.compareAndSet(null, token) ? token : null;
     }
 
     /**
-     * 释放会话锁
+     * 释放会话锁。仅当锁仍由 token 持有时才释放, 避免延迟回调误放他人已重新获取的锁。
      */
-    public void release(String sessionId) {
-        AtomicBoolean flag = busyFlags.get(sessionId);
+    public void release(String sessionId, Object token) {
+        AtomicReference<Object> flag = busyFlags.get(sessionId);
         if (flag != null) {
-            flag.set(false);
+            flag.compareAndSet(token, null);
         }
     }
 

@@ -280,11 +280,11 @@ export const useSandboxStore = defineStore('sandbox', () => {
   }
 
   /** 获取沙箱上下文（发消息时附带给后端） */
-  function getSandboxContext(): { tools: string; files: string[] } | null {
+  function getSandboxContext(): { tools: import('@/types/sandbox-tools').SandboxToolMeta[]; files: string[] } | null {
     if (!settings.enabled) return null
     const toolsStore = useSandboxToolsStore()
     return {
-      tools: toolsStore.getToolDescriptions(),
+      tools: toolsStore.getToolMetadata(),
       files: syncedFiles.value
     }
   }

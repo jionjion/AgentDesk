@@ -32,3 +32,9 @@ export interface SandboxToolFormData {
   code: string
   dependencies: string[]
 }
+
+/** 发送给后端的沙箱工具元数据（后端据此组装工具描述 prompt） */
+export interface SandboxToolMeta {
+  signature: string
+  description: string
+}

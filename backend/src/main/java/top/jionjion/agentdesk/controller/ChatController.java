@@ -1,45 +1,37 @@
 package top.jionjion.agentdesk.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.agentscope.core.message.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.annotation.RateLimit;
-import top.jionjion.agentdesk.dto.chat.ChatEventDto;
 import top.jionjion.agentdesk.dto.chat.ChatRequest;
-import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.dto.chat.SearchResultDto;
 import top.jionjion.agentdesk.entity.ChatMessage;
-import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.repository.SessionRepository;
 import top.jionjion.agentdesk.security.UserContext;
-import top.jionjion.agentdesk.service.FileService;
-import top.jionjion.agentdesk.service.KnowledgeRetrievalService;
-import top.jionjion.agentdesk.service.RetrievalIntentService;
-import top.jionjion.agentdesk.service.TitleGenerationService;
 import top.jionjion.agentdesk.service.SessionService;
-import top.jionjion.agentdesk.dto.knowledge.RetrievalResultDto;
+import top.jionjion.agentdesk.service.chat.ChatMessageService;
+import top.jionjion.agentdesk.service.chat.ChatStreamOrchestrator;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * 对话控制器, 通过SSE流式推送对话事件
+ * 对话控制器, 通过SSE流式推送对话事件。
+ * <p>
+ * 仅负责鉴权、参数校验与委托, 对话流的编排逻辑下沉至 {@link ChatStreamOrchestrator}。
  *
  * @author Jion
  */
@@ -47,62 +39,25 @@ import java.util.regex.Pattern;
 @RequestMapping("/api/chat")
 public class ChatController {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private static final Pattern SESSION_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+$");
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String ROLE_ASSISTANT = "assistant";
-    private static final int BYTES_PER_KB = 1024;
-    private static final int BYTES_PER_MB = 1024 * 1024;
-    private static final double KB_DIVISOR = 1024.0;
-    private static final String FORMAT_KB = "%.1fKB";
-    private static final String FORMAT_MB = "%.1fMB";
-    private static final String UNIT_BYTE = "B";
-    private static final Set<String> IMAGE_CONTENT_TYPES = Set.of(
-            "image/jpeg", "image/png", "image/gif", "image/webp"
-    );
-    /**
-     * 标题生成专用线程池, 避免阻塞 ForkJoinPool.commonPool 导致线程饥饿
-     */
-    private static final ExecutorService TITLE_EXECUTOR = new ThreadPoolExecutor(
-            1, 1, 0L, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(128),
-            r -> {
-                Thread t = new Thread(r, "title-gen");
-                t.setDaemon(true);
-                return t;
-            });
-    /**
-     * SSE 心跳调度器, 定期发送注释事件防止连接被中间网络设备断开
-     */
-    private static final ScheduledExecutorService HEARTBEAT_SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "sse-heartbeat");
-        t.setDaemon(true);
-        return t;
-    });
-    private static final long HEARTBEAT_INTERVAL_SECONDS = 30;
+    private static final DateTimeFormatter DATETIME_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     private final AgentPool agentPool;
-    private final ChatMessageRepository chatMessageRepository;
     private final SessionRepository sessionRepository;
     private final SessionService sessionService;
-    private final FileService fileService;
-    private final TitleGenerationService titleGenerationService;
-    private final KnowledgeRetrievalService knowledgeRetrievalService;
-    private final RetrievalIntentService retrievalIntentService;
+    private final ChatMessageService chatMessageService;
+    private final ChatStreamOrchestrator chatStreamOrchestrator;
 
-    public ChatController(AgentPool agentPool, ChatMessageRepository chatMessageRepository,
+    public ChatController(AgentPool agentPool,
                           SessionRepository sessionRepository, SessionService sessionService,
-                          FileService fileService, TitleGenerationService titleGenerationService,
-                          KnowledgeRetrievalService knowledgeRetrievalService,
-                          RetrievalIntentService retrievalIntentService) {
+                          ChatMessageService chatMessageService,
+                          ChatStreamOrchestrator chatStreamOrchestrator) {
         this.agentPool = agentPool;
-        this.chatMessageRepository = chatMessageRepository;
         this.sessionRepository = sessionRepository;
         this.sessionService = sessionService;
-        this.fileService = fileService;
-        this.titleGenerationService = titleGenerationService;
-        this.knowledgeRetrievalService = knowledgeRetrievalService;
-        this.retrievalIntentService = retrievalIntentService;
+        this.chatMessageService = chatMessageService;
+        this.chatStreamOrchestrator = chatStreamOrchestrator;
     }
 
     /**
@@ -110,13 +65,11 @@ public class ChatController {
      */
     @GetMapping("/messages")
     public List<ChatMessage> getMessages(@RequestParam String sessionId) {
-        if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
-        }
+        validateSessionId(sessionId);
         if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
-        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        return chatMessageService.getHistory(sessionId);
     }
 
     /**
@@ -126,290 +79,18 @@ public class ChatController {
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest chatRequest) {
         String sessionId = chatRequest.sessionId();
-        String message = chatRequest.message();
-        String fileIds = chatRequest.fileIds();
-        String kbIds = chatRequest.kbIds();
-        ChatRequest.SandboxContext sandboxContext = chatRequest.sandboxContext();
-
         validateSessionId(sessionId);
-        if (message == null || message.isBlank()) {
+        if (chatRequest.message() == null || chatRequest.message().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "message is empty");
         }
         if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
-        if (!agentPool.tryAcquire(sessionId)) {
+        Object lockToken = agentPool.tryAcquire(sessionId);
+        if (lockToken == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
         }
-
-        AgentHandle handle = agentPool.getOrCreate(sessionId);
-        SseEmitter emitter = new SseEmitter(300_000L);
-        handle.hook().setEmitter(emitter);
-
-        // 注入前端传入的工作目录到 RemoteExecTool
-        if (handle.remoteExecTool() != null && chatRequest.workingDir() != null) {
-            handle.remoteExecTool().setWorkingDir(chatRequest.workingDir());
-        }
-
-        // 解析文件并持久化用户消息
-        List<Long> parsedFileIds = parseFileIds(fileIds);
-        List<FileResponse> files = parsedFileIds.isEmpty()
-                ? Collections.emptyList()
-                : fileService.getByIds(parsedFileIds);
-        List<FileResponse> imageFiles = files.stream().filter(f -> isImageFile(f.contentType())).toList();
-        List<FileResponse> nonImageFiles = files.stream().filter(f -> !isImageFile(f.contentType())).toList();
-        saveUserMessage(sessionId, message, parsedFileIds);
-
-        // 知识库检索增强
-        RetrievalContext retrieval = performKnowledgeRetrieval(message, kbIds);
-
-        // 沙箱上下文增强
-        String augmentedMessage = buildSandboxAugmentedMessage(retrieval.augmentedMessage(), sandboxContext);
-
-        configureSseCallbacks(emitter, sessionId, handle);
-        sendKnowledgeRetrievedEvent(emitter, retrieval.results());
-        if (handle.longTermMemoryEnabled()) {
-            handle.hook().setLongTermMemoryEnabled(true);
-        }
-
-        // 构建用户消息并启动 Agent 流
-        Msg userMsg = buildUserMsg(augmentedMessage, imageFiles, nonImageFiles);
-        subscribeAgentStream(handle, userMsg, sessionId, message, emitter);
-
-        return emitter;
-    }
-
-    private void validateSessionId(String sessionId) {
-        if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
-        }
-    }
-
-    private void saveUserMessage(String sessionId, String message, List<Long> parsedFileIds) {
-        ChatMessage chatMsg = new ChatMessage(sessionId, "user", message);
-        if (!parsedFileIds.isEmpty()) {
-            chatMsg.setFileIds(parsedFileIds);
-        }
-        chatMessageRepository.save(chatMsg);
-    }
-
-    private void configureSseCallbacks(SseEmitter emitter, String sessionId, AgentHandle handle) {
-        ScheduledFuture<?> heartbeat = startHeartbeat(emitter, sessionId);
-        emitter.onTimeout(() -> {
-            log.warn("Session {} SSE timeout", sessionId);
-            heartbeat.cancel(false);
-            handle.hook().markDisconnected();
-            agentPool.release(sessionId);
-        });
-        emitter.onCompletion(() -> {
-            log.debug("Session {} SSE completed", sessionId);
-            heartbeat.cancel(false);
-            handle.hook().setEmitter(null);
-        });
-        emitter.onError(e -> {
-            heartbeat.cancel(false);
-            // 客户端断开连接是正常情况, 降级为 DEBUG
-            if (isClientDisconnect(e)) {
-                log.debug("Session {} 客户端断开连接", sessionId);
-            } else {
-                log.warn("Session {} SSE error: {}", sessionId, e.getMessage());
-            }
-            handle.hook().markDisconnected();
-            agentPool.release(sessionId);
-        });
-    }
-
-    /**
-     * 启动 SSE 心跳, 每 30 秒发送一个心跳事件保持连接活跃
-     */
-    private ScheduledFuture<?> startHeartbeat(SseEmitter emitter, String sessionId) {
-        return HEARTBEAT_SCHEDULER.scheduleAtFixedRate(() -> {
-            try {
-                emitter.send(SseEmitter.event().name("heartbeat").data(""));
-            } catch (Exception e) {
-                log.debug("Session {} 心跳发送失败, 连接可能已关闭: {}", sessionId, e.getMessage());
-            }
-        }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
-    }
-
-    private static final Set<String> DISCONNECT_KEYWORDS = Set.of(
-            "Broken pipe", "broken pipe", "disconnected client",
-            "Connection reset", "connection reset", "中止"
-    );
-
-    private boolean isClientDisconnect(Throwable e) {
-        Throwable cause = e;
-        while (cause != null) {
-            String msg = cause.getMessage();
-            if (msg != null && containsDisconnectKeyword(msg)) {
-                return true;
-            }
-            cause = cause.getCause();
-        }
-        return false;
-    }
-
-    private boolean containsDisconnectKeyword(String msg) {
-        for (String keyword : DISCONNECT_KEYWORDS) {
-            if (msg.contains(keyword)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private record RetrievalContext(String augmentedMessage, List<RetrievalResultDto> results) {
-    }
-
-    private RetrievalContext performKnowledgeRetrieval(String message, String kbIds) {
-        String augmented = message;
-        List<RetrievalResultDto> results = List.of();
-
-        // 只有用户主动勾选知识库（传入 kbIds）时才进行检索
-        if (kbIds == null || kbIds.isBlank()) {
-            log.info("未指定知识库, 跳过检索");
-            return new RetrievalContext(augmented, results);
-        }
-
-        try {
-            boolean enabled = knowledgeRetrievalService.isEnabled(UserContext.getUserId());
-            log.info("知识库检索: enabled={}, userId={}, kbIds={}", enabled, UserContext.getUserId(), kbIds);
-            if (enabled) {
-                boolean needsRetrieval = retrievalIntentService.needsRetrieval(message);
-                if (needsRetrieval) {
-                    List<Long> parsedKbIds = parseKbIds(kbIds);
-                    results = knowledgeRetrievalService.retrieve(UserContext.getUserId(), message, parsedKbIds);
-                    log.info("知识库检索完成: 命中 {} 条", results.size());
-                    if (!results.isEmpty()) {
-                        augmented = knowledgeRetrievalService.buildAugmentedMessage(message, results);
-                    }
-                } else {
-                    log.info("AI 判断无需检索知识库, 跳过检索");
-                }
-            }
-        } catch (Exception e) {
-            log.warn("知识检索异常, 降级为无检索模式: {}", e.getMessage(), e);
-        }
-        return new RetrievalContext(augmented, results);
-    }
-
-    private void sendKnowledgeRetrievedEvent(SseEmitter emitter, List<RetrievalResultDto> retrievalResults) {
-        if (retrievalResults.isEmpty()) {
-            return;
-        }
-        try {
-            List<Map<String, Object>> refs = retrievalResults.stream()
-                    .map(r -> Map.<String, Object>of(
-                            "documentName", r.documentName(),
-                            "score", Math.round(r.score() * 100) / 100.0,
-                            "chunkIndex", r.chunkIndex()
-                    )).toList();
-            List<String> sources = retrievalResults.stream()
-                    .map(RetrievalResultDto::documentName)
-                    .distinct().toList();
-            String json = OBJECT_MAPPER.writeValueAsString(Map.of(
-                    "count", retrievalResults.size(),
-                    "sources", sources,
-                    "references", refs
-            ));
-            emitter.send(SseEmitter.event().name("knowledge_retrieved").data(json));
-        } catch (Exception ex) {
-            log.debug("Failed to send knowledge_retrieved event: {}", ex.getMessage());
-        }
-    }
-
-    private Msg buildUserMsg(String message, List<FileResponse> imageFiles, List<FileResponse> nonImageFiles) {
-        if (imageFiles.isEmpty()) {
-            String enrichedMessage = buildMessageWithFiles(message, nonImageFiles);
-            return Msg.builder().textContent(enrichedMessage).build();
-        }
-        return buildMultimodalMsg(message, imageFiles, nonImageFiles);
-    }
-
-    private void subscribeAgentStream(AgentHandle handle, Msg userMsg,
-                                      String sessionId, String message, SseEmitter emitter) {
-        handle.agent().stream(userMsg)
-                .doOnComplete(() -> onStreamComplete(sessionId, message, handle, emitter))
-                .doOnError(e -> {
-                    if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
-                        log.debug("Session {} Agent流处理中客户端已断开", sessionId);
-                    } else {
-                        log.error("Agent error: {}", e.getMessage(), e);
-                    }
-                    try {
-                        if (!handle.hook().isClientDisconnected()) {
-                            sendErrorEvent(emitter, e.getMessage());
-                        }
-                        emitter.completeWithError(e);
-                    } catch (Exception ex) {
-                        log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
-                    }
-                })
-                .doFinally(signal -> agentPool.release(sessionId))
-                .subscribe();
-    }
-
-    private void onStreamComplete(String sessionId, String message, AgentHandle handle, SseEmitter emitter) {
-        try {
-            String reply = handle.hook().getLastReply();
-            if (reply != null && !reply.isEmpty()) {
-                ChatMessage saved = chatMessageRepository.save(new ChatMessage(sessionId, "assistant", reply));
-                // 发送 message_saved 事件, 携带数据库消息ID, 供前端更新本地ID
-                if (!handle.hook().isClientDisconnected()) {
-                    try {
-                        String json = OBJECT_MAPPER.writeValueAsString(Map.of("messageId", saved.getId()));
-                        emitter.send(SseEmitter.event().name("message_saved").data(json));
-                    } catch (Exception ex) {
-                        log.debug("Failed to send message_saved event: {}", ex.getMessage());
-                    }
-                }
-            }
-            agentPool.save(sessionId);
-            sessionService.touch(sessionId);
-            if (!handle.hook().isClientDisconnected()) {
-                emitter.complete();
-            }
-        } catch (Exception e) {
-            log.debug("Session {} SSE complete 时客户端已断开: {}", sessionId, e.getMessage());
-        }
-
-        // 首次对话时异步生成标题 (emitter 已关闭, 不再通过 SSE 推送)
-        if (sessionService.hasDefaultTitle(sessionId)) {
-            TITLE_EXECUTOR.execute(() -> {
-                try {
-                    String generatedTitle = titleGenerationService.generateTitle(message);
-                    if (generatedTitle != null && !generatedTitle.isEmpty()) {
-                        sessionService.updateTitleInternal(sessionId, generatedTitle);
-                    }
-                } catch (Exception e) {
-                    log.warn("自动生成标题失败: {}", e.getMessage());
-                }
-            });
-        }
-    }
-
-    /**
-     * 导出会话聊天记录为 Markdown 文件
-     */
-    @GetMapping("/export/{sessionId}")
-    public ResponseEntity<byte[]> exportMarkdown(@PathVariable String sessionId) {
-        validateSessionId(sessionId);
-        Long userId = UserContext.getUserId();
-
-        var session = sessionRepository.findByIdAndUserId(sessionId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在"));
-
-        List<ChatMessage> messages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-
-        String markdown = buildExportMarkdown(session.getTitle(), messages);
-        byte[] content = markdown.getBytes(StandardCharsets.UTF_8);
-
-        String filename = session.getTitle().replaceAll("[^a-zA-Z0-9\\u4e00-\\u9fff_-]", "_") + ".md";
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.parseMediaType("text/markdown; charset=UTF-8"))
-                .body(content);
+        return chatStreamOrchestrator.startChat(chatRequest, lockToken);
     }
 
     /**
@@ -424,81 +105,40 @@ public class ChatController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
 
-        // 查找目标 assistant 消息
-        ChatMessage targetMsg = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
-        if (!targetMsg.getSessionId().equals(sessionId) || !ROLE_ASSISTANT.equals(targetMsg.getRole())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "只能重新生成助手消息");
-        }
+        // 校验目标消息并查找触发该回复的用户消息 (锁前完成, 与原逻辑一致)
+        chatMessageService.requireAssistantMessage(sessionId, messageId);
+        List<ChatMessage> history = chatMessageService.getHistory(sessionId);
+        String userMessage = chatMessageService.findTriggeringUserMessage(messageId, history);
 
-        // 查找触发该回复的用户消息（createdAt 在目标消息之前、最近的一条 user 消息）
-        List<ChatMessage> history = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-        String userMessage = getUserMessage(messageId, history);
-
-        if (!agentPool.tryAcquire(sessionId)) {
+        Object lockToken = agentPool.tryAcquire(sessionId);
+        if (lockToken == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
         }
-
-        // 删除旧的 assistant 消息
-        chatMessageRepository.deleteById(messageId);
-
-        // 使 agent 失效并重建
-        agentPool.invalidate(sessionId);
-        AgentHandle handle = agentPool.getOrCreate(sessionId);
-        SseEmitter emitter = new SseEmitter(300_000L);
-        handle.hook().setEmitter(emitter);
-
-        configureSseCallbacks(emitter, sessionId, handle);
-
-        // 通知 Hook 长期记忆已启用, 由 Hook 在实际召回时发送事件
-        if (handle.longTermMemoryEnabled()) {
-            handle.hook().setLongTermMemoryEnabled(true);
-        }
-
-        Msg userMsg = Msg.builder().textContent(userMessage).build();
-
-        handle.agent().stream(userMsg)
-                .doOnComplete(() -> onStreamComplete(sessionId, userMessage, handle, emitter))
-                .doOnError(e -> {
-                    if (handle.hook().isClientDisconnected() || isClientDisconnect(e)) {
-                        log.debug("Session {} Agent流处理中客户端已断开", sessionId);
-                    } else {
-                        log.error("Regenerate error: {}", e.getMessage(), e);
-                    }
-                    try {
-                        if (!handle.hook().isClientDisconnected()) {
-                            sendErrorEvent(emitter, e.getMessage());
-                        }
-                        emitter.completeWithError(e);
-                    } catch (Exception ex) {
-                        log.debug("SSE已关闭, 忽略错误事件发送: {}", ex.getMessage());
-                    }
-                })
-                .doFinally(signal -> agentPool.release(sessionId))
-                .subscribe();
-
-        return emitter;
+        return chatStreamOrchestrator.regenerate(sessionId, messageId, userMessage, lockToken);
     }
 
-    @NonNull
-    private static String getUserMessage(Long messageId, List<ChatMessage> history) {
-        String userMessage = null;
-        for (int i = 0; i < history.size(); i++) {
-            if (history.get(i).getId().equals(messageId) && i > 0) {
-                // 往前找最近的 user 消息
-                for (int j = i - 1; j >= 0; j--) {
-                    if ("user".equals(history.get(j).getRole())) {
-                        userMessage = history.get(j).getContent();
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-        if (userMessage == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未找到对应的用户消息");
-        }
-        return userMessage;
+    /**
+     * 导出会话聊天记录为 Markdown 文件
+     */
+    @GetMapping("/export/{sessionId}")
+    public ResponseEntity<byte[]> exportMarkdown(@PathVariable String sessionId) {
+        validateSessionId(sessionId);
+        Long userId = UserContext.getUserId();
+
+        var session = sessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在"));
+
+        List<ChatMessage> messages = chatMessageService.getHistory(sessionId);
+
+        String markdown = buildExportMarkdown(session.getTitle(), messages);
+        byte[] content = markdown.getBytes(StandardCharsets.UTF_8);
+
+        String filename = session.getTitle().replaceAll("[^a-zA-Z0-9\\u4e00-\\u9fff_-]", "_") + ".md";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("text/markdown; charset=UTF-8"))
+                .body(content);
     }
 
     /**
@@ -511,7 +151,7 @@ public class ChatController {
         }
         Long userId = UserContext.getUserId();
         Map<String, String> titleMap = sessionService.getSessionTitleMap();
-        List<ChatMessage> messages = chatMessageRepository.searchByContent(userId, keyword.trim());
+        List<ChatMessage> messages = chatMessageService.searchByContent(userId, keyword.trim());
 
         return messages.stream()
                 .map(m -> new SearchResultDto(
@@ -538,149 +178,11 @@ public class ChatController {
         return Map.of("status", "interrupted");
     }
 
-    /**
-     * 向客户端发送错误事件
-     */
-    private void sendErrorEvent(SseEmitter emitter, String errorMessage) {
-        try {
-            String json = OBJECT_MAPPER.writeValueAsString(ChatEventDto.error(errorMessage != null ? errorMessage : "unknown error"));
-            emitter.send(SseEmitter.event().name("error").data(json));
-        } catch (Exception e) {
-            log.debug("Failed to send error event: {}", e.getMessage());
+    private void validateSessionId(String sessionId) {
+        if (sessionId == null || !SESSION_ID_PATTERN.matcher(sessionId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
         }
     }
-
-    /**
-     * 解析逗号分隔的 fileIds 字符串
-     */
-    private List<Long> parseFileIds(String fileIds) {
-        if (fileIds == null || fileIds.isBlank()) {
-            return Collections.emptyList();
-        }
-        return Arrays.stream(fileIds.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(Long::valueOf)
-                .toList();
-    }
-
-    private List<Long> parseKbIds(String kbIds) {
-        if (kbIds == null || kbIds.isBlank()) {
-            return Collections.emptyList();
-        }
-        return Arrays.stream(kbIds.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(Long::valueOf)
-                .toList();
-    }
-
-    /**
-     * 将文件元信息拼入用户消息
-     */
-    private String buildMessageWithFiles(String message, List<FileResponse> files) {
-        if (files.isEmpty()) {
-            return message;
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("[用户上传了以下文件]\n");
-        for (FileResponse f : files) {
-            sb.append(String.format("- %s (大小: %s, 类型: %s, fileId: %d)\n",
-                    f.originalName(),
-                    formatSize(f.size()),
-                    f.contentType(),
-                    f.id()));
-        }
-        sb.append("\n[用户消息]\n");
-        sb.append(message);
-        return sb.toString();
-    }
-
-    /**
-     * 判断是否为图片文件
-     */
-    private boolean isImageFile(String contentType) {
-        return contentType != null && IMAGE_CONTENT_TYPES.contains(contentType.toLowerCase());
-    }
-
-    /**
-     * 将沙箱上下文（工具描述 + 文件列表）拼入用户消息
-     */
-    private String buildSandboxAugmentedMessage(String message, ChatRequest.SandboxContext sandboxContext) {
-        if (sandboxContext == null) {
-            return message;
-        }
-
-        StringBuilder sb = new StringBuilder();
-
-        // 注入文件列表
-        if (sandboxContext.files() != null && !sandboxContext.files().isEmpty()) {
-            sb.append("[本地 Python 沙箱文件]\n");
-            sb.append("以下文件已加载到用户本地的 Python 沙箱 /data/ 目录中，可通过 sandbox_exec 工具执行代码访问：\n");
-            for (String file : sandboxContext.files()) {
-                sb.append("- /data/").append(file).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        // 注入工具描述
-        if (sandboxContext.tools() != null && !sandboxContext.tools().isBlank()) {
-            sb.append("[沙箱中可用的 Python 工具函数]\n");
-            sb.append(sandboxContext.tools()).append("\n\n");
-        }
-
-        // 使用指南
-        if (!sb.isEmpty()) {
-            sb.append("[使用方式]\n");
-            sb.append("当需要处理上述文件或进行数据分析时，使用 sandbox_exec 工具执行 Python 代码。\n");
-            sb.append("代码中可直接使用 tools.* 函数和 /data/ 下的文件。\n");
-            sb.append("将需要展示的结果赋值给 result 变量。\n");
-            sb.append("示例：sandbox_exec(code=\"pages = tools.read_pdf('/data/xx.pdf')\\nresult = pages[0][:200]\")\n\n");
-            sb.append("---\n\n");
-        }
-
-        sb.append(message);
-        return sb.toString();
-    }
-
-    /**
-     * 构建多模态消息 (含图片 ImageBlock)
-     */
-    private Msg buildMultimodalMsg(String message, List<FileResponse> imageFiles, List<FileResponse> nonImageFiles) {
-        List<ContentBlock> blocks = new ArrayList<>();
-
-        // 文本块: 用户消息 + 非图片文件描述
-        String textPart = buildMessageWithFiles(message, nonImageFiles);
-        blocks.add(TextBlock.builder().text(textPart).build());
-
-        // 图片块: 使用 OSS 预签名 URL
-        for (FileResponse img : imageFiles) {
-            blocks.add(ImageBlock.builder()
-                    .source(URLSource.builder()
-                            .url(img.downloadUrl())
-                            .build())
-                    .build());
-        }
-
-        return Msg.builder()
-                .role(MsgRole.USER)
-                .content(blocks)
-                .build();
-    }
-
-    private String formatSize(long bytes) {
-        if (bytes < BYTES_PER_KB) {
-            return bytes + UNIT_BYTE;
-        }
-        if (bytes < BYTES_PER_MB) {
-            return String.format(FORMAT_KB, bytes / KB_DIVISOR);
-        }
-        return String.format(FORMAT_MB, bytes / (KB_DIVISOR * BYTES_PER_KB));
-    }
-
-    private static final DateTimeFormatter DATETIME_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     private String buildExportMarkdown(String title, List<ChatMessage> messages) {
         StringBuilder sb = new StringBuilder();
@@ -688,11 +190,12 @@ public class ChatController {
         sb.append("> 导出时间: ").append(DATETIME_FMT.format(Instant.now())).append("\n\n");
 
         for (ChatMessage msg : messages) {
-            if (!"user".equals(msg.getRole()) && !"assistant".equals(msg.getRole())) {
+            if (!ChatMessageService.ROLE_USER.equals(msg.getRole())
+                    && !ChatMessageService.ROLE_ASSISTANT.equals(msg.getRole())) {
                 continue;
             }
             sb.append("---\n\n");
-            String roleName = "user".equals(msg.getRole()) ? "用户" : "助手";
+            String roleName = ChatMessageService.ROLE_USER.equals(msg.getRole()) ? "用户" : "助手";
             String time = DATETIME_FMT.format(Instant.ofEpochMilli(msg.getCreatedAt()));
             sb.append("**").append(roleName).append("** (").append(time).append(")\n\n");
             sb.append(msg.getContent() != null ? msg.getContent() : "").append("\n\n");

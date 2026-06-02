@@ -35,6 +35,7 @@ public class DatabaseSession implements Session {
 
     public DatabaseSession(AgentStateRepository repository) {
         this.repository = repository;
+        log.info("Agent 会话状态存储: PostgreSQL (DatabaseSession)");
     }
 
     /**

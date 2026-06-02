@@ -1,5 +1,6 @@
 import request from './request'
 import type {BackendChatMessage, SearchResult} from '@/types/chat'
+import type {SandboxToolMeta} from '@/types/sandbox-tools'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
@@ -22,7 +23,7 @@ export interface FetchSSE {
     set onerror(handler: (() => void) | null)
 }
 
-export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[], sandboxContext?: { tools: string; files: string[] } | null, workingDir?: string): FetchSSE {
+export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[], sandboxContext?: { tools: SandboxToolMeta[]; files: string[] } | null, workingDir?: string): FetchSSE {
     const token = localStorage.getItem('auth_token') || ''
     const url = `${BASE_URL}/api/chat/stream`
 
