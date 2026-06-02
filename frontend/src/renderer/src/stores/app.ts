@@ -5,7 +5,7 @@ import {useAuthStore} from './auth'
 export type ThemeMode = 'light' | 'dark' | 'auto'
 
 export const useAppStore = defineStore('app', () => {
-    const sidebarCollapsed = ref(false)
+
     const currentUser = computed(() => {
         const authStore = useAuthStore()
         return authStore.user
@@ -21,9 +21,6 @@ export const useAppStore = defineStore('app', () => {
         (localStorage.getItem('theme') as ThemeMode) || 'light'
     )
 
-    function toggleSidebar() {
-        sidebarCollapsed.value = !sidebarCollapsed.value
-    }
 
     function setTheme(mode: ThemeMode) {
         theme.value = mode
@@ -46,10 +43,8 @@ export const useAppStore = defineStore('app', () => {
     }
 
     return {
-        sidebarCollapsed,
         currentUser,
         theme,
-        toggleSidebar,
         setTheme,
         initTheme
     }

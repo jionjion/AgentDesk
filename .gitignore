@@ -15,7 +15,7 @@ node_modules
 
 
 frontend/docs
-backend/docs
+
 
 .env
 
@@ -24,5 +24,11 @@ frontend/src/renderer/public/pyodide/
 
 test-space/
 
-.codegraph
-.cursor
+frontend/.codegraph
+frontend/.cursor
+
+
+
+backend/docs
+backend/.codegraph
+backend/.cursor

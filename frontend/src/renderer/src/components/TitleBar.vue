@@ -3,13 +3,8 @@
       class="title-bar flex items-center justify-between h-10 px-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none"
       style="-webkit-app-region: drag"
   >
-    <!-- 左侧操作区 -->
-    <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">
-      <Button variant="ghost" size="icon" class="h-8 w-8" @click="appStore.toggleSidebar()">
-        <ChevronsLeft v-if="!appStore.sidebarCollapsed" :size="16"/>
-        <ChevronsRight v-else :size="16"/>
-      </Button>
-    </div>
+    <!-- 左侧占位 -->
+    <div class="flex items-center gap-2"></div>
 
     <!-- 右侧操作区 -->
     <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">
@@ -58,8 +53,7 @@
 
 <script setup lang="ts">
 import {ref} from 'vue'
-import {useAppStore} from '@/stores/app'
-import {ChevronsLeft, ChevronsRight, CircleHelp, Maximize2, Minus, Search, X} from 'lucide-vue-next'
+import {CircleHelp, Maximize2, Minus, Search, X} from 'lucide-vue-next'
 import {Button} from '@/components/ui/button'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import SearchDialog from '@/components/SearchDialog.vue'
@@ -70,7 +64,6 @@ declare const __BUILD_DATE__: string
 const appVersion = __APP_VERSION__
 const buildDate = __BUILD_DATE__
 
-const appStore = useAppStore()
 const searchOpen = ref(false)
 
 function handleMinimize() {

@@ -2,7 +2,7 @@
   <div class="h-screen w-screen flex flex-col overflow-hidden bg-white dark:bg-gray-900">
     <TitleBar/>
     <div class="flex flex-1 overflow-hidden">
-      <AppSidebar v-show="!appStore.sidebarCollapsed"/>
+      <AppSidebar/>
       <main class="flex-1 overflow-hidden">
         <RouterView/>
       </main>
