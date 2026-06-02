@@ -38,21 +38,19 @@ class PromptContextBuilderTest {
         // 与前端 getToolDescriptions() 模板逐字符对齐的期望输出。
         // 注意: 故意用字符串拼接而非文本块——文本块的闭合 """ 独占一行会引入末尾换行,
         // 与 buildToolDescriptions 以 ``` 结尾(无末尾换行)不一致, 会破坏逐字符断言。
-        String expected = """
-                ## 沙箱可用工具函数
-
-                以下工具函数已预装在沙箱环境中，可直接通过 `tools.` 命名空间调用：
-
-                - `tools.list_files(dir: str = "/data") -> list[str]` — 列出 /data/ 目录下的文件
-                - `tools.read_pdf(path: str) -> list[str]` — 读取 PDF 文件文本内容
-
-                使用示例：
-                ```python
-                files = tools.list_files()
-                df = tools.to_dataframe('/data/sales.xlsx')
-                tools.save_file(df, 'result.csv')
-                ```
-                """;
+        String expected = "## 沙箱可用工具函数\n"
+                + "\n"
+                + "以下工具函数已预装在沙箱环境中，可直接通过 `tools.` 命名空间调用：\n"
+                + "\n"
+                + "- `tools.list_files(dir: str = \"/data\") -> list[str]` — 列出 /data/ 目录下的文件\n"
+                + "- `tools.read_pdf(path: str) -> list[str]` — 读取 PDF 文件文本内容\n"
+                + "\n"
+                + "使用示例：\n"
+                + "```python\n"
+                + "files = tools.list_files()\n"
+                + "df = tools.to_dataframe('/data/sales.xlsx')\n"
+                + "tools.save_file(df, 'result.csv')\n"
+                + "```";
 
         assertEquals(expected, builder.buildToolDescriptions(tools));
     }
