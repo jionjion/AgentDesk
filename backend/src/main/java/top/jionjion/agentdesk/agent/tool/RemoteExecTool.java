@@ -130,13 +130,24 @@ public class RemoteExecTool {
                     ? trimmed.substring(CMD_CD.length()).trim()
                     : trimmed.substring(CMD_SET_LOCATION.length()).trim();
             // 去掉引号
-            if ((target.startsWith(QUOTE_DOUBLE) && target.endsWith(QUOTE_DOUBLE))
-                    || (target.startsWith(QUOTE_SINGLE) && target.endsWith(QUOTE_SINGLE))) {
+            if (isQuoted(target)) {
                 target = target.substring(1, target.length() - 1);
             }
             return target.isEmpty() ? null : target;
         }
         return null;
+    }
+
+    /**
+     * 判断字符串是否被成对的双引号或单引号包裹
+     *
+     * @param value 待判断的字符串
+     * @return 被成对引号包裹返回 true
+     */
+    private static boolean isQuoted(String value) {
+        boolean doubleQuoted = value.startsWith(QUOTE_DOUBLE) && value.endsWith(QUOTE_DOUBLE);
+        boolean singleQuoted = value.startsWith(QUOTE_SINGLE) && value.endsWith(QUOTE_SINGLE);
+        return doubleQuoted || singleQuoted;
     }
 
     /**

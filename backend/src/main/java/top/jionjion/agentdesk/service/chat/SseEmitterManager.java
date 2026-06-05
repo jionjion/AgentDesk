@@ -12,9 +12,9 @@ import top.jionjion.agentdesk.dto.knowledge.RetrievalResultDto;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,9 +38,10 @@ public class SseEmitterManager {
     );
 
     /**
-     * SSE 心跳调度器, 定期发送事件防止连接被中间网络设备断开
+     * SSE 心跳调度器, 定期发送事件防止连接被中间网络设备断开。
+     * 显式构造线程池（而非 Executors 工厂方法）, 单核心线程 + 守护线程, 避免阻塞 JVM 退出。
      */
-    private static final ScheduledExecutorService HEARTBEAT_SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
+    private static final ScheduledExecutorService HEARTBEAT_SCHEDULER = new ScheduledThreadPoolExecutor(1, r -> {
         Thread t = new Thread(r, "sse-heartbeat");
         t.setDaemon(true);
         return t;

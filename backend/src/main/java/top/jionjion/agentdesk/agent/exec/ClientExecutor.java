@@ -16,12 +16,16 @@ public interface ClientExecutor {
 
     /**
      * 检查指定用户的客户端是否已连接。
+     *
+     * @param userId 用户 ID
+     * @return 已连接返回 true, 否则返回 false
      */
     boolean isConnected(Long userId);
 
     /**
      * 获取客户端平台信息（如 "Windows", "macOS", "Linux"）。
      *
+     * @param userId 用户 ID
      * @return 平台描述, 未知时返回 null
      */
     String getClientPlatform(Long userId);

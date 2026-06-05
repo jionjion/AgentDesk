@@ -275,7 +275,9 @@ public class SkillService {
         if (dto.systemPrompt().length() > MAX_SYS_PROMPT_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "系统提示词最长 8192 字符");
         }
-        if (dto.maxIters() != null && (dto.maxIters() < 1 || dto.maxIters() > MAX_ITERS)) {
+        Integer maxIters = dto.maxIters();
+        boolean maxItersOutOfRange = maxIters != null && (maxIters < 1 || maxIters > MAX_ITERS);
+        if (maxItersOutOfRange) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "maxIters 范围 1~10");
         }
         if (dto.tools() != null) {
