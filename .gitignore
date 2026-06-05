@@ -15,6 +15,8 @@ node_modules
 
 
 frontend/docs
+frontend/tsconfig.node.tsbuildinfo
+frontend/tsconfig.web.tsbuildinfo
 
 
 .env
