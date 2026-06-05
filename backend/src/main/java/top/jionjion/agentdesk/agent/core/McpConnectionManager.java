@@ -11,6 +11,7 @@ import top.jionjion.agentdesk.entity.McpServer;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,17 +52,23 @@ public class McpConnectionManager {
     /**
      * 将已启用的 MCP 服务器连接并注册到 Toolkit 中.
      * 连接失败时记录日志并跳过, 不影响 Agent 创建.
+     *
+     * @return 各服务器的连接结果 (服务器ID -> 是否成功), 供上层做失败计数与熔断
      */
-    public void connectAndRegister(Toolkit toolkit, List<McpServer> servers) {
+    public Map<Long, Boolean> connectAndRegister(Toolkit toolkit, List<McpServer> servers) {
+        Map<Long, Boolean> results = new HashMap<>();
         for (McpServer server : servers) {
             try {
                 McpClientWrapper client = buildClient(server);
                 toolkit.registerMcpClient(client).block();
                 log.info("MCP 服务器 [{}] 已连接并注册 (type={})", server.getName(), server.getType());
+                results.put(server.getId(), true);
             } catch (Exception e) {
                 log.warn("MCP 服务器 [{}] 连接失败, 已跳过: {}", server.getName(), e.getMessage());
+                results.put(server.getId(), false);
             }
         }
+        return results;
     }
 
     /**

@@ -52,6 +52,12 @@ public class McpServer {
     @Column(nullable = false)
     private boolean enabled;
 
+    /**
+     * 连续连接失败次数. 成功连接后清零, 累计达到阈值时自动禁用 (enabled=false).
+     */
+    @Column(name = "failure_count", nullable = false)
+    private int failureCount;
+
     @Column(name = "created_at", nullable = false)
     private long createdAt;
 

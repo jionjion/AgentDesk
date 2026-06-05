@@ -1,5 +1,7 @@
 package top.jionjion.agentdesk.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,13 @@ import java.util.Map;
  */
 @Service
 public class McpServerService {
+
+    private static final Logger log = LoggerFactory.getLogger(McpServerService.class);
+
+    /**
+     * 连续失败达到此阈值时, 自动禁用 MCP 服务器 (熔断)
+     */
+    private static final int FAILURE_THRESHOLD = 3;
 
     private final McpServerRepository repository;
     private final McpConnectionManager connectionManager;
@@ -67,6 +76,7 @@ public class McpServerService {
         server.setType(request.type());
         server.setConfig(request.config());
         server.setEnabled(true);
+        server.setFailureCount(0);
         server.setCreatedAt(now);
         server.setUpdatedAt(now);
 
@@ -91,6 +101,8 @@ public class McpServerService {
         server.setDescription(request.description());
         server.setType(request.type());
         server.setConfig(request.config());
+        // 配置已更新, 重置失败计数, 给新配置一次重新连接的机会
+        server.setFailureCount(0);
         server.setUpdatedAt(System.currentTimeMillis());
 
         return toDto(repository.save(server));
@@ -112,8 +124,46 @@ public class McpServerService {
     public void setEnabled(Long id, boolean enabled, Long userId) {
         McpServer server = findByIdAndUser(id, userId);
         server.setEnabled(enabled);
+        // 手动重新启用时清空失败计数, 给服务器一次新机会
+        if (enabled) {
+            server.setFailureCount(0);
+        }
         server.setUpdatedAt(System.currentTimeMillis());
         repository.save(server);
+    }
+
+    /**
+     * 根据连接结果更新失败计数并执行熔断.
+     * 由 AgentFactory 在连接 MCP 服务器后调用.
+     * 成功: 失败计数清零;
+     * 失败: 失败计数 +1, 累计达到阈值时自动禁用 (enabled=false).
+     *
+     * @param results 服务器ID -> 是否连接成功
+     */
+    @Transactional
+    public void applyConnectionResults(Map<Long, Boolean> results) {
+        for (Map.Entry<Long, Boolean> entry : results.entrySet()) {
+            repository.findById(entry.getKey()).ifPresent(server -> {
+                if (entry.getValue()) {
+                    // 连接成功: 清零计数
+                    if (server.getFailureCount() != 0) {
+                        server.setFailureCount(0);
+                        server.setUpdatedAt(System.currentTimeMillis());
+                        repository.save(server);
+                    }
+                } else {
+                    // 连接失败: 累加并判断熔断
+                    int failures = server.getFailureCount() + 1;
+                    server.setFailureCount(failures);
+                    if (failures >= FAILURE_THRESHOLD) {
+                        server.setEnabled(false);
+                        log.warn("MCP 服务器 [{}] 连续失败 {} 次, 已自动禁用", server.getName(), failures);
+                    }
+                    server.setUpdatedAt(System.currentTimeMillis());
+                    repository.save(server);
+                }
+            });
+        }
     }
 
     /**
@@ -163,6 +213,7 @@ public class McpServerService {
                 server.getType(),
                 server.getConfig(),
                 server.isEnabled(),
+                server.getFailureCount(),
                 server.getCreatedAt(),
                 server.getUpdatedAt()
         );

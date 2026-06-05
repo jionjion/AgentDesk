@@ -184,7 +184,9 @@ public class AgentFactory {
         if (userId != null) {
             List<McpServer> mcpServers = mcpServerService.getEnabledServers(userId);
             if (!mcpServers.isEmpty()) {
-                mcpConnectionManager.connectAndRegister(toolkit, mcpServers);
+                Map<Long, Boolean> results = mcpConnectionManager.connectAndRegister(toolkit, mcpServers);
+                // 回写连接结果: 成功清零失败计数, 连续失败超阈值自动熔断禁用
+                mcpServerService.applyConnectionResults(results);
                 log.info("已为会话 {} 注册 {} 个 MCP 服务器", sessionId, mcpServers.size());
             }
         }

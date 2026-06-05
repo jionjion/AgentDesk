@@ -450,6 +450,7 @@ CREATE TABLE IF NOT EXISTS agent_desk.mcp_servers
     type        VARCHAR(16)  NOT NULL,
     config      JSONB        NOT NULL DEFAULT '{}',
     enabled     BOOLEAN      NOT NULL DEFAULT TRUE,
+    failure_count INTEGER    NOT NULL DEFAULT 0,
     created_at  BIGINT       NOT NULL,
     updated_at  BIGINT       NOT NULL,
     UNIQUE (user_id, name)
@@ -462,6 +463,7 @@ COMMENT ON COLUMN agent_desk.mcp_servers.description IS '服务器描述';
 COMMENT ON COLUMN agent_desk.mcp_servers.type IS '传输类型: sse / stdio';
 COMMENT ON COLUMN agent_desk.mcp_servers.config IS '传输配置, JSON格式. SSE: {url, headers}; StdIO: {command, env, workingDirectory}';
 COMMENT ON COLUMN agent_desk.mcp_servers.enabled IS '是否启用';
+COMMENT ON COLUMN agent_desk.mcp_servers.failure_count IS '连续连接失败次数, 成功后清零, 累计达到阈值自动禁用';
 COMMENT ON COLUMN agent_desk.mcp_servers.created_at IS '创建时间戳(毫秒)';
 COMMENT ON COLUMN agent_desk.mcp_servers.updated_at IS '更新时间戳(毫秒)';
 
