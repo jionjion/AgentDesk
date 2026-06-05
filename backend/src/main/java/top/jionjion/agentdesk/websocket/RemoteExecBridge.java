@@ -7,12 +7,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import top.jionjion.agentdesk.agent.exec.ClientExecException;
+import top.jionjion.agentdesk.agent.exec.ClientExecutor;
 import top.jionjion.agentdesk.websocket.dto.CommandRequest;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
 import top.jionjion.agentdesk.websocket.dto.SandboxResult;
 import top.jionjion.agentdesk.websocket.dto.WsMessage;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -31,7 +34,7 @@ import java.util.concurrent.TimeoutException;
  * @author Jion
  */
 @Service
-public class RemoteExecBridge {
+public class RemoteExecBridge implements ClientExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(RemoteExecBridge.class);
 
@@ -39,6 +42,8 @@ public class RemoteExecBridge {
     private final long commandTimeout;
     private final int maxPendingCommands;
     private final int maxResultSize;
+    private final int execMemoryLimitMb;
+    private final int execMaxProcesses;
 
     /**
      * userId → WebSocketSession 映射（每个用户最多一个活跃连接）
@@ -63,11 +68,15 @@ public class RemoteExecBridge {
     public RemoteExecBridge(ObjectMapper objectMapper,
                             @Value("${agentdesk.remote-exec.command-timeout:120000}") long commandTimeout,
                             @Value("${agentdesk.remote-exec.max-pending-commands:10}") int maxPendingCommands,
-                            @Value("${agentdesk.remote-exec.max-result-size:10240}") int maxResultSize) {
+                            @Value("${agentdesk.remote-exec.max-result-size:10240}") int maxResultSize,
+                            @Value("${agentdesk.remote-exec.exec-memory-limit-mb:2048}") int execMemoryLimitMb,
+                            @Value("${agentdesk.remote-exec.exec-max-processes:64}") int execMaxProcesses) {
         this.objectMapper = objectMapper;
         this.commandTimeout = commandTimeout;
         this.maxPendingCommands = maxPendingCommands;
         this.maxResultSize = maxResultSize;
+        this.execMemoryLimitMb = execMemoryLimitMb;
+        this.execMaxProcesses = execMaxProcesses;
     }
 
     // ==================== 连接管理 ====================
@@ -162,18 +171,29 @@ public class RemoteExecBridge {
         pendingRequests.put(requestId, future);
 
         try {
+            // 构建执行隔离策略: 后端只下发服务端可控的资源限制与隔离档位,
+            // 目录边界 allowedRoots 由客户端依据用户授权工作目录自行掌握。
+            CommandRequest.ExecPolicy policy = new CommandRequest.ExecPolicy(
+                    null,
+                    new CommandRequest.ResourceLimits(commandTimeout, maxResultSize, execMemoryLimitMb, execMaxProcesses),
+                    CommandRequest.ExecPolicy.LEVEL_BOUNDARY
+            );
+
             // 构建命令请求消息
-            CommandRequest request = new CommandRequest(command, workingDir, riskLevel, commandTimeout, null);
+            CommandRequest request = new CommandRequest(command, workingDir, riskLevel, commandTimeout, null, policy);
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("command", request.command());
+            payload.put("workingDir", request.workingDir() != null ? request.workingDir() : "");
+            payload.put("riskLevel", request.riskLevel());
+            payload.put("timeoutMs", request.timeoutMs());
+            payload.put("policy", request.policy());
+
             WsMessage msg = WsMessage.of(
                     WsMessage.TYPE_COMMAND_REQUEST,
                     requestId,
                     sessionId,
-                    Map.of(
-                            "command", request.command(),
-                            "workingDir", request.workingDir() != null ? request.workingDir() : "",
-                            "riskLevel", request.riskLevel(),
-                            "timeoutMs", request.timeoutMs()
-                    )
+                    payload
             );
 
             // 发送到客户端
@@ -314,7 +334,7 @@ public class RemoteExecBridge {
     /**
      * 远程执行异常
      */
-    public static class RemoteExecException extends Exception {
+    public static class RemoteExecException extends ClientExecException {
         public RemoteExecException(String message) {
             super(message);
         }

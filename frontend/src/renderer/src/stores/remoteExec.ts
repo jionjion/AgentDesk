@@ -7,7 +7,8 @@ import type {
   PendingCommand,
   WsMessage,
   CommandRequestPayload,
-  CommandResult
+  CommandResult,
+  ExecPolicy
 } from '@/types/remote-exec'
 import { WS_MESSAGE_TYPES } from '@/types/remote-exec'
 
@@ -30,6 +31,25 @@ function loadSettings(): RemoteExecSettings {
 
 function saveSettings(settings: RemoteExecSettings): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+}
+
+/**
+ * 构建执行隔离策略：
+ * - allowedRoots 由客户端掌握（用户授权的工作目录），后端不下发目录边界。
+ * - resourceLimits.timeoutMs 取后端下发值（payload.timeoutMs）。
+ * - 后端若下发 policy（resourceLimits/isolationLevel）则合并覆盖。
+ */
+function buildPolicy(workingDir: string, payload: CommandRequestPayload): ExecPolicy {
+  const backendPolicy = payload.policy
+  const allowedRoots = workingDir && workingDir.trim() ? [workingDir] : []
+  return {
+    allowedRoots,
+    resourceLimits: {
+      timeoutMs: payload.timeoutMs,
+      ...backendPolicy?.resourceLimits
+    },
+    isolationLevel: backendPolicy?.isolationLevel ?? 'boundary'
+  }
 }
 
 // ── WebSocket URL 构建 ──────────────────────────────
@@ -175,14 +195,17 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     const payload = msg.payload as unknown as CommandRequestPayload
     if (!payload || !msg.requestId) return
 
+    const workingDir = payload.workingDir || settings.value.defaultWorkDir
+
     const pending: PendingCommand = {
       requestId: msg.requestId,
       sessionId: msg.sessionId || '',
       command: payload.command,
-      workingDir: payload.workingDir || settings.value.defaultWorkDir,
+      workingDir,
       riskLevel: payload.riskLevel,
       timeoutMs: payload.timeoutMs,
-      receivedAt: Date.now()
+      receivedAt: Date.now(),
+      policy: buildPolicy(workingDir, payload)
     }
 
     // 低风险 + 自动执行 → 直接执行
@@ -262,7 +285,7 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     pendingCommands.value = pendingCommands.value.filter(c => c.requestId !== cmd.requestId)
 
     try {
-      const result = await window.electronAPI.shell.execute(cmd.command, cmd.workingDir || undefined)
+      const result = await window.electronAPI.shell.execute(cmd.command, cmd.workingDir || undefined, cmd.policy)
 
       // 记录历史
       executionHistory.value.unshift({ command: cmd.command, result, timestamp: Date.now() })

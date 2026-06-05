@@ -83,20 +83,22 @@ public final class ToolDefinitions {
     // ==================== 远程执行工具 ====================
 
     public static final String REMOTE_EXEC = "remote_exec";
-    public static final String REMOTE_EXEC_DESC = "在用户的本地机器上执行 shell 命令并返回结果。" +
-            "命令会通过网络发送到用户的桌面客户端执行, 适用于需要访问用户本地文件系统、运行项目命令、查看系统状态等场景。" +
-            "重要: 执行结果会包含客户端操作系统信息, 请根据目标系统使用正确的命令语法 " +
-            "(Windows 使用 cmd/PowerShell 命令如 dir, type, del; macOS/Linux 使用 Unix 命令如 ls, cat, rm)。" +
-            "低风险命令（如 ls/dir, cat/type, git status）会自动执行, 高风险命令（如 rm/del, npm install, git push）需要用户确认。";
+    public static final String REMOTE_EXEC_DESC = "在用户本地机器上执行 shell 命令或真实 Python 代码，是执行类任务的【默认首选】。" +
+            "命令通过网络发送到用户桌面客户端执行，拥有完整能力：访问真实文件系统、联网、安装并使用任意 Python 包（含 scipy、scikit-learn、PyTorch、opencv 等 C 扩展包）、运行项目命令、查看系统状态。" +
+            "跑 Python 时用 `python -c \"...\"` 或先写脚本文件再执行。" +
+            "重要：执行结果会包含客户端操作系统信息，请按目标系统使用正确语法 " +
+            "(Windows 用 cmd/PowerShell 如 dir, type, del；macOS/Linux 用 Unix 命令如 ls, cat, rm)。" +
+            "低风险命令（如 ls/dir, cat/type, git status）自动执行，高风险命令（如 rm/del, npm install, git push）需用户确认。" +
+            "【与 sandbox_exec 的选择】涉及真实文件读写、网络、第三方包、系统操作、运行项目时，一律用本工具；" +
+            "仅当任务是纯内存计算、画图、或使用 tools.* 数据处理函数，且不碰真实文件/网络/C扩展包时，才改用 sandbox_exec。";
 
     // ==================== 沙箱执行工具 ====================
 
     public static final String SANDBOX_EXEC = "sandbox_exec";
-    public static final String SANDBOX_EXEC_DESC = "在用户浏览器端的 Python 沙箱（Pyodide/WASM）中执行 Python 代码。" +
-            "沙箱中预装了 pandas、numpy、matplotlib 等数据分析包，以及 tools.* 命名空间的工具函数。" +
-            "代码执行后可获取 stdout、stderr、返回值（result 变量）、matplotlib 图表。" +
-            "重要：沙箱的文件系统是虚拟的（MEMFS），工作目录文件挂载在 /data/ 下，输出文件保存到 /data/output/。" +
-            "不要用 remote_exec 来执行沙箱代码，也不要在沙箱中使用网络请求。" +
-            "限制：沙箱只能安装纯 Python 包，不支持带 C 扩展的包（如 scipy、scikit-learn、PyTorch、opencv-python、lxml 等），" +
-            "遇到这类需求请改用 remote_exec 在用户本机执行。";
+    public static final String SANDBOX_EXEC_DESC = "在用户浏览器端的轻量 Python 沙箱（Pyodide/WASM）中执行 Python 代码，是 remote_exec 之外的【受限便捷选项】，无需用户确认即可自动执行。" +
+            "适用场景【且仅适用于】：纯内存的数据计算、用 matplotlib 画图、使用 tools.* 命名空间的数据处理函数（如 tools.read_pdf、tools.to_dataframe）。预装 pandas、numpy、matplotlib。" +
+            "可获取 stdout、stderr、返回值（result 变量）、matplotlib 图表。" +
+            "文件系统是虚拟的（MEMFS）：工作目录文件挂载在 /data/ 下，输出文件保存到 /data/output/。" +
+            "【硬限制，不满足请改用 remote_exec】不能访问用户真实文件系统、不能联网、只能装纯 Python 包（不支持 scipy、scikit-learn、PyTorch、opencv-python、lxml 等 C 扩展包）。" +
+            "判断标准：只要任务需要真实文件、网络、或上述受限包，就用 remote_exec，不要用本工具撞限制后再退回。";
 }

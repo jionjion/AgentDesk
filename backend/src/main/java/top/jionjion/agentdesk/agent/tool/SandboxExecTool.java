@@ -4,8 +4,8 @@ import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.jionjion.agentdesk.websocket.RemoteExecBridge;
-import top.jionjion.agentdesk.websocket.RemoteExecBridge.RemoteExecException;
+import top.jionjion.agentdesk.agent.exec.ClientExecException;
+import top.jionjion.agentdesk.agent.exec.ClientExecutor;
 import top.jionjion.agentdesk.websocket.dto.SandboxResult;
 
 /**
@@ -23,11 +23,11 @@ public class SandboxExecTool {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxExecTool.class);
 
-    private final RemoteExecBridge bridge;
+    private final ClientExecutor bridge;
     private final Long userId;
     private final String sessionId;
 
-    public SandboxExecTool(RemoteExecBridge bridge, Long userId, String sessionId) {
+    public SandboxExecTool(ClientExecutor bridge, Long userId, String sessionId) {
         this.bridge = bridge;
         this.userId = userId;
         this.sessionId = sessionId;
@@ -51,7 +51,7 @@ public class SandboxExecTool {
         try {
             SandboxResult result = bridge.executeSandbox(userId, sessionId, code);
             return formatResult(result);
-        } catch (RemoteExecException e) {
+        } catch (ClientExecException e) {
             return "沙箱执行失败: " + e.getMessage();
         }
     }

@@ -1,5 +1,18 @@
 import {contextBridge, ipcRenderer} from 'electron'
 
+/** 执行隔离策略 */
+export interface ExecPolicy {
+    allowedRoots?: string[]
+    resourceLimits?: {
+        timeoutMs?: number
+        maxOutputChars?: number
+        memMB?: number
+        maxProcesses?: number
+    }
+    isolationLevel?: 'boundary' | 'none'
+}
+
+
 const electronAPI = {
     dialog: {
         openFile: (): Promise<string[]> => ipcRenderer.invoke('dialog:openFile'),
@@ -20,8 +33,8 @@ const electronAPI = {
     shell: {
         openExternal: (url: string): Promise<void> =>
             ipcRenderer.invoke('shell:openExternal', url),
-        execute: (command: string, workingDir?: string): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> =>
-            ipcRenderer.invoke('shell:execute', command, workingDir)
+        execute: (command: string, workingDir?: string, policy?: ExecPolicy): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> =>
+            ipcRenderer.invoke('shell:execute', command, workingDir, policy)
     },
     app: {
         getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),

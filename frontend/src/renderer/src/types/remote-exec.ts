@@ -17,6 +17,21 @@ export interface CommandRequestPayload {
   workingDir: string
   riskLevel: 'LOW' | 'HIGH'
   timeoutMs: number
+  /** 后端下发的执行隔离策略（可选） */
+  policy?: ExecPolicy
+}
+
+/** 执行隔离策略（与 preload ExecPolicy 对应） */
+export interface ExecPolicy {
+  /** 允许执行的根目录树（绝对路径） */
+  allowedRoots?: string[]
+  resourceLimits?: {
+    timeoutMs?: number
+    maxOutputChars?: number
+    memMB?: number
+    maxProcesses?: number
+  }
+  isolationLevel?: 'boundary' | 'none'
 }
 
 /** 命令执行结果 */
@@ -39,6 +54,8 @@ export interface PendingCommand {
   riskLevel: 'LOW' | 'HIGH'
   timeoutMs: number
   receivedAt: number
+  /** 执行隔离策略 */
+  policy?: ExecPolicy
 }
 
 /** 远程执行设置 */

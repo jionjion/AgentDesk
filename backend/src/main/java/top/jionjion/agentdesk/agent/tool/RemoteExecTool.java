@@ -4,8 +4,8 @@ import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.jionjion.agentdesk.websocket.RemoteExecBridge;
-import top.jionjion.agentdesk.websocket.RemoteExecBridge.RemoteExecException;
+import top.jionjion.agentdesk.agent.exec.ClientExecException;
+import top.jionjion.agentdesk.agent.exec.ClientExecutor;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
 
 /**
@@ -32,7 +32,7 @@ public class RemoteExecTool {
     private static final String PLATFORM_MAC = "mac";
     private static final String PLATFORM_LINUX = "linux";
 
-    private final RemoteExecBridge bridge;
+    private final ClientExecutor bridge;
     private final CommandRiskClassifier riskClassifier;
     private final Long userId;
     private final String sessionId;
@@ -42,7 +42,7 @@ public class RemoteExecTool {
      */
     private volatile String currentWorkingDir;
 
-    public RemoteExecTool(RemoteExecBridge bridge, CommandRiskClassifier riskClassifier,
+    public RemoteExecTool(ClientExecutor bridge, CommandRiskClassifier riskClassifier,
                           Long userId, String sessionId) {
         this.bridge = bridge;
         this.riskClassifier = riskClassifier;
@@ -101,7 +101,7 @@ public class RemoteExecTool {
         try {
             CommandResult result = bridge.executeCommand(userId, sessionId, command, effectiveDir, riskLevel);
             return formatResult(command, result, osHint);
-        } catch (RemoteExecException e) {
+        } catch (ClientExecException e) {
             return "远程执行失败: " + e.getMessage();
         }
     }
