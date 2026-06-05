@@ -68,7 +68,7 @@ public class RemoteExecBridge implements ClientExecutor {
     public RemoteExecBridge(ObjectMapper objectMapper,
                             @Value("${agentdesk.remote-exec.command-timeout:120000}") long commandTimeout,
                             @Value("${agentdesk.remote-exec.max-pending-commands:10}") int maxPendingCommands,
-                            @Value("${agentdesk.remote-exec.max-result-size:10240}") int maxResultSize,
+                            @Value("${agentdesk.remote-exec.max-result-size:262144}") int maxResultSize,
                             @Value("${agentdesk.remote-exec.exec-memory-limit-mb:2048}") int execMemoryLimitMb,
                             @Value("${agentdesk.remote-exec.exec-max-processes:64}") int execMaxProcesses) {
         this.objectMapper = objectMapper;

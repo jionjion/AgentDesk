@@ -54,23 +54,30 @@ __stderr_capture = __OutputCapture()
 # matplotlib 图表捕获
 __figures = []
 
+def __collect_figures():
+    """采集当前所有未关闭的 matplotlib 图表为 base64 PNG。
+    无论用户是调用 plt.show() 还是 plt.savefig()，只要图还在画布上就会被采集。"""
+    try:
+        import matplotlib.pyplot as plt
+        import base64
+    except ImportError:
+        return
+    for fig_num in plt.get_fignums():
+        fig = plt.figure(fig_num)
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        __figures.append(base64.b64encode(buf.read()).decode())
+    plt.close('all')
+
 def __setup_matplotlib():
     try:
         import matplotlib
         matplotlib.use('agg')
         import matplotlib.pyplot as plt
-        import base64
 
-        def _capture_show(*args, **kwargs):
-            for fig_num in plt.get_fignums():
-                fig = plt.figure(fig_num)
-                buf = BytesIO()
-                fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-                buf.seek(0)
-                __figures.append(base64.b64encode(buf.read()).decode())
-            plt.close('all')
-
-        plt.show = _capture_show
+        # show() 时立即采集（避免用户后续 close 丢图）
+        plt.show = lambda *args, **kwargs: __collect_figures()
     except ImportError:
         pass
 
@@ -221,6 +228,10 @@ try:
     _code_to_run = ${JSON.stringify(userCode)}
     _compiled = compile(_code_to_run, '<sandbox>', 'exec')
     exec(_compiled, __user_globals)
+
+    # 兜底采集：用户代码未调用 plt.show() 时（如仅 savefig 或留空白），
+    # 把仍未关闭的图表也采集出来，确保对话界面能展示。
+    __collect_figures()
 
     # 捕获 result 变量
     if 'result' in __user_globals:

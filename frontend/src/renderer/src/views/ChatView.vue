@@ -245,10 +245,12 @@ import {formatFileSize, isImageType} from '@/utils/file'
 import type {PlanMessage, ToolCallMessage} from '@/types/chat'
 import type {ExecuteResult} from '@/types/sandbox'
 import {useSandboxStore} from '@/stores/sandbox'
+import {useRemoteExecStore} from '@/stores/remoteExec'
 
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const sandboxStore = useSandboxStore()
+const remoteExecStore = useRemoteExecStore()
 const route = useRoute()
 const {planState} = usePlanSubtasks()
 
@@ -264,6 +266,30 @@ async function handleRunCode(code: string, msgId: string) {
   const result = await sandboxStore.execute(sessionId, code)
   codeExecutionResults.value[msgId] = result
 }
+
+// Agent 通过 sandbox_exec 触发的执行结果：绑定到当前流式助手消息并累加图表
+watch(() => remoteExecStore.lastSandboxResult?.seq, () => {
+  const payload = remoteExecStore.lastSandboxResult
+  if (!payload) return
+
+  // 找到当前会话最后一条助手消息作为承载对象
+  const msgs = chatStore.currentMessages
+  const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant')
+  if (!lastAssistant) return
+
+  const incoming = payload.result
+  const existing = codeExecutionResults.value[lastAssistant.id]
+  if (existing) {
+    // 同一条消息多次执行：累加图表与输出文件，其余字段取最新一次
+    codeExecutionResults.value[lastAssistant.id] = {
+      ...incoming,
+      figures: [...(existing.figures ?? []), ...(incoming.figures ?? [])],
+      outputFiles: { ...(existing.outputFiles ?? {}), ...(incoming.outputFiles ?? {}) }
+    }
+  } else {
+    codeExecutionResults.value[lastAssistant.id] = incoming
+  }
+})
 
 async function handleSelectWorkdir() {
   const dir = await window.electronAPI?.dialog.openDirectory()

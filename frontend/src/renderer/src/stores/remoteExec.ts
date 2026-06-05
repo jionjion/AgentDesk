@@ -11,6 +11,7 @@ import type {
   ExecPolicy
 } from '@/types/remote-exec'
 import { WS_MESSAGE_TYPES } from '@/types/remote-exec'
+import type { ExecuteResult } from '@/types/sandbox'
 
 // ── 配置持久化 ──────────────────────────────────────
 const SETTINGS_KEY = 'remote_exec_settings'
@@ -66,6 +67,12 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
   const status = ref<RemoteExecStatus>('disconnected')
   const pendingCommands = ref<PendingCommand[]>([])
   const executionHistory = ref<Array<{ command: string; result: CommandResult; timestamp: number }>>([])
+  /**
+   * Agent 触发的沙箱执行结果（含图表），供聊天界面渲染。
+   * 每次 Agent 调用 sandbox_exec 后写入最新一条，ChatView 监听后绑定到当前流式助手消息。
+   */
+  const lastSandboxResult = ref<{ sessionId: string; result: ExecuteResult; seq: number } | null>(null)
+  let sandboxResultSeq = 0
   /** 已授权"本次全部允许"的会话 ID 集合（内存态，刷新重置） */
   const autoApprovedSessions = ref<Set<string>>(new Set())
   // WebSocket 实例（非响应式）
@@ -245,6 +252,9 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
       const sessionId = msg.sessionId || 'default'
       const result = await sandboxStore.execute(sessionId, payload.code)
 
+      // 把执行结果（含图表）暴露给聊天界面渲染（绑定到当前流式助手消息）
+      lastSandboxResult.value = { sessionId, result, seq: ++sandboxResultSeq }
+
       // 回传执行结果
       sendMessage({
         type: WS_MESSAGE_TYPES.SANDBOX_EXEC_RESULT,
@@ -285,7 +295,11 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     pendingCommands.value = pendingCommands.value.filter(c => c.requestId !== cmd.requestId)
 
     try {
-      const result = await window.electronAPI.shell.execute(cmd.command, cmd.workingDir || undefined, cmd.policy)
+      // policy 来自响应式 ref（pendingCommands），是嵌套的 Vue Proxy；
+      // 直接经 IPC 传递会触发 structuredClone 失败（An object could not be cloned）。
+      // policy 仅含字符串/数字/数组等可序列化值，用 JSON 深拷贝彻底剥离所有层级的 Proxy。
+      const rawPolicy = cmd.policy ? JSON.parse(JSON.stringify(cmd.policy)) : undefined
+      const result = await window.electronAPI.shell.execute(cmd.command, cmd.workingDir || undefined, rawPolicy)
 
       // 记录历史
       executionHistory.value.unshift({ command: cmd.command, result, timestamp: Date.now() })
@@ -376,6 +390,7 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     status,
     pendingCommands,
     executionHistory,
+    lastSandboxResult,
     // Computed
     isConnected,
     hasPendingCommands,
