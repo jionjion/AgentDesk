@@ -42,10 +42,16 @@ public class SimpleTools {
 
     private final FileRecordRepository fileRecordRepository;
     private final OssService ossService;
+    private final Long userId;
 
     public SimpleTools(FileRecordRepository fileRecordRepository, OssService ossService) {
+        this(fileRecordRepository, ossService, null);
+    }
+
+    public SimpleTools(FileRecordRepository fileRecordRepository, OssService ossService, Long userId) {
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
+        this.userId = userId;
     }
 
     @Tool(name = ToolDefinitions.GET_CURRENT_TIME, description = ToolDefinitions.GET_CURRENT_TIME_DESC)
@@ -76,7 +82,11 @@ public class SimpleTools {
             @ToolParam(name = "fileId", description = "文件ID，从用户上传的文件信息中获取")
             Long fileId
     ) {
-        FileRecord record = fileRecordRepository.findById(fileId).orElse(null);
+        if (userId == null) {
+            return "无权读取文件: 当前工具未绑定用户";
+        }
+
+        FileRecord record = fileRecordRepository.findByIdAndUserId(fileId, userId).orElse(null);
         if (record == null) {
             return "文件不存在: " + fileId;
         }

@@ -6,6 +6,15 @@ import {registerIpcHandlers} from './ipc'
 import {initUpdater} from './updater'
 
 type CloseAction = 'ask' | 'minimize' | 'quit'
+const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+
+function isAllowedExternalUrl(urlString: string): boolean {
+    try {
+        return ALLOWED_EXTERNAL_PROTOCOLS.has(new URL(urlString).protocol)
+    } catch {
+        return false
+    }
+}
 
 // ── 本地设置持久化 ──────────────────────────────
 const settingsDir = join(app.getPath('userData'), 'local-settings')
@@ -134,7 +143,9 @@ function createWindow(): void {
     })
 
     mainWindow.webContents.setWindowOpenHandler((details) => {
-        shell.openExternal(details.url)
+        if (isAllowedExternalUrl(details.url)) {
+            void shell.openExternal(details.url)
+        }
         return {action: 'deny'}
     })
 

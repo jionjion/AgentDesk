@@ -15,17 +15,28 @@ import type { ExecuteResult } from '@/types/sandbox'
 
 // ── 配置持久化 ──────────────────────────────────────
 const SETTINGS_KEY = 'remote_exec_settings'
+const SETTINGS_VERSION = 2
 
 const DEFAULT_SETTINGS: RemoteExecSettings = {
+  settingsVersion: SETTINGS_VERSION,
   enabled: true,
-  autoExecuteLowRisk: true,
+  autoExecuteLowRisk: false,
   defaultWorkDir: ''
 }
 
 function loadSettings(): RemoteExecSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<RemoteExecSettings>
+      const settings = { ...DEFAULT_SETTINGS, ...parsed }
+      if (parsed.settingsVersion !== SETTINGS_VERSION) {
+        settings.autoExecuteLowRisk = false
+        settings.settingsVersion = SETTINGS_VERSION
+        saveSettings(settings)
+      }
+      return settings
+    }
   } catch { /* ignore */ }
   return { ...DEFAULT_SETTINGS }
 }

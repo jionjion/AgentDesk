@@ -32,10 +32,16 @@ public class FileTools {
 
     private final FileRecordRepository fileRecordRepository;
     private final OssService ossService;
+    private final Long userId;
 
     public FileTools(FileRecordRepository fileRecordRepository, OssService ossService) {
+        this(fileRecordRepository, ossService, null);
+    }
+
+    public FileTools(FileRecordRepository fileRecordRepository, OssService ossService, Long userId) {
         this.fileRecordRepository = fileRecordRepository;
         this.ossService = ossService;
+        this.userId = userId;
     }
 
     @Tool(name = ToolDefinitions.READ_FILE, description = ToolDefinitions.READ_FILE_DESC)
@@ -43,7 +49,11 @@ public class FileTools {
             @ToolParam(name = "fileId", description = "文件ID，从用户上传的文件信息中获取")
             Long fileId
     ) {
-        FileRecord record = fileRecordRepository.findById(fileId).orElse(null);
+        if (userId == null) {
+            return "无权读取文件: 当前工具未绑定用户";
+        }
+
+        FileRecord record = fileRecordRepository.findByIdAndUserId(fileId, userId).orElse(null);
         if (record == null) {
             return "文件不存在: " + fileId;
         }

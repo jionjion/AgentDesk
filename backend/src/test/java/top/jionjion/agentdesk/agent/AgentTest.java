@@ -4,6 +4,7 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.tool.Toolkit;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Agent 集成测试 - 直接调用阿里云百炼平台验证 Agent 效果
  */
 @SpringBootTest
+@Disabled("Requires live DashScope credentials and database-backed tool dependencies")
 class AgentTest {
 
     @Autowired

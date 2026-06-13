@@ -60,6 +60,8 @@ export interface PendingCommand {
 
 /** 远程执行设置 */
 export interface RemoteExecSettings {
+  /** 本地设置结构版本, 用于安全默认值迁移 */
+  settingsVersion: number
   /** 是否启用远程执行 */
   enabled: boolean
   /** 自动执行低风险命令 */

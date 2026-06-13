@@ -4,7 +4,7 @@
       style="-webkit-app-region: drag"
   >
     <!-- 左侧占位 -->
-    <div class="flex items-center gap-2"></div>
+    <div class="flex items-center gap-2"/>
 
     <!-- 右侧操作区 -->
     <div class="flex items-center gap-2" style="-webkit-app-region: no-drag">

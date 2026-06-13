@@ -32,7 +32,7 @@ public class CommandRiskClassifier {
     private final Set<String> lowRiskCommands;
 
     public CommandRiskClassifier(
-            @Value("${agentdesk.remote-exec.low-risk-commands:ls,cat,head,tail,find,grep,wc,pwd,echo,date,whoami,which,env,printenv,type,file,dir,where,hostname,ver,systeminfo,set,cd,tree}") String lowRiskCommandsStr) {
+            @Value("${agentdesk.remote-exec.low-risk-commands:ls,cat,head,tail,find,grep,wc,pwd,echo,date,whoami,which,type,file,dir,where,ver,cd,tree}") String lowRiskCommandsStr) {
         this.lowRiskCommands = Arrays.stream(lowRiskCommandsStr.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -125,7 +125,21 @@ public class CommandRiskClassifier {
      */
     private boolean containsDangerousOperators(String command) {
         return command.contains("|") || command.contains(">") || command.contains("<")
-                || command.contains("`") || command.contains("$(");
+                || command.contains("`") || command.contains("$(") || containsSingleAmpersand(command);
+    }
+
+    private boolean containsSingleAmpersand(String command) {
+        for (int i = 0; i < command.length(); i++) {
+            if (command.charAt(i) != '&') {
+                continue;
+            }
+            boolean previousIsAmpersand = i > 0 && command.charAt(i - 1) == '&';
+            boolean nextIsAmpersand = i + 1 < command.length() && command.charAt(i + 1) == '&';
+            if (!previousIsAmpersand && !nextIsAmpersand) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

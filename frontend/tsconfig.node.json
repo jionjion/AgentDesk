@@ -8,6 +8,7 @@
   "compilerOptions": {
     "composite": true,
     "moduleResolution": "bundler",
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/node.tsbuildinfo",
     "types": ["electron-vite/node"]
   }
 }

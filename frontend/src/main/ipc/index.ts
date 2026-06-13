@@ -29,7 +29,16 @@ const DEFAULT_TIMEOUT_MS = 120_000
 const DEFAULT_MAX_OUTPUT_CHARS = 1_000_000
 /** 全局并发执行上限 */
 const MAX_CONCURRENT_EXECUTIONS = 5
+const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 let runningExecutions = 0
+
+function isAllowedExternalUrl(urlString: string): boolean {
+    try {
+        return ALLOWED_EXTERNAL_PROTOCOLS.has(new URL(urlString).protocol)
+    } catch {
+        return false
+    }
+}
 
 /**
  * 规范化路径：解析符号链接后取绝对路径。路径不存在时回退到 path.resolve。
@@ -145,6 +154,9 @@ export function registerIpcHandlers(): void {
 
     // Shell 操作
     ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+        if (!isAllowedExternalUrl(url)) {
+            throw new Error('不允许打开该链接')
+        }
         await shell.openExternal(url)
     })
 

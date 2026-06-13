@@ -19,7 +19,7 @@ public interface FileRecordRepository extends JpaRepository<FileRecord, Long> {
      * @param ids 文件ID列表
      * @return 文件记录列表
      */
-    List<FileRecord> findByIdIn(List<Long> ids);
+    List<FileRecord> findByIdInAndUserId(List<Long> ids, Long userId);
 
     /**
      * 根据文件ID和用户ID查询文件记录

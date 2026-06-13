@@ -58,12 +58,18 @@ public class RemoteExecBridge implements ClientExecutor {
     /**
      * requestId → CompletableFuture 映射（等待客户端响应）
      */
-    private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingRequests = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PendingCommand> pendingRequests = new ConcurrentHashMap<>();
 
     /**
      * requestId → CompletableFuture 映射（沙箱执行等待）
      */
-    private final ConcurrentHashMap<String, CompletableFuture<SandboxResult>> pendingSandboxRequests = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PendingSandbox> pendingSandboxRequests = new ConcurrentHashMap<>();
+
+    private record PendingCommand(Long userId, CompletableFuture<CommandResult> future) {
+    }
+
+    private record PendingSandbox(Long userId, CompletableFuture<SandboxResult> future) {
+    }
 
     public RemoteExecBridge(ObjectMapper objectMapper,
                             @Value("${agentdesk.remote-exec.command-timeout:120000}") long commandTimeout,
@@ -123,10 +129,21 @@ public class RemoteExecBridge implements ClientExecutor {
         connections.remove(userId);
         clientPlatforms.remove(userId);
         // 完成该用户所有 pending 请求（以异常方式）
-        pendingRequests.forEach((requestId, future) -> {
-            if (!future.isDone()) {
-                future.completeExceptionally(new IOException("客户端已断开连接"));
+        pendingRequests.entrySet().removeIf(entry -> {
+            PendingCommand pending = entry.getValue();
+            if (userId.equals(pending.userId()) && !pending.future().isDone()) {
+                pending.future().completeExceptionally(new IOException("客户端已断开连接"));
+                return true;
             }
+            return false;
+        });
+        pendingSandboxRequests.entrySet().removeIf(entry -> {
+            PendingSandbox pending = entry.getValue();
+            if (userId.equals(pending.userId()) && !pending.future().isDone()) {
+                pending.future().completeExceptionally(new IOException("客户端已断开连接"));
+                return true;
+            }
+            return false;
         });
         log.info("用户 {} 远程执行客户端已断开", userId);
     }
@@ -161,14 +178,14 @@ public class RemoteExecBridge implements ClientExecutor {
         }
 
         // 检查并发限制
-        long userPendingCount = pendingRequests.size();
+        long userPendingCount = countPendingForUser(userId);
         if (userPendingCount >= maxPendingCommands) {
             throw new RemoteExecException("待执行命令数已达上限 (" + maxPendingCommands + "), 请等待当前命令完成。");
         }
 
         String requestId = UUID.randomUUID().toString();
         CompletableFuture<CommandResult> future = new CompletableFuture<>();
-        pendingRequests.put(requestId, future);
+        pendingRequests.put(requestId, new PendingCommand(userId, future));
 
         try {
             // 构建执行隔离策略: 后端只下发服务端可控的资源限制与隔离档位,
@@ -227,9 +244,9 @@ public class RemoteExecBridge implements ClientExecutor {
      * 处理客户端返回的命令执行结果
      */
     public void onCommandResult(String requestId, CommandResult result) {
-        CompletableFuture<CommandResult> future = pendingRequests.get(requestId);
-        if (future != null) {
-            future.complete(result);
+        PendingCommand pending = pendingRequests.get(requestId);
+        if (pending != null) {
+            pending.future().complete(result);
         } else {
             log.warn("收到未知 requestId 的结果: {}", requestId);
         }
@@ -239,9 +256,9 @@ public class RemoteExecBridge implements ClientExecutor {
      * 处理客户端拒绝执行
      */
     public void onCommandRejected(String requestId, String reason) {
-        CompletableFuture<CommandResult> future = pendingRequests.get(requestId);
-        if (future != null) {
-            future.completeExceptionally(new RemoteExecException("用户拒绝执行该命令" +
+        PendingCommand pending = pendingRequests.get(requestId);
+        if (pending != null) {
+            pending.future().completeExceptionally(new RemoteExecException("用户拒绝执行该命令" +
                     (reason != null && !reason.isBlank() ? ": " + reason : "")));
         }
     }
@@ -257,9 +274,14 @@ public class RemoteExecBridge implements ClientExecutor {
             throw new RemoteExecException("客户端未连接, 无法执行沙箱代码。");
         }
 
+        long userPendingCount = countPendingForUser(userId);
+        if (userPendingCount >= maxPendingCommands) {
+            throw new RemoteExecException("待执行命令数已达上限 (" + maxPendingCommands + "), 请等待当前命令完成。");
+        }
+
         String requestId = UUID.randomUUID().toString();
         CompletableFuture<SandboxResult> future = new CompletableFuture<>();
-        pendingSandboxRequests.put(requestId, future);
+        pendingSandboxRequests.put(requestId, new PendingSandbox(userId, future));
 
         try {
             WsMessage msg = WsMessage.of(
@@ -292,9 +314,9 @@ public class RemoteExecBridge implements ClientExecutor {
      * 处理客户端返回的沙箱执行结果
      */
     public void onSandboxResult(String requestId, SandboxResult result) {
-        CompletableFuture<SandboxResult> future = pendingSandboxRequests.get(requestId);
-        if (future != null) {
-            future.complete(result);
+        PendingSandbox pending = pendingSandboxRequests.get(requestId);
+        if (pending != null) {
+            pending.future().complete(result);
         } else {
             log.warn("收到未知 requestId 的沙箱结果: {}", requestId);
         }
@@ -329,6 +351,16 @@ public class RemoteExecBridge implements ClientExecutor {
             return new CommandResult(result.exitCode(), stdout, stderr, result.durationMs());
         }
         return result;
+    }
+
+    private long countPendingForUser(Long userId) {
+        long commandCount = pendingRequests.values().stream()
+                .filter(pending -> userId.equals(pending.userId()))
+                .count();
+        long sandboxCount = pendingSandboxRequests.values().stream()
+                .filter(pending -> userId.equals(pending.userId()))
+                .count();
+        return commandCount + sandboxCount;
     }
 
     /**

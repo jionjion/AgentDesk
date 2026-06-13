@@ -74,5 +74,5 @@ agentdesk:
     heartbeat-interval: 30
     heartbeat-timeout: 10
     max-result-size: 262144
-    low-risk-commands: ls,cat,head,tail,find,grep,wc,pwd,echo,date,whoami,which,env,printenv,type,file
+    low-risk-commands: ls,cat,head,tail,find,grep,wc,pwd,echo,date,whoami,which,type,file
     allowed-origins: ${AGENTDESK_WS_ALLOWED_ORIGINS:http://localhost:*}

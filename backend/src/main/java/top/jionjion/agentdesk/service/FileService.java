@@ -89,7 +89,8 @@ public class FileService {
      * 按 ID 批量查询文件
      */
     public List<FileResponse> getByIds(List<Long> ids) {
-        return fileRecordRepository.findByIdIn(ids)
+        Long userId = UserContext.getUserId();
+        return fileRecordRepository.findByIdInAndUserId(ids, userId)
                 .stream().map(this::toResponse).toList();
     }
 

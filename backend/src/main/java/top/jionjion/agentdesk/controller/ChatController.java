@@ -173,6 +173,9 @@ public class ChatController {
         if (!SESSION_ID_PATTERN.matcher(sessionId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid sessionId");
         }
+        if (!sessionService.belongsToUser(sessionId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
+        }
         AgentHandle handle = agentPool.getOrCreate(sessionId);
         handle.agent().interrupt();
         return Map.of("status", "interrupted");

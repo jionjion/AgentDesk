@@ -16,9 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
- * 限流拦截器: 基于用户维度的滑动窗口限流.
+ * 限流拦截器: 已登录请求按用户限流, 未登录请求按客户端 IP 限流.
  * <p>
- * 使用内存 ConcurrentHashMap 存储每个用户每个接口的请求时间戳队列,
+ * 使用内存 ConcurrentHashMap 存储每个身份每个接口的请求时间戳队列,
  * 通过滑动窗口算法判断是否超过限流阈值.
  *
  * @author Jion
@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     /**
-     * key = userId:handlerClass#method, value = 请求时间戳队列
+     * key = identity:handlerClass#method, value = 请求时间戳队列
      */
     private final ConcurrentHashMap<String, Deque<Long>> requestRecords = new ConcurrentHashMap<>();
 
@@ -42,13 +42,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 用户必须已认证
-        if (!UserContext.isAuthenticated()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "未认证, 无法访问该接口");
-        }
-
-        Long userId = UserContext.getUserId();
-        String key = userId + ":" + handlerMethod.getBeanType().getSimpleName() + "#" + handlerMethod.getMethod().getName();
+        String identity = UserContext.isAuthenticated()
+                ? "user:" + UserContext.getUserId()
+                : "ip:" + clientIp(request);
+        String key = identity + ":" + handlerMethod.getBeanType().getSimpleName() + "#" + handlerMethod.getMethod().getName();
 
         long now = System.currentTimeMillis();
         long windowStart = now - rateLimit.windowSeconds() * 1000L;
@@ -66,5 +63,17 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         timestamps.addLast(now);
         return true;
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

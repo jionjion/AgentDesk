@@ -10,7 +10,7 @@
   <a href="https://github.com/jionjion/AgentDesk/issues"><img src="https://img.shields.io/github/issues/jionjion/AgentDesk" alt="Issues"></a>
   <a href="https://github.com/jionjion/AgentDesk/commits/main"><img src="https://img.shields.io/github/last-commit/jionjion/AgentDesk" alt="Last Commit"></a>
   <br>
-  <a href="https://openjdk.org/"><img src="https://img.shields.io/badge/Java-25-orange" alt="Java"></a>
+  <a href="https://openjdk.org/"><img src="https://img.shields.io/badge/Java-21-orange" alt="Java"></a>
   <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring%20Boot-3.5-brightgreen" alt="Spring Boot"></a>
   <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue-3-4FC08D" alt="Vue"></a>
   <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Electron-33-47848F" alt="Electron"></a>
@@ -45,7 +45,7 @@ AgentDesk 是一款桌面端智能体应用，让你通过自然语言对话驱�
 ### 环境要求
 
 - **Node.js** >= 18
-- **Java** >= 25
+- **Java** >= 21
 - **PostgreSQL** >= 14
 - **Maven** >= 3.6
 
@@ -54,7 +54,7 @@ AgentDesk 是一款桌面端智能体应用，让你通过自然语言对话驱�
 在 PostgreSQL 中执行初始化脚本，创建 schema 和所有表：
 
 ```bash
-psql -U postgres -f backend/src/main/resources/database.sql
+psql -U postgres -f backend/src/main/resources/db/database.sql
 ```
 
 ### 2. 启动后端

@@ -150,7 +150,6 @@ public class AgentFactory {
     public AgentHandle createAgent(String sessionId) {
         // 每个 Agent 独立的 Toolkit（Toolkit 有状态, 不可共享）
         Toolkit toolkit = new Toolkit();
-        toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
         toolkit.registerTool(new ApiCallTool());
         toolkit.registerTool(new IpLocationTool());
 
@@ -173,6 +172,8 @@ public class AgentFactory {
             userApiKey = settingsService.getDashScopeApiKey(userId);
             memSettings = settingsService.getMemorySettings(userId);
         }
+
+        toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService, userId));
 
         // 通过工厂创建模型（自动 fallback 到系统默认 Key）
         DashScopeChatModel model = chatModelFactory.create(ms, userApiKey);
@@ -211,7 +212,7 @@ public class AgentFactory {
         }
 
         // 子代理集成: 注册 web-researcher 子代理（通过 Agent as Tool 模式）
-        registerSubAgents(toolkit, model);
+        registerSubAgents(toolkit, model, userId);
 
         log.info("会话 {} 工具注册完成, 已注册工具: {}", sessionId, toolkit.getToolNames());
 
@@ -313,7 +314,7 @@ public class AgentFactory {
      * 注册子代理: 将专用子代理作为工具注册到父 Agent 的 Toolkit。
      * 子代理在独立上下文中执行任务, 只返回精简结果, 减少父 Agent 上下文消耗。
      */
-    private void registerSubAgents(Toolkit toolkit, DashScopeChatModel model) {
+    private void registerSubAgents(Toolkit toolkit, DashScopeChatModel model, Long userId) {
         // ─── 联网子代理（依赖 Tavily API Key）───
         if (tavilyApiKey != null) {
             try {
@@ -396,7 +397,7 @@ public class AgentFactory {
             // code-reviewer 子代理: 代码审查，使用代码专用模型
             DashScopeChatModel codeModel = chatModelFactory.createByModelName("qwen3-coder-plus");
             Toolkit codeToolkit = new Toolkit();
-            codeToolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
+            codeToolkit.registerTool(new SimpleTools(fileRecordRepository, ossService, userId));
 
             String codeReviewerPrompt = loadAgentPrompt("agents/code-reviewer.ftl");
             toolkit.registration()
@@ -458,7 +459,7 @@ public class AgentFactory {
         try {
             // 构建工具池: 子代理可选的工具实例
             Map<String, Object> toolPool = new LinkedHashMap<>();
-            SimpleTools simpleToolsForPool = new SimpleTools(fileRecordRepository, ossService);
+            SimpleTools simpleToolsForPool = new SimpleTools(fileRecordRepository, ossService, userId);
             toolPool.put(ToolDefinitions.GET_CURRENT_TIME, simpleToolsForPool);
             toolPool.put(ToolDefinitions.CALCULATE, simpleToolsForPool);
             toolPool.put(ToolDefinitions.READ_FILE, simpleToolsForPool);

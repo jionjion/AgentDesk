@@ -255,6 +255,7 @@ class="shrink-0 rounded px-1.5 py-0.5 text-xs text-violet-600 dark:text-violet-4
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {Marked} from 'marked'
 import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 import {api as viewerApi} from 'v-viewer'
 import {CheckCircle2, ChevronRight, Copy, Database, FileText, Loader2, RefreshCw, Settings2, Trash2, BookMarked} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
@@ -271,6 +272,16 @@ import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, A
 import PrecipitateDialog from '@/components/chat/PrecipitateDialog.vue'
 
 const marked = new Marked()
+
+const MARKDOWN_SANITIZE_CONFIG = {
+  ADD_ATTR: ['data-code'],
+  FORBID_TAGS: ['script', 'style'],
+  FORBID_ATTR: ['style']
+}
+
+function renderMarkdown(markdown: string): string {
+  return DOMPurify.sanitize(marked.parse(markdown) as string, MARKDOWN_SANITIZE_CONFIG)
+}
 
 // 自定义 code block 渲染，注入复制按钮 + 运行按钮 + 高亮
 marked.use({
@@ -450,7 +461,7 @@ const contentSegments = computed<ContentSegment[]>(() => {
 
   while ((match = regex.exec(content)) !== null) {
     const before = content.slice(lastIndex, match.index)
-    const html = before.trim() ? (marked.parse(before) as string) : ''
+    const html = before.trim() ? renderMarkdown(before) : ''
 
     if (match[1] !== undefined) {
       // subtask_done marker
@@ -469,7 +480,7 @@ const contentSegments = computed<ContentSegment[]>(() => {
 
   const remaining = content.slice(lastIndex)
   if (remaining.trim()) {
-    segments.push({html: marked.parse(remaining) as string})
+    segments.push({html: renderMarkdown(remaining)})
   }
 
   // 流式输出时，将光标注入最后一个有 html 的段落
@@ -509,7 +520,7 @@ const uniqueKnowledgeRefs = computed(() => {
 const renderedContent = computed(() => {
   const content = (props.message as AssistantMessage).content || ''
   const clean = content.replace(new RegExp(ANY_MARKER.source, 'g'), '')
-  let html = marked.parse(clean) as string
+  let html = renderMarkdown(clean)
   if ((props.message as AssistantMessage).isStreaming) {
     html = injectCursor(html)
   }
