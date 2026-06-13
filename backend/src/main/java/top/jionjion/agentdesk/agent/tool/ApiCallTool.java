@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -44,11 +45,13 @@ public class ApiCallTool {
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(10, TimeUnit.SECONDS)
+                .followRedirects(false)
+                .followSslRedirects(false)
                 .dns(hostname -> {
                     // SSRF 防护: 解析后检查是否为内网地址
                     var addresses = InetAddress.getAllByName(hostname);
                     for (InetAddress addr : addresses) {
-                        if (addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()) {
+                        if (isBlockedAddress(addr)) {
                             throw new java.net.UnknownHostException("禁止访问内网地址: " + hostname);
                         }
                     }
@@ -81,8 +84,13 @@ public class ApiCallTool {
         }
 
         try {
+            HttpUrl parsedUrl = HttpUrl.parse(url);
+            if (parsedUrl == null) {
+                return "错误: url 格式不正确";
+            }
+
             // 构建请求
-            Request.Builder requestBuilder = new Request.Builder().url(url);
+            Request.Builder requestBuilder = new Request.Builder().url(parsedUrl);
 
             // 解析并设置请求头
             if (headers != null && !headers.isBlank()) {
@@ -123,13 +131,21 @@ public class ApiCallTool {
                 if (response.body() != null) {
                     // 限制读取大小
                     byte[] bytes = response.body().byteStream().readNBytes(MAX_BODY_SIZE);
-                    responseBody = new String(bytes);
+                    responseBody = new String(bytes, StandardCharsets.UTF_8);
                 }
 
                 // 格式化输出
                 StringBuilder result = new StringBuilder();
                 result.append("HTTP ").append(statusCode).append(" ").append(response.message()).append("\n");
                 result.append("---\n");
+                if (statusCode >= 300 && statusCode < 400) {
+                    String location = response.header("Location");
+                    result.append("重定向响应已停止自动跟随");
+                    if (location != null && !location.isBlank()) {
+                        result.append(": ").append(location);
+                    }
+                    return result.toString();
+                }
 
                 if (responseBody.length() > MAX_RESPONSE_LENGTH) {
                     result.append(responseBody, 0, MAX_RESPONSE_LENGTH);
@@ -144,5 +160,29 @@ public class ApiCallTool {
             log.error("api_call 调用失败: {} {} - {}", upperMethod, url, e.getMessage());
             return "请求失败: " + e.getMessage();
         }
+    }
+
+    boolean isBlockedAddress(InetAddress addr) {
+        if (addr.isAnyLocalAddress() || addr.isLoopbackAddress()
+                || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()
+                || addr.isMulticastAddress()) {
+            return true;
+        }
+
+        byte[] bytes = addr.getAddress();
+        if (bytes.length == 4) {
+            int first = bytes[0] & 0xff;
+            int second = bytes[1] & 0xff;
+            return first == 0
+                    || first == 10
+                    || first == 127
+                    || (first == 100 && second >= 64 && second <= 127)
+                    || (first == 169 && second == 254)
+                    || (first == 172 && second >= 16 && second <= 31)
+                    || (first == 192 && second == 168);
+        }
+
+        // IPv6 Unique Local Addresses fc00::/7.
+        return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
     }
 }

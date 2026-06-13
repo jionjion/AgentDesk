@@ -9,7 +9,7 @@ export interface ExecPolicy {
         memMB?: number
         maxProcesses?: number
     }
-    isolationLevel?: 'boundary' | 'none'
+    isolationLevel?: 'boundary'
 }
 
 

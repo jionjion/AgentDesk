@@ -1,7 +1,7 @@
 package top.jionjion.agentdesk.service;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 文件上传集成测试 - 直接调用阿里云 OSS 验证上传/查询/删除
  */
 @SpringBootTest
-@Disabled("Requires local image file, database and live OSS credentials")
+@Tag("integration")
 class FileServiceTest {
 
     @Autowired

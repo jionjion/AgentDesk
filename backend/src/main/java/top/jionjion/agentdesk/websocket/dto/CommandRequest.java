@@ -34,7 +34,7 @@ public record CommandRequest(
      *
      * @param allowedRoots   允许执行的根目录树（通常为 null, 由客户端决定）
      * @param resourceLimits 资源限制
-     * @param isolationLevel 隔离档位: boundary（目录边界+兜底）/ none（旧行为透传）
+     * @param isolationLevel 隔离档位: boundary（目录边界+资源兜底）
      */
     public record ExecPolicy(
             List<String> allowedRoots,
@@ -43,7 +43,6 @@ public record CommandRequest(
     ) {
 
         public static final String LEVEL_BOUNDARY = "boundary";
-        public static final String LEVEL_NONE = "none";
     }
 
     /**

@@ -67,14 +67,14 @@ cp .env.example .env
 # 编辑 .env 文件填入实际配置
 
 # 启动
-mvn spring-boot:run
+.\mvnw.cmd spring-boot:run
 ```
 
 也可以用 Docker 部署后端：
 
 ```bash
 cd backend
-mvn clean package -DskipTests
+.\mvnw.cmd clean package -DskipTests
 docker build -f .docker/Dockerfile -t agentdesk-backend .
 docker run -d -p 8080:8080 --name agentdesk-backend agentdesk-backend
 ```

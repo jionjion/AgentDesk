@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSandboxStore } from '@/stores/sandbox'
 import type {
   RemoteExecStatus,
   RemoteExecSettings,
@@ -49,7 +50,7 @@ function saveSettings(settings: RemoteExecSettings): void {
  * 构建执行隔离策略：
  * - allowedRoots 由客户端掌握（用户授权的工作目录），后端不下发目录边界。
  * - resourceLimits.timeoutMs 取后端下发值（payload.timeoutMs）。
- * - 后端若下发 policy（resourceLimits/isolationLevel）则合并覆盖。
+ * - 后端若下发 policy，仅合并资源限制；隔离级别始终由客户端固定为 boundary。
  */
 function buildPolicy(workingDir: string, payload: CommandRequestPayload): ExecPolicy {
   const backendPolicy = payload.policy
@@ -60,7 +61,7 @@ function buildPolicy(workingDir: string, payload: CommandRequestPayload): ExecPo
       timeoutMs: payload.timeoutMs,
       ...backendPolicy?.resourceLimits
     },
-    isolationLevel: backendPolicy?.isolationLevel ?? 'boundary'
+    isolationLevel: 'boundary'
   }
 }
 
@@ -256,8 +257,6 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     if (!payload || !payload.code || !msg.requestId) return
 
     try {
-      // 动态导入沙箱 store（避免循环依赖）
-      const { useSandboxStore } = await import('@/stores/sandbox')
       const sandboxStore = useSandboxStore()
 
       const sessionId = msg.sessionId || 'default'

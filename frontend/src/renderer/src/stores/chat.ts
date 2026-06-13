@@ -6,6 +6,7 @@ import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessage
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
 import {useSandboxStore} from '@/stores/sandbox'
+import {useRemoteExecStore} from '@/stores/remoteExec'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -503,7 +504,6 @@ export const useChatStore = defineStore('chat', () => {
         const sandboxContext = sandboxStore.getSandboxContext()
 
         // 获取当前工作目录（优先用 remoteExec 的 defaultWorkDir，其次用 sandbox 的 workdir）
-        const { useRemoteExecStore } = await import('@/stores/remoteExec')
         const remoteExecStore = useRemoteExecStore()
         const workingDir = remoteExecStore.settings.defaultWorkDir || sandboxStore.workdir || undefined
 

@@ -7,7 +7,7 @@ import {createJob} from './jobObject'
 
 /** 执行隔离策略（由渲染进程/后端下发） */
 interface ExecPolicy {
-    /** 允许执行的根目录树（绝对路径）。为空表示不做目录约束（兼容旧行为） */
+    /** 允许执行的根目录树（绝对路径）。必须至少有一个授权根目录 */
     allowedRoots?: string[]
     /** 资源限制 */
     resourceLimits?: {
@@ -20,8 +20,8 @@ interface ExecPolicy {
         /** 活动进程数上限，Windows Job Object 硬限制 */
         maxProcesses?: number
     }
-    /** 隔离级别：boundary=仅目录边界+兜底；none=旧行为透传 */
-    isolationLevel?: 'boundary' | 'none'
+    /** 隔离级别：boundary=目录边界+资源兜底 */
+    isolationLevel?: 'boundary'
 }
 
 /** 默认资源限制 */
@@ -31,6 +31,10 @@ const DEFAULT_MAX_OUTPUT_CHARS = 1_000_000
 const MAX_CONCURRENT_EXECUTIONS = 5
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 let runningExecutions = 0
+
+const allowedReadFiles = new Set<string>()
+const allowedReadRoots = new Set<string>()
+const allowedWriteFiles = new Set<string>()
 
 function isAllowedExternalUrl(urlString: string): boolean {
     try {
@@ -52,13 +56,62 @@ async function canonicalize(p: string): Promise<string> {
     }
 }
 
+function pathKey(p: string): string {
+    return process.platform === 'win32' ? p.toLowerCase() : p
+}
+
+async function rememberReadFile(filePath: string): Promise<void> {
+    allowedReadFiles.add(pathKey(await canonicalize(filePath)))
+}
+
+async function rememberReadRoot(dirPath: string): Promise<void> {
+    allowedReadRoots.add(pathKey(await canonicalize(dirPath)))
+}
+
+async function rememberWriteFile(filePath: string): Promise<void> {
+    allowedWriteFiles.add(pathKey(await canonicalize(filePath)))
+}
+
 /** 判断 child 是否在 root 目录树之内（含相等） */
 function isWithin(root: string, child: string): boolean {
-    const a = root.replace(/[\\/]+$/, '').toLowerCase()
-    const b = child.replace(/[\\/]+$/, '').toLowerCase()
+    const a = pathKey(root.replace(/[\\/]+$/, ''))
+    const b = pathKey(child.replace(/[\\/]+$/, ''))
     if (a === b) return true
     const sep = process.platform === 'win32' ? '\\' : '/'
     return b.startsWith(a + sep) || b.startsWith(a + '/')
+}
+
+async function assertReadAllowed(filePath: string): Promise<string> {
+    const canonical = await canonicalize(filePath)
+    const key = pathKey(canonical)
+    if (allowedReadFiles.has(key)) {
+        return canonical
+    }
+    for (const root of allowedReadRoots) {
+        if (isWithin(root, key)) {
+            return canonical
+        }
+    }
+    throw new Error('未授权读取该路径')
+}
+
+async function assertReadRootAllowed(dirPath: string): Promise<string> {
+    const canonical = await canonicalize(dirPath)
+    const key = pathKey(canonical)
+    for (const root of allowedReadRoots) {
+        if (isWithin(root, key)) {
+            return canonical
+        }
+    }
+    throw new Error('未授权读取该目录')
+}
+
+async function assertWriteAllowed(filePath: string): Promise<string> {
+    const canonical = await canonicalize(filePath)
+    if (!allowedWriteFiles.has(pathKey(canonical))) {
+        throw new Error('未授权写入该路径')
+    }
+    return canonical
 }
 
 /**
@@ -68,8 +121,7 @@ async function resolveCwd(workingDir: string | undefined, policy: ExecPolicy | u
     Promise<{ ok: true; cwd: string | undefined } | { ok: false; reason: string }> {
     const roots = policy?.allowedRoots
     if (!roots || roots.length === 0) {
-        // 无目录约束：保持旧行为
-        return {ok: true, cwd: workingDir || undefined}
+        return {ok: false, reason: '缺少授权工作目录，请先选择工作目录后再执行命令'}
     }
     const canonicalRoots = await Promise.all(roots.map(canonicalize))
     // 未显式指定工作目录时，默认使用第一个授权根
@@ -88,7 +140,9 @@ export function registerIpcHandlers(): void {
         const result = await dialog.showOpenDialog({
             properties: ['openFile', 'multiSelections']
         })
-        return result.canceled ? [] : result.filePaths
+        if (result.canceled) return []
+        await Promise.all(result.filePaths.map(rememberReadFile))
+        return result.filePaths
     })
 
     ipcMain.handle('dialog:saveFile', async (_event, options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => {
@@ -96,26 +150,33 @@ export function registerIpcHandlers(): void {
             defaultPath: options?.defaultPath,
             filters: options?.filters
         })
-        return result.canceled ? '' : result.filePath
+        if (result.canceled || !result.filePath) return ''
+        await rememberWriteFile(result.filePath)
+        return result.filePath
     })
 
     ipcMain.handle('dialog:openDirectory', async () => {
         const result = await dialog.showOpenDialog({properties: ['openDirectory']})
-        return result.canceled ? '' : result.filePaths[0]
+        if (result.canceled || !result.filePaths[0]) return ''
+        await rememberReadRoot(result.filePaths[0])
+        return result.filePaths[0]
     })
 
     // 文件系统操作
     ipcMain.handle('fs:readFile', async (_event, filePath: string) => {
-        const data = await readFile(filePath)
+        const allowedPath = await assertReadAllowed(filePath)
+        const data = await readFile(allowedPath)
         return new Uint8Array(data)
     })
 
     ipcMain.handle('fs:writeFile', async (_event, filePath: string, data: Uint8Array) => {
-        await writeFile(filePath, data)
+        const allowedPath = await assertWriteAllowed(filePath)
+        await writeFile(allowedPath, data)
     })
 
     ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
-        const entries = await readdir(dirPath)
+        const allowedPath = await assertReadRootAllowed(dirPath)
+        const entries = await readdir(allowedPath)
         return entries
     })
 
@@ -124,6 +185,7 @@ export function registerIpcHandlers(): void {
         const results: string[] = []
         const MAX_FILES = 200
         const MAX_DEPTH = 5
+        const allowedDir = await assertReadRootAllowed(dirPath)
 
         async function walk(currentDir: string, relativePath: string, depth: number) {
             if (depth > MAX_DEPTH || results.length >= MAX_FILES) return
@@ -148,7 +210,7 @@ export function registerIpcHandlers(): void {
             }
         }
 
-        await walk(dirPath, '', 0)
+        await walk(allowedDir, '', 0)
         return results
     })
 
@@ -191,31 +253,35 @@ async function executeShellCommand(
 ): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> {
     const startTime = Date.now()
 
-    // none 档：完全保持旧行为，跳过所有校验
-    const enforce = policy?.isolationLevel !== 'none'
-
-    if (enforce) {
-        // 并发上限
-        if (runningExecutions >= MAX_CONCURRENT_EXECUTIONS) {
-            return {
-                exitCode: -1,
-                stdout: '',
-                stderr: `并发执行数已达上限 (${MAX_CONCURRENT_EXECUTIONS})，请等待当前命令完成。`,
-                durationMs: Date.now() - startTime
-            }
+    if (policy?.isolationLevel !== 'boundary') {
+        return {
+            exitCode: -1,
+            stdout: '',
+            stderr: '命令被拒绝: 缺少执行隔离策略',
+            durationMs: Date.now() - startTime
         }
-        // 工作目录边界
-        const cwdResult = await resolveCwd(workingDir, policy)
-        if (!cwdResult.ok) {
-            return {
-                exitCode: -1,
-                stdout: '',
-                stderr: `命令被拒绝: ${cwdResult.reason}`,
-                durationMs: Date.now() - startTime
-            }
-        }
-        workingDir = cwdResult.cwd
     }
+
+    // 并发上限
+    if (runningExecutions >= MAX_CONCURRENT_EXECUTIONS) {
+        return {
+            exitCode: -1,
+            stdout: '',
+            stderr: `并发执行数已达上限 (${MAX_CONCURRENT_EXECUTIONS})，请等待当前命令完成。`,
+            durationMs: Date.now() - startTime
+        }
+    }
+    // 工作目录边界
+    const cwdResult = await resolveCwd(workingDir, policy)
+    if (!cwdResult.ok) {
+        return {
+            exitCode: -1,
+            stdout: '',
+            stderr: `命令被拒绝: ${cwdResult.reason}`,
+            durationMs: Date.now() - startTime
+        }
+    }
+    workingDir = cwdResult.cwd
 
     runningExecutions++
     try {

@@ -170,7 +170,7 @@ public class DynamicAgentTool {
         private volatile String reply;
 
         @Override
-        public Mono<HookEvent> onEvent(HookEvent event) {
+        public <T extends HookEvent> Mono<T> onEvent(T event) {
             if (event instanceof PostCallEvent e) {
                 var finalMsg = e.getFinalMessage();
                 if (finalMsg != null) {
