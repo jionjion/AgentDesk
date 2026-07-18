@@ -102,6 +102,52 @@ public class MemoryService {
         }
     }
 
+    /** Searches Mem0 for facts relevant to the current user turn. */
+    public List<MemoryItemDto> searchMemories(Long userId, String query) {
+        String url = mem0BaseUrl + "/search";
+        String json;
+        try {
+            json = MAPPER.writeValueAsString(new SearchMemoryRequest(query, String.valueOf(userId)));
+        } catch (JsonProcessingException e) {
+            return List.of();
+        }
+
+        Builder reqBuilder = new Builder().url(url).post(RequestBody.create(json, JSON_TYPE));
+        addApiKey(reqBuilder);
+        try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
+            if (!response.isSuccessful()) {
+                log.warn("Mem0 搜索记忆失败: {}", response.code());
+                return List.of();
+            }
+            String body = response.body() != null ? response.body().string() : "[]";
+            return parseMemoryList(body).stream().limit(5).toList();
+        } catch (IOException e) {
+            log.warn("Mem0 搜索不可用，当前对话降级为无长期记忆: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** Records one completed conversation turn so Mem0 can extract durable facts. */
+    public void addConversation(Long userId, String userMessage, String assistantReply) {
+        String url = mem0BaseUrl + "/memories";
+        try {
+            var messages = List.of(
+                    Map.of("role", "user", "content", userMessage),
+                    Map.of("role", "assistant", "content", assistantReply));
+            String json = MAPPER.writeValueAsString(
+                    new AddMemoryRequest(messages, String.valueOf(userId)));
+            Builder reqBuilder = new Builder().url(url).post(RequestBody.create(json, JSON_TYPE));
+            addApiKey(reqBuilder);
+            try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
+                if (!response.isSuccessful()) {
+                    log.warn("Mem0 记录对话失败: {}", response.code());
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Mem0 记录对话不可用: {}", e.getMessage());
+        }
+    }
+
     /**
      * 删除单条记忆
      */
@@ -223,5 +269,9 @@ public class MemoryService {
      */
     private record AddMemoryRequest(List<Map<String, String>> messages,
                                      @JsonProperty("user_id") String userId) {
+    }
+
+    private record SearchMemoryRequest(String query,
+                                       @JsonProperty("user_id") String userId) {
     }
 }

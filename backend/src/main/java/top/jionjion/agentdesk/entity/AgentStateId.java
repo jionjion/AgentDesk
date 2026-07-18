@@ -16,6 +16,8 @@ import java.io.Serializable;
 @EqualsAndHashCode
 public class AgentStateId implements Serializable {
 
+    private String userId;
+
     private String sessionId;
 
     private String stateKey;

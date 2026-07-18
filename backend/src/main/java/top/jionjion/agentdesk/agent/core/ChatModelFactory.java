@@ -1,7 +1,7 @@
 package top.jionjion.agentdesk.agent.core;
 
-import io.agentscope.core.model.DashScopeChatModel;
 import io.agentscope.core.model.GenerateOptions;
+import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;

@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.annotation.RateLimit;
 import top.jionjion.agentdesk.dto.chat.ChatRequest;
@@ -108,7 +107,7 @@ public class ChatController {
         // 校验目标消息并查找触发该回复的用户消息 (锁前完成, 与原逻辑一致)
         chatMessageService.requireAssistantMessage(sessionId, messageId);
         List<ChatMessage> history = chatMessageService.getHistory(sessionId);
-        String userMessage = chatMessageService.findTriggeringUserMessage(messageId, history);
+        ChatMessage userMessage = chatMessageService.findTriggeringUserMessageEntity(messageId, history);
 
         Object lockToken = agentPool.tryAcquire(sessionId);
         if (lockToken == null) {
@@ -176,9 +175,8 @@ public class ChatController {
         if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
-        AgentHandle handle = agentPool.getOrCreate(sessionId);
-        handle.agent().interrupt();
-        return Map.of("status", "interrupted");
+        boolean interrupted = agentPool.interrupt(UserContext.getUserId(), sessionId);
+        return Map.of("status", interrupted ? "interrupted" : "not_running");
     }
 
     private void validateSessionId(String sessionId) {

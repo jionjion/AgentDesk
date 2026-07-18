@@ -66,6 +66,20 @@ COMMENT ON COLUMN agent_desk.agent_state.state_key IS '状态键名 (如 memory,
 COMMENT ON COLUMN agent_desk.agent_state.state_data IS 'AgentScope 序列化的状态数据(JSON)';
 COMMENT ON COLUMN agent_desk.agent_state.updated_at IS '最后更新时间戳(毫秒)';
 
+-- AgentScope Java v2 state store. v2 addresses state by userId + sessionId.
+CREATE TABLE IF NOT EXISTS agent_desk.agent_state_v2
+(
+    user_id    VARCHAR(128) NOT NULL,
+    session_id VARCHAR(128) NOT NULL,
+    state_key  VARCHAR(128) NOT NULL,
+    state_data JSONB        NOT NULL DEFAULT '{}',
+    updated_at BIGINT       NOT NULL,
+    PRIMARY KEY (user_id, session_id, state_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_state_v2_session
+    ON agent_desk.agent_state_v2 (user_id, session_id);
+
 -- 5. 用户表
 CREATE TABLE IF NOT EXISTS agent_desk.users
 (

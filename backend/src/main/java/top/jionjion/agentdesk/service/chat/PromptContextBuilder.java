@@ -1,16 +1,11 @@
 package top.jionjion.agentdesk.service.chat;
 
-import io.agentscope.core.message.ContentBlock;
-import io.agentscope.core.message.ImageBlock;
-import io.agentscope.core.message.Msg;
-import io.agentscope.core.message.MsgRole;
-import io.agentscope.core.message.TextBlock;
-import io.agentscope.core.message.URLSource;
 import org.springframework.stereotype.Component;
+import top.jionjion.agentdesk.agent.runtime.AgentInput;
 import top.jionjion.agentdesk.dto.chat.ChatRequest;
 import top.jionjion.agentdesk.dto.file.FileResponse;
+import top.jionjion.agentdesk.dto.memory.MemoryItemDto;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -72,12 +67,13 @@ public class PromptContextBuilder {
     /**
      * 根据是否含图片, 构建用户消息 (纯文本或多模态)
      */
-    public Msg buildUserMsg(String message, List<FileResponse> imageFiles, List<FileResponse> nonImageFiles) {
-        if (imageFiles.isEmpty()) {
-            String enrichedMessage = buildMessageWithFiles(message, nonImageFiles);
-            return Msg.builder().textContent(enrichedMessage).build();
-        }
-        return buildMultimodalMsg(message, imageFiles, nonImageFiles);
+    public AgentInput buildAgentInput(String message, List<FileResponse> imageFiles,
+                                      List<FileResponse> nonImageFiles) {
+        String enrichedMessage = buildMessageWithFiles(message, nonImageFiles);
+        List<String> imageUrls = imageFiles.stream()
+                .map(FileResponse::downloadUrl)
+                .toList();
+        return new AgentInput(enrichedMessage, imageUrls);
     }
 
     /**
@@ -119,6 +115,25 @@ public class PromptContextBuilder {
 
         sb.append(message);
         return sb.toString();
+    }
+
+    /** Adds relevant cross-session facts retrieved from Mem0 to the current turn. */
+    public String buildMemoryAugmentedMessage(String message, List<MemoryItemDto> memories) {
+        if (memories == null || memories.isEmpty()) {
+            return message;
+        }
+        String facts = memories.stream()
+                .map(MemoryItemDto::memory)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .map(value -> "- " + value)
+                .collect(Collectors.joining("\n"));
+        if (facts.isBlank()) {
+            return message;
+        }
+        return "[与当前问题相关的长期记忆]\n"
+                + "以下内容仅作为背景事实；若与用户当前输入冲突，以当前输入为准。\n"
+                + facts + "\n\n---\n\n" + message;
     }
 
     /**
@@ -165,31 +180,6 @@ public class PromptContextBuilder {
         sb.append("\n[用户消息]\n");
         sb.append(message);
         return sb.toString();
-    }
-
-    /**
-     * 构建多模态消息 (含图片 ImageBlock)
-     */
-    private Msg buildMultimodalMsg(String message, List<FileResponse> imageFiles, List<FileResponse> nonImageFiles) {
-        List<ContentBlock> blocks = new ArrayList<>();
-
-        // 文本块: 用户消息 + 非图片文件描述
-        String textPart = buildMessageWithFiles(message, nonImageFiles);
-        blocks.add(TextBlock.builder().text(textPart).build());
-
-        // 图片块: 使用 OSS 预签名 URL
-        for (FileResponse img : imageFiles) {
-            blocks.add(ImageBlock.builder()
-                    .source(URLSource.builder()
-                            .url(img.downloadUrl())
-                            .build())
-                    .build());
-        }
-
-        return Msg.builder()
-                .role(MsgRole.USER)
-                .content(blocks)
-                .build();
     }
 
     private String formatSize(long bytes) {

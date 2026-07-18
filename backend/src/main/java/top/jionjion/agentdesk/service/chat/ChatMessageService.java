@@ -115,6 +115,16 @@ public class ChatMessageService {
         chatMessageRepository.deleteById(messageId);
     }
 
+    /** Removes the selected assistant reply and every later branch message. */
+    public void deleteBranchFrom(String sessionId, Long messageId) {
+        chatMessageRepository.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
+    }
+
+    /** Returns durable messages before the user turn that will be regenerated. */
+    public List<ChatMessage> getHistoryBefore(String sessionId, Long messageId) {
+        return chatMessageRepository.findBySessionIdAndIdLessThanOrderByCreatedAtAsc(sessionId, messageId);
+    }
+
     /**
      * 校验目标消息为本会话的助手消息, 不满足抛出异常
      */
@@ -132,21 +142,27 @@ public class ChatMessageService {
      */
     @NonNull
     public String findTriggeringUserMessage(Long messageId, List<ChatMessage> history) {
-        String userMessage = null;
+        return findTriggeringUserMessageEntity(messageId, history).getContent();
+    }
+
+    /** Finds the complete user message that triggered the selected assistant reply. */
+    @NonNull
+    public ChatMessage findTriggeringUserMessageEntity(Long messageId, List<ChatMessage> history) {
+        ChatMessage triggeringMessage = null;
         for (int i = 0; i < history.size(); i++) {
             if (history.get(i).getId().equals(messageId) && i > 0) {
                 for (int j = i - 1; j >= 0; j--) {
                     if (ROLE_USER.equals(history.get(j).getRole())) {
-                        userMessage = history.get(j).getContent();
+                        triggeringMessage = history.get(j);
                         break;
                     }
                 }
                 break;
             }
         }
-        if (userMessage == null) {
+        if (triggeringMessage == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "未找到对应的用户消息");
         }
-        return userMessage;
+        return triggeringMessage;
     }
 }

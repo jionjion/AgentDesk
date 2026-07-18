@@ -1,12 +1,13 @@
 package top.jionjion.agentdesk.agent.core;
 
-import io.agentscope.core.session.Session;
+import io.agentscope.core.state.AgentStateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import top.jionjion.agentdesk.repository.SessionRepository;
 import top.jionjion.agentdesk.entity.SessionMetadata;
+import top.jionjion.agentdesk.security.UserContext;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,7 +24,7 @@ public class AgentPool {
     private static final Logger log = LoggerFactory.getLogger(AgentPool.class);
 
     private final AgentFactory agentFactory;
-    private final Session session;
+    private final AgentStateStore stateStore;
     private final SessionRepository sessionRepository;
 
     private final ConcurrentHashMap<String, AgentHandle> agents = new ConcurrentHashMap<>();
@@ -33,11 +34,12 @@ public class AgentPool {
      */
     private final ConcurrentHashMap<String, AtomicReference<Object>> busyFlags = new ConcurrentHashMap<>();
 
-    public AgentPool(AgentFactory agentFactory, Session session, SessionRepository sessionRepository) {
+    public AgentPool(AgentFactory agentFactory, AgentStateStore stateStore,
+                     SessionRepository sessionRepository) {
         this.agentFactory = agentFactory;
-        this.session = session;
+        this.stateStore = stateStore;
         this.sessionRepository = sessionRepository;
-        log.info("Agent 会话状态存储实现: {}", session.getClass().getSimpleName());
+        log.info("AgentScope v2 state store: {}", stateStore.getClass().getSimpleName());
     }
 
     /**
@@ -46,31 +48,8 @@ public class AgentPool {
     public AgentHandle getOrCreate(String sessionId) {
         return agents.computeIfAbsent(sessionId, id -> {
             log.info("为会话 {} 创建新的 Agent", id);
-            AgentHandle handle = agentFactory.createAgent(id);
-            // 尝试从数据库恢复状态
-            try {
-                handle.agent().loadIfExists(session, id);
-                log.info("已恢复会话 {} 的状态", id);
-            } catch (Exception e) {
-                log.warn("恢复会话 {} 状态失败: {}", id, e.getMessage());
-            }
-            return handle;
+            return agentFactory.createAgent(id);
         });
-    }
-
-    /**
-     * 保存会话状态
-     */
-    public void save(String sessionId) {
-        AgentHandle handle = agents.get(sessionId);
-        if (handle != null) {
-            try {
-                handle.agent().saveTo(session, sessionId);
-                log.debug("已保存会话 {} 的状态", sessionId);
-            } catch (Exception e) {
-                log.warn("保存会话 {} 状态失败: {}", sessionId, e.getMessage());
-            }
-        }
     }
 
     /**
@@ -80,12 +59,16 @@ public class AgentPool {
         AgentHandle handle = agents.remove(sessionId);
         busyFlags.remove(sessionId);
         if (handle != null) {
-            try {
-                session.delete(io.agentscope.core.state.SimpleSessionKey.of(sessionId));
-                log.info("已删除会话 {} 的 Agent 和持久化状态", sessionId);
-            } catch (Exception e) {
-                log.warn("删除会话 {} 持久化状态失败: {}", sessionId, e.getMessage());
-            }
+            handle.close();
+        }
+        try {
+            String userId = UserContext.isAuthenticated()
+                    ? String.valueOf(UserContext.getUserId())
+                    : null;
+            stateStore.delete(userId, sessionId);
+            log.info("已删除会话 {} 的 AgentScope v2 持久化状态", sessionId);
+        } catch (Exception e) {
+            log.warn("删除会话 {} 持久化状态失败: {}", sessionId, e.getMessage());
         }
     }
 
@@ -96,8 +79,26 @@ public class AgentPool {
     public void invalidate(String sessionId) {
         AgentHandle handle = agents.remove(sessionId);
         if (handle != null) {
+            handle.close();
             log.info("已使会话 {} 的 Agent 失效 (模型切换)", sessionId);
         }
+    }
+
+    /** Drops both the in-memory handle and the persisted v2 state for an exact regeneration. */
+    public void resetState(Long userId, String sessionId) {
+        invalidate(sessionId);
+        stateStore.delete(userId == null ? null : String.valueOf(userId), sessionId);
+        log.info("已重置会话 {} 的 AgentScope v2 状态", sessionId);
+    }
+
+    /** Interrupts only an existing in-flight session; never creates an agent as a side effect. */
+    public boolean interrupt(Long userId, String sessionId) {
+        AgentHandle handle = agents.get(sessionId);
+        if (handle == null) {
+            return false;
+        }
+        handle.interrupt(userId, sessionId);
+        return true;
     }
 
     /**
@@ -109,7 +110,9 @@ public class AgentPool {
                 Sort.by(Sort.Direction.DESC, "lastUsedAt"));
         int count = 0;
         for (SessionMetadata s : sessions) {
-            if (agents.remove(s.getId()) != null) {
+            AgentHandle handle = agents.remove(s.getId());
+            if (handle != null) {
+                handle.close();
                 count++;
             }
         }

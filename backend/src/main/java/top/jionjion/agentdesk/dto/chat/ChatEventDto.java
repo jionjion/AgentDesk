@@ -117,7 +117,7 @@ public record ChatEventDto(
     }
 
     /**
-     * 任务进度事件（PlanNotebook 执行追踪）
+     * 任务进度事件（Harness Task List 执行追踪）
      */
     public static ChatEventDto taskProgress(TaskProgressDto progress) {
         return new ChatEventDto("task_progress", null, null, null, null, null, null, null, null, null, progress);

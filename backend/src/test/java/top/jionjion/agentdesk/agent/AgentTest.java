@@ -1,14 +1,18 @@
 package top.jionjion.agentdesk.agent;
 
-import io.agentscope.core.ReActAgent;
+import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.Msg;
-import io.agentscope.core.model.DashScopeChatModel;
+import io.agentscope.core.message.UserMessage;
+import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
 import io.agentscope.core.tool.Toolkit;
+import io.agentscope.harness.agent.HarnessAgent;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import top.jionjion.agentdesk.agent.core.ChatModelFactory;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
+import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
 import top.jionjion.agentdesk.service.OssService;
 
@@ -22,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class AgentTest {
 
     @Autowired
-    private DashScopeChatModel model;
+    private ChatModelFactory chatModelFactory;
 
     @Autowired
     private FileRecordRepository fileRecordRepository;
@@ -33,12 +37,13 @@ class AgentTest {
 
     @Test
     void testAgentChat() {
+        DashScopeChatModel model = chatModelFactory.create(ModelSettingsDto.defaults());
         // 注册工具
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
 
         // 创建 Agent
-        ReActAgent agent = ReActAgent.builder()
+        HarnessAgent agent = HarnessAgent.builder()
                 .name("test-assistant")
                 .sysPrompt("你是一个智能助手, 请用中文回答。")
                 .model(model)
@@ -46,9 +51,8 @@ class AgentTest {
                 .build();
 
         // 测试简单对话
-        Msg response = agent.call(Msg.builder()
-                .textContent("你好, 请介绍一下你自己")
-                .build()).block();
+        Msg response = agent.call(new UserMessage("你好, 请介绍一下你自己"),
+                RuntimeContext.builder().sessionId("integration-chat").build()).block();
 
         assertNotNull(response);
         System.out.println("Agent 回复: " + response.getTextContent());
@@ -56,10 +60,11 @@ class AgentTest {
 
     @Test
     void testAgentWithTool() {
+        DashScopeChatModel model = chatModelFactory.create(ModelSettingsDto.defaults());
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService));
 
-        ReActAgent agent = ReActAgent.builder()
+        HarnessAgent agent = HarnessAgent.builder()
                 .name("test-assistant")
                 .sysPrompt("你是一个智能助手, 请用中文回答。当用户询问时间时, 请调用工具获取。")
                 .model(model)
@@ -67,9 +72,8 @@ class AgentTest {
                 .build();
 
         // 测试工具调用
-        Msg response = agent.call(Msg.builder()
-                .textContent("现在北京时间几点了?")
-                .build()).block();
+        Msg response = agent.call(new UserMessage("现在北京时间几点了?"),
+                RuntimeContext.builder().sessionId("integration-tool").build()).block();
 
         assertNotNull(response);
         System.out.println("Agent 回复(工具调用): " + response.getTextContent());

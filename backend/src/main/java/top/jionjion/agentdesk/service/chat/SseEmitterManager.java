@@ -62,13 +62,13 @@ public class SseEmitterManager {
         emitter.onTimeout(() -> {
             log.warn("Session {} SSE timeout", sessionId);
             heartbeat.cancel(false);
-            handle.hook().markDisconnected();
+            handle.markClientDisconnected();
             onRelease.run();
         });
         emitter.onCompletion(() -> {
             log.debug("Session {} SSE completed", sessionId);
             heartbeat.cancel(false);
-            handle.hook().setEmitter(null);
+            handle.detachEmitter();
         });
         emitter.onError(e -> {
             heartbeat.cancel(false);
@@ -78,7 +78,7 @@ public class SseEmitterManager {
             } else {
                 log.warn("Session {} SSE error: {}", sessionId, e.getMessage());
             }
-            handle.hook().markDisconnected();
+            handle.markClientDisconnected();
             onRelease.run();
         });
     }
@@ -121,6 +121,18 @@ public class SseEmitterManager {
             emitter.send(SseEmitter.event().name("knowledge_retrieved").data(json));
         } catch (Exception ex) {
             log.debug("Failed to send knowledge_retrieved event: {}", ex.getMessage());
+        }
+    }
+
+    public void sendMemoryRecalled(SseEmitter emitter, int count) {
+        if (count <= 0) {
+            return;
+        }
+        try {
+            emitter.send(SseEmitter.event().name("memory_recalled")
+                    .data(OBJECT_MAPPER.writeValueAsString(ChatEventDto.memoryRecalled(count))));
+        } catch (Exception ex) {
+            log.debug("Failed to send memory_recalled event: {}", ex.getMessage());
         }
     }
 

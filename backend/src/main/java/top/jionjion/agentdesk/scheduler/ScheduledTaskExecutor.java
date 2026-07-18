@@ -1,6 +1,5 @@
 package top.jionjion.agentdesk.scheduler;
 
-import io.agentscope.core.message.Msg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -8,6 +7,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.core.AgentFactory;
 import top.jionjion.agentdesk.agent.core.AgentHandle;
+import top.jionjion.agentdesk.agent.runtime.AgentInput;
+import top.jionjion.agentdesk.agent.runtime.AgentRunContext;
 import top.jionjion.agentdesk.entity.ScheduledTask;
 import top.jionjion.agentdesk.entity.ScheduledTaskLog;
 import top.jionjion.agentdesk.entity.User;
@@ -68,18 +69,13 @@ public class ScheduledTaskExecutor {
 
             // 创建一次性 Agent
             String sessionId = "sched-" + taskId + "-" + startTime;
-            AgentHandle handle = agentFactory.createAgent(sessionId);
-
-            // 构建消息并执行
-            Msg userMsg = Msg.builder()
-                    .textContent(task.getPrompt())
-                    .build();
-
-            // 阻塞执行 Agent 流
-            handle.agent().stream(userMsg).blockLast();
-
-            // 获取回复
-            String reply = handle.hook().getLastReply();
+            String reply;
+            try (AgentHandle handle = agentFactory.createAgent(sessionId)) {
+                // 阻塞执行 Agent 流
+                AgentRunContext runContext = AgentRunContext.of(userId, sessionId);
+                handle.stream(AgentInput.text(task.getPrompt()), runContext).blockLast();
+                reply = handle.lastReply();
+            }
 
             long endTime = System.currentTimeMillis();
             taskLog.setStatus("SUCCESS");

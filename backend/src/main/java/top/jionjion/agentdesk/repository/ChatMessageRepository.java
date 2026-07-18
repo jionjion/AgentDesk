@@ -23,6 +23,11 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
      */
     List<ChatMessage> findBySessionIdOrderByCreatedAtAsc(String sessionId);
 
+    List<ChatMessage> findBySessionIdAndIdLessThanOrderByCreatedAtAsc(String sessionId, Long id);
+
+    @Transactional(rollbackFor = Exception.class)
+    void deleteBySessionIdAndIdGreaterThanEqual(String sessionId, Long id);
+
     /**
      * 统计指定会话的消息数量
      *

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
 /**
- * SSE 任务进度事件载荷，用于追踪 Agent PlanNotebook 的执行进度
+ * SSE 任务进度事件载荷，用于追踪 Harness Task List 的执行进度
  *
  * @param eventType      事件子类型: plan_created / task_updated / task_completed / plan_revised / plan_finished
  * @param planTitle      计划标题

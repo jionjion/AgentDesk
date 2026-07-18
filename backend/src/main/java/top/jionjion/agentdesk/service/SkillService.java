@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * <p>
  * 支持两种技能类型:
  * - prompt 型: 传统提示词驱动的技能（向后兼容）
- * - package 型: 脚本化技能包，存储在文件系统，由 SkillBox 加载
+ * - package 型: 脚本化技能包，存储在文件系统，由 AgentSkillRepository 加载
  *
  * @author Jion
  */

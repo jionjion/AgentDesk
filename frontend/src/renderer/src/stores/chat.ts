@@ -339,7 +339,9 @@ export const useChatStore = defineStore('chat', () => {
 
             for (let i = msgs.length - 1; i >= 0; i--) {
                 const m = msgs[i]
-                if (m.role === 'tool_call' && m.toolName === data.toolName && m.status === 'calling') {
+                if (m.role === 'tool_call'
+                    && m.status === 'calling'
+                    && (data.toolId ? m.toolId === data.toolId : m.toolName === data.toolName)) {
                     m.result = data.result
                     m.status = 'done'
                     break

@@ -14,15 +14,19 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "agent_state", schema = "agent_desk")
+@Table(name = "agent_state_v2", schema = "agent_desk")
 @IdClass(AgentStateId.class)
 public class AgentState {
+
+    @Id
+    @Column(name = "user_id", nullable = false, length = 128)
+    private String userId;
 
     /**
      * 会话ID
      */
     @Id
-    @Column(name = "session_id", nullable = false, length = 32)
+    @Column(name = "session_id", nullable = false, length = 128)
     private String sessionId;
 
     /**
@@ -44,7 +48,8 @@ public class AgentState {
     @Column(name = "updated_at", nullable = false)
     private long updatedAt;
 
-    public AgentState(String sessionId, String stateKey, String stateData) {
+    public AgentState(String userId, String sessionId, String stateKey, String stateData) {
+        this.userId = userId;
         this.sessionId = sessionId;
         this.stateKey = stateKey;
         this.stateData = stateData;
