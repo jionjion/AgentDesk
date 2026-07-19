@@ -181,10 +181,7 @@
           />
           <div class="flex items-center justify-between mt-3">
             <div class="flex items-center gap-2">
-              <Button variant="ghost" size="sm" @click="handleSelectWorkdir">
-                <FolderOpen :size="14" class="mr-1"/>
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ sandboxStore.workdir ? sandboxStore.workdir.split(/[/\\]/).pop() : '选择工作目录' }}</span>
-              </Button>
+              <ProjectSelector/>
               <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
                 <Paintbrush :size="16"/>
               </Button>
@@ -226,7 +223,7 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
-import {AlertCircle, ArrowUp, BarChart3, Camera, FileText, FolderOpen, Loader2, Paintbrush, Paperclip, Square, X} from 'lucide-vue-next'
+import {AlertCircle, ArrowUp, BarChart3, Camera, FileText, Loader2, Paintbrush, Paperclip, Square, X} from 'lucide-vue-next'
 import {useChatStore} from '@/stores/chat'
 import {useSettingsStore} from '@/stores/settings'
 import {Button} from '@/components/ui/button'
@@ -244,6 +241,7 @@ import MemoryIndicator from '@/components/chat/MemoryIndicator.vue'
 import KnowledgeIndicator from '@/components/chat/KnowledgeIndicator.vue'
 import SlashCommandMenu from '@/components/chat/SlashCommandMenu.vue'
 import ChatNavRail from '@/components/chat/ChatNavRail.vue'
+import ProjectSelector from '@/components/chat/ProjectSelector.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
 import {formatFileSize, isImageType} from '@/utils/file'
@@ -299,13 +297,6 @@ watch(() => remoteExecStore.lastSandboxResult?.seq, () => {
     codeExecutionResults.value[lastAssistant.id] = incoming
   }
 })
-
-async function handleSelectWorkdir() {
-  const dir = await window.electronAPI?.dialog.openDirectory()
-  if (dir) {
-    await sandboxStore.setWorkdir(dir)
-  }
-}
 
 /**
  * 获取 index 处的助手消息对应的子任务名称

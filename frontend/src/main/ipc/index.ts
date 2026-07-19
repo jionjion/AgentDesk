@@ -4,6 +4,14 @@ import {spawn} from 'child_process'
 import os from 'os'
 import path from 'path'
 import {createJob} from './jobObject'
+import {
+    bindLocation,
+    getDeviceId,
+    getLocation,
+    listLocations,
+    removeLocation,
+    touchLocation
+} from '../projects/projectStore'
 
 /** 执行隔离策略（由渲染进程/后端下发） */
 interface ExecPolicy {
@@ -241,6 +249,24 @@ export function registerIpcHandlers(): void {
             hostname: os.hostname()
         }
     })
+
+    // 项目本地位置管理（设备级配置, 见开发计划第 7 章）
+    ipcMain.handle('projects:getDeviceId', () => getDeviceId())
+
+    ipcMain.handle('projects:listLocations', () => listLocations())
+
+    ipcMain.handle('projects:getLocation', (_event, projectId: string) => getLocation(projectId))
+
+    ipcMain.handle('projects:bindLocation', async (_event, projectId: string, rootPath: string) => {
+        const location = await bindLocation(projectId, rootPath)
+        // 绑定的项目根目录同时授权为可读根, 供现有文件读取 IPC 使用
+        await rememberReadRoot(location.rootPath)
+        return location
+    })
+
+    ipcMain.handle('projects:removeLocation', (_event, projectId: string) => removeLocation(projectId))
+
+    ipcMain.handle('projects:touchLocation', (_event, projectId: string) => touchLocation(projectId))
 }
 
 /**

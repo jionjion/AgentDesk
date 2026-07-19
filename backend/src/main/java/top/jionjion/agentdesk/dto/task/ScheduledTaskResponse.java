@@ -10,6 +10,8 @@ package top.jionjion.agentdesk.dto.task;
  * @param cronExpression Cron 表达式
  * @param scheduleLabel  调度标签
  * @param skillId        关联技能ID
+ * @param projectId      可选关联项目ID
+ * @param deviceId       目标设备ID
  * @param enabled        是否启用
  * @param createdAt      创建时间戳
  * @param updatedAt      更新时间戳
@@ -23,6 +25,8 @@ public record ScheduledTaskResponse(
         String cronExpression,
         String scheduleLabel,
         String skillId,
+        String projectId,
+        String deviceId,
         boolean enabled,
         long createdAt,
         long updatedAt

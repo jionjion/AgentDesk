@@ -5,8 +5,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.dto.session.SessionResponse;
+import top.jionjion.agentdesk.entity.Project;
 import top.jionjion.agentdesk.entity.SessionMetadata;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
+import top.jionjion.agentdesk.repository.ProjectRepository;
 import top.jionjion.agentdesk.repository.SessionRepository;
 import top.jionjion.agentdesk.security.UserContext;
 
@@ -25,18 +27,21 @@ public class SessionService {
 
     private final SessionRepository sessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ProjectRepository projectRepository;
     private final AgentPool agentPool;
 
-    public SessionService(SessionRepository sessionRepository, ChatMessageRepository chatMessageRepository, AgentPool agentPool) {
+    public SessionService(SessionRepository sessionRepository, ChatMessageRepository chatMessageRepository,
+                          ProjectRepository projectRepository, AgentPool agentPool) {
         this.sessionRepository = sessionRepository;
         this.chatMessageRepository = chatMessageRepository;
+        this.projectRepository = projectRepository;
         this.agentPool = agentPool;
     }
 
     /**
-     * 创建新会话
+     * 创建新会话, 可选绑定项目 (校验项目归属当前用户)
      */
-    public SessionResponse create(String title) {
+    public SessionResponse create(String title, String projectId) {
         Long userId = UserContext.getUserId();
         String id = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         long now = System.currentTimeMillis();
@@ -47,6 +52,11 @@ public class SessionService {
         metadata.setCreatedAt(now);
         metadata.setLastUsedAt(now);
         metadata.setUserId(userId);
+        if (projectId != null && !projectId.isBlank()) {
+            Project project = projectRepository.findByIdAndUserId(projectId, userId)
+                    .orElseThrow(() -> new IllegalArgumentException("项目不存在: " + projectId));
+            metadata.setProjectId(project.getId());
+        }
         sessionRepository.save(metadata);
 
         return toResponse(metadata);
@@ -156,12 +166,57 @@ public class SessionService {
                 .collect(Collectors.toMap(SessionMetadata::getId, SessionMetadata::getTitle));
     }
 
+    /**
+     * 绑定/解绑会话项目。projectId 为 null 时解绑。
+     *
+     * <p>规则 (见开发计划 6.2):
+     * <ul>
+     *   <li>会话正在流式执行时不允许切换项目</li>
+     *   <li>切换成功后使内存 AgentHandle 失效, 下一轮重建并注入新项目上下文</li>
+     *   <li>不删除会话历史</li>
+     * </ul>
+     *
+     * @return 更新后的会话; 会话不存在返回 null
+     * @throws IllegalStateException    会话正在执行
+     * @throws IllegalArgumentException 项目不属于当前用户
+     */
+    public SessionResponse bindProject(String sessionId, String projectId) {
+        Long userId = UserContext.getUserId();
+        SessionMetadata metadata = sessionRepository.findByIdAndUserId(sessionId, userId).orElse(null);
+        if (metadata == null) {
+            return null;
+        }
+        if (agentPool.isBusy(sessionId)) {
+            throw new IllegalStateException("会话正在执行中, 无法切换项目");
+        }
+        if (projectId == null || projectId.isBlank()) {
+            metadata.setProjectId(null);
+        } else {
+            Project project = projectRepository.findByIdAndUserId(projectId, userId)
+                    .orElseThrow(() -> new IllegalArgumentException("项目不存在: " + projectId));
+            metadata.setProjectId(project.getId());
+        }
+        sessionRepository.save(metadata);
+        // 使内存 Agent 失效, 下一轮重建时注入新的项目上下文; 不删除持久化对话状态
+        agentPool.invalidate(sessionId);
+        return toResponse(metadata);
+    }
+
     private SessionResponse toResponse(SessionMetadata metadata) {
+        String projectId = metadata.getProjectId();
+        String projectName = null;
+        if (projectId != null) {
+            projectName = projectRepository.findById(projectId)
+                    .map(Project::getName)
+                    .orElse(null);
+        }
         return new SessionResponse(
                 metadata.getId(),
                 metadata.getTitle(),
                 metadata.getCreatedAt(),
-                metadata.getLastUsedAt()
+                metadata.getLastUsedAt(),
+                projectId,
+                projectName
         );
     }
 }

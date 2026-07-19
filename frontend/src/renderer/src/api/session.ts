@@ -1,9 +1,9 @@
 import request from './request'
 import type {ChatSession} from '@/types/chat'
 
-/** 创建会话 */
-export function createSession(title?: string) {
-    return request.post<ChatSession>('/api/sessions', {title: title || '新对话'})
+/** 创建会话 (可选绑定项目) */
+export function createSession(title?: string, projectId?: string | null) {
+    return request.post<ChatSession>('/api/sessions', {title: title || '新对话', projectId: projectId || null})
 }
 
 /** 获取所有会话 */

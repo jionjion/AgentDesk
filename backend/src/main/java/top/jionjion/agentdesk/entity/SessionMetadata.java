@@ -50,4 +50,10 @@ public class SessionMetadata {
      */
     @Column(name = "user_id")
     private Long userId;
+
+    /**
+     * 可选关联项目ID
+     */
+    @Column(name = "project_id", length = 32)
+    private String projectId;
 }

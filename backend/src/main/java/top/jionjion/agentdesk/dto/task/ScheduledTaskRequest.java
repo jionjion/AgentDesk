@@ -9,6 +9,8 @@ package top.jionjion.agentdesk.dto.task;
  * @param cronExpression Cron 表达式
  * @param scheduleLabel  调度标签(前端展示用)
  * @param skillId        关联技能ID
+ * @param projectId      可选关联项目ID
+ * @param deviceId       目标设备ID, 与 projectId 必须同时提供
  * @author Jion
  */
 public record ScheduledTaskRequest(
@@ -17,6 +19,8 @@ public record ScheduledTaskRequest(
         String prompt,
         String cronExpression,
         String scheduleLabel,
-        String skillId
+        String skillId,
+        String projectId,
+        String deviceId
 ) {
 }

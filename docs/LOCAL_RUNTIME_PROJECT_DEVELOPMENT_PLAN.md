@@ -563,13 +563,6 @@ HarnessAgent.builder().workspace(serverWorkspace)
 - `ToolExecutionContext` 已被官方标记 `@Deprecated`，禁止使用。
 - 因此**不需要**实现回退的 `ExecutionContextRegistry`；`AgentHandle.stream()` 中现有 `RuntimeContext.builder()` 只需追加类型化 put。
 
-回退实现方式（仅当官方注入验证失败时启用，当前判定不需要）：
-
-- 建立调用级 `ExecutionContextRegistry`，键使用 `(userId, sessionId)`。
-- 在开始 stream 前注册，在 `doFinally` 中清理。
-- 当前已有 per-session 执行锁，因此同一会话不会同时覆盖上下文。
-- Reactor 流中不要使用 `ThreadLocal`。
-
 禁止：
 
 - 把当前 project/cwd 存在单例字段。
@@ -830,7 +823,6 @@ backend/src/main/java/top/jionjion/agentdesk/service/ProjectService.java
 backend/src/main/java/top/jionjion/agentdesk/controller/ProjectController.java
 backend/src/main/java/top/jionjion/agentdesk/dto/project/*
 backend/src/main/java/top/jionjion/agentdesk/agent/runtime/ProjectRuntimeContext.java
-backend/src/main/java/top/jionjion/agentdesk/agent/runtime/ExecutionContextRegistry.java  # 仅在框架无官方上下文访问方式时
 backend/src/main/java/top/jionjion/agentdesk/agent/tool/PythonExecTool.java
 backend/src/main/java/top/jionjion/agentdesk/agent/tool/LocalFileTools.java
 backend/src/main/resources/db/migration-project-runtime.sql
@@ -967,6 +959,8 @@ frontend/src/renderer/public/pyodide/  # copy 脚本生成的运行时资源目�
 - 阅读 AgentScope `2.0.0` sources jar，确认 RuntimeContext 在工具层的访问方式。
 
 完成标准：现有主分支可以稳定构建，已确定调用级上下文实现路径。
+
+**Phase 0 已完成（2026-07-19）**：前端 typecheck/lint 通过；后端 `mvnw test` 通过；工作区仅有本计划文档为未跟踪文件；RuntimeContext 官方注入路径已确认（见 9.2 调研结论）。
 
 ### Phase 1：Project 实体与会话绑定
 

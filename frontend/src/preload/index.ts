@@ -12,6 +12,18 @@ export interface ExecPolicy {
     isolationLevel?: 'boundary'
 }
 
+/** 项目在当前设备上的位置配置 */
+export interface ProjectLocation {
+    projectId: string
+    deviceId: string
+    rootPath: string
+    defaultCwd?: string
+    pythonExecutable?: string
+    shellProfile?: 'powershell' | 'cmd' | 'sh' | 'bash' | 'zsh'
+    env?: Record<string, string>
+    lastOpenedAt: number
+}
+
 
 const electronAPI = {
     dialog: {
@@ -61,6 +73,18 @@ const electronAPI = {
         minimize: (): void => ipcRenderer.send('window:minimize'),
         maximize: (): void => ipcRenderer.send('window:maximize'),
         close: (): void => ipcRenderer.send('window:close')
+    },
+    projects: {
+        getDeviceId: (): Promise<string> => ipcRenderer.invoke('projects:getDeviceId'),
+        listLocations: (): Promise<ProjectLocation[]> => ipcRenderer.invoke('projects:listLocations'),
+        getLocation: (projectId: string): Promise<ProjectLocation | null> =>
+            ipcRenderer.invoke('projects:getLocation', projectId),
+        bindLocation: (projectId: string, rootPath: string): Promise<ProjectLocation> =>
+            ipcRenderer.invoke('projects:bindLocation', projectId, rootPath),
+        removeLocation: (projectId: string): Promise<boolean> =>
+            ipcRenderer.invoke('projects:removeLocation', projectId),
+        touchLocation: (projectId: string): Promise<void> =>
+            ipcRenderer.invoke('projects:touchLocation', projectId)
     },
     updater: {
         check: (): Promise<unknown> => ipcRenderer.invoke('updater:check'),

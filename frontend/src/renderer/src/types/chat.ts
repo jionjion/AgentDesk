@@ -8,6 +8,10 @@ export interface ChatSession {
     title: string
     createdAt: number
     lastUsedAt: number
+    /** 可选关联项目ID */
+    projectId?: string | null
+    /** 可选关联项目名称 */
+    projectName?: string | null
 }
 
 /** 附件信息 */

@@ -147,4 +147,13 @@ public class AgentPool {
     public boolean exists(String sessionId) {
         return agents.containsKey(sessionId);
     }
+
+    /**
+     * 检查会话是否正在执行 (被某次请求占用)。
+     * 用于会话切换项目前的守卫: 流式执行中的会话不允许切换项目。
+     */
+    public boolean isBusy(String sessionId) {
+        AtomicReference<Object> flag = busyFlags.get(sessionId);
+        return flag != null && flag.get() != null;
+    }
 }

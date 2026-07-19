@@ -9,6 +9,7 @@ import top.jionjion.agentdesk.dto.task.ScheduledTaskRequest;
 import top.jionjion.agentdesk.dto.task.ScheduledTaskResponse;
 import top.jionjion.agentdesk.entity.ScheduledTask;
 import top.jionjion.agentdesk.entity.ScheduledTaskLog;
+import top.jionjion.agentdesk.repository.ProjectRepository;
 import top.jionjion.agentdesk.repository.ScheduledTaskLogRepository;
 import top.jionjion.agentdesk.repository.ScheduledTaskRepository;
 import top.jionjion.agentdesk.scheduler.DynamicTaskScheduler;
@@ -31,15 +32,18 @@ public class ScheduledTaskService {
     private final ScheduledTaskLogRepository logRepository;
     private final DynamicTaskScheduler dynamicTaskScheduler;
     private final ScheduledTaskExecutor taskExecutor;
+    private final ProjectRepository projectRepository;
 
     public ScheduledTaskService(ScheduledTaskRepository taskRepository,
                                 ScheduledTaskLogRepository logRepository,
                                 DynamicTaskScheduler dynamicTaskScheduler,
-                                ScheduledTaskExecutor taskExecutor) {
+                                ScheduledTaskExecutor taskExecutor,
+                                ProjectRepository projectRepository) {
         this.taskRepository = taskRepository;
         this.logRepository = logRepository;
         this.dynamicTaskScheduler = dynamicTaskScheduler;
         this.taskExecutor = taskExecutor;
+        this.projectRepository = projectRepository;
     }
 
     /**
@@ -77,6 +81,7 @@ public class ScheduledTaskService {
         task.setCronExpression(req.cronExpression());
         task.setScheduleLabel(req.scheduleLabel());
         task.setSkillId(req.skillId());
+        applyProjectBinding(task, req);
         task.setEnabled(false);
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
@@ -100,6 +105,7 @@ public class ScheduledTaskService {
         task.setCronExpression(req.cronExpression());
         task.setScheduleLabel(req.scheduleLabel());
         task.setSkillId(req.skillId());
+        applyProjectBinding(task, req);
         task.setUpdatedAt(System.currentTimeMillis());
 
         taskRepository.save(task);
@@ -168,6 +174,27 @@ public class ScheduledTaskService {
 
     // === Private helpers ===
 
+    /**
+     * 应用项目绑定 (见开发计划 5.1): projectId 与 deviceId 必须同时保存, 且项目须属于当前用户。
+     */
+    private void applyProjectBinding(ScheduledTask task, ScheduledTaskRequest req) {
+        String projectId = req.projectId();
+        String deviceId = req.deviceId();
+        if (projectId == null || projectId.isBlank()) {
+            task.setProjectId(null);
+            task.setDeviceId(null);
+            return;
+        }
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定项目的定时任务必须同时指定目标设备");
+        }
+        if (projectRepository.findByIdAndUserId(projectId, task.getUserId()).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "项目不存在: " + projectId);
+        }
+        task.setProjectId(projectId);
+        task.setDeviceId(deviceId);
+    }
+
     private ScheduledTask findOwnedTask(Long taskId, Long userId) {
         ScheduledTask task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "定时任务不存在"));
@@ -206,6 +233,8 @@ public class ScheduledTaskService {
                 task.getCronExpression(),
                 task.getScheduleLabel(),
                 task.getSkillId(),
+                task.getProjectId(),
+                task.getDeviceId(),
                 task.isEnabled(),
                 task.getCreatedAt(),
                 task.getUpdatedAt()

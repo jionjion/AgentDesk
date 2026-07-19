@@ -72,6 +72,25 @@
               </SelectContent>
             </Select>
           </div>
+
+          <!-- 关联项目 -->
+          <div class="space-y-1">
+            <Label>关联项目（可选）</Label>
+            <Select v-model="projectIdSelect">
+              <SelectTrigger>
+                <SelectValue placeholder="不关联项目"/>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">不关联项目</SelectItem>
+                <SelectItem v-for="project in projectsStore.projects" :key="project.id" :value="project.id">
+                  {{ project.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p v-if="form.projectId" class="text-xs text-muted-foreground">
+              任务将在本设备执行；本设备离线时该任务本次执行失败
+            </p>
+          </div>
         </TabsContent>
 
         <!-- 时间页：执行计划 -->
@@ -169,6 +188,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {useScheduledTasksStore} from '@/stores/scheduledTasks'
 import {useSkillsStore} from '@/stores/skills'
+import {useProjectsStore} from '@/stores/projects'
 import type {ScheduledTask, ScheduledTaskFormData} from '@/types/scheduledTask'
 
 const props = defineProps<{
@@ -183,6 +203,7 @@ const emit = defineEmits<{
 
 const store = useScheduledTasksStore()
 const skillsStore = useSkillsStore()
+const projectsStore = useProjectsStore()
 const saving = ref(false)
 const submitted = ref(false)
 
@@ -227,6 +248,21 @@ const skillIdSelect = computed({
   get: () => form.value.skillId || SKILL_NONE,
   set: (v: string) => {
     form.value.skillId = v === SKILL_NONE ? '' : v
+  }
+})
+
+const PROJECT_NONE = '__none__'
+const projectIdSelect = computed({
+  get: () => form.value.projectId || PROJECT_NONE,
+  set: (v: string) => {
+    if (v === PROJECT_NONE) {
+      form.value.projectId = ''
+      form.value.deviceId = ''
+    } else {
+      form.value.projectId = v
+      // MVP: 目标设备固定为当前设备
+      form.value.deviceId = projectsStore.deviceId
+    }
   }
 })
 
@@ -277,7 +313,9 @@ const form = ref<ScheduledTaskFormData>({
   prompt: '',
   cronExpression: '0 30 9 * * *',
   scheduleLabel: '每天 09:30',
-  skillId: ''
+  skillId: '',
+  projectId: '',
+  deviceId: ''
 })
 
 // 执行计划摘要
@@ -332,6 +370,10 @@ watch(() => props.open, (val) => {
     if (skillsStore.skills.length === 0) {
       skillsStore.fetchSkills()
     }
+    // 确保项目列表已加载
+    if (!projectsStore.loaded) {
+      void projectsStore.load()
+    }
   }
   if (val && props.task) {
     form.value = {
@@ -340,7 +382,9 @@ watch(() => props.open, (val) => {
       prompt: props.task.prompt,
       cronExpression: props.task.cronExpression,
       scheduleLabel: props.task.scheduleLabel || '',
-      skillId: props.task.skillId || ''
+      skillId: props.task.skillId || '',
+      projectId: props.task.projectId || '',
+      deviceId: props.task.deviceId || ''
     }
     // 尝试从 scheduleLabel 恢复预设
     const label = props.task.scheduleLabel || ''
@@ -377,7 +421,7 @@ watch(() => props.open, (val) => {
       syncFormToCronFields()
     }
   } else if (val) {
-    form.value = {name: '', description: '', prompt: '', cronExpression: '0 30 9 * * *', scheduleLabel: '每天 09:30', skillId: ''}
+    form.value = {name: '', description: '', prompt: '', cronExpression: '0 30 9 * * *', scheduleLabel: '每天 09:30', skillId: '', projectId: '', deviceId: ''}
     selectedPreset.value = '每天'
     scheduleHour.value = '09'
     scheduleMinute.value = '30'

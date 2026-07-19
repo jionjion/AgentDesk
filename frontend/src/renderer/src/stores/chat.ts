@@ -7,6 +7,7 @@ import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
 import {useSandboxStore} from '@/stores/sandbox'
 import {useRemoteExecStore} from '@/stores/remoteExec'
+import {useProjectsStore} from '@/stores/projects'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -89,17 +90,15 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    /** 创建新会话 */
+    /** 创建新会话 (默认继承最近使用项目, 显式写入 projectId) */
     async function createNewSession(title?: string): Promise<string> {
-        const res = await createSession(title)
+        const projectsStore = useProjectsStore()
+        const lastProjectId = projectsStore.lastProject?.id ?? null
+        const res = await createSession(title, lastProjectId)
         const session = res.data
         sessions.value.unshift(session)
         currentSessionId.value = session.id
         messagesBySession.value[session.id] = []
-
-        // 新建会话时清空沙箱工作目录
-        const sandboxStore = useSandboxStore()
-        sandboxStore.clearWorkdir()
 
         return session.id
     }

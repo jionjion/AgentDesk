@@ -3,10 +3,6 @@ package top.jionjion.agentdesk.dto.session;
 /**
  * 会话响应
  *
- * @param id         会话ID
- * @param title      会话标题
- * @param createdAt  创建时间戳
- * @param lastUsedAt 最后使用时间戳
  * @author Jion
  */
 public record SessionResponse(
@@ -17,5 +13,9 @@ public record SessionResponse(
         /** 创建时间戳 */
         long createdAt,
         /** 最后使用时间戳 */
-        long lastUsedAt) {
+        long lastUsedAt,
+        /** 可选关联项目ID */
+        String projectId,
+        /** 可选关联项目名称 */
+        String projectName) {
 }

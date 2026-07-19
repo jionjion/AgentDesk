@@ -7,6 +7,10 @@ export interface ScheduledTask {
     cronExpression: string
     scheduleLabel: string | null
     skillId: string | null
+    /** 可选关联项目ID */
+    projectId: string | null
+    /** 目标设备ID (与 projectId 同时保存) */
+    deviceId: string | null
     enabled: boolean
     createdAt: number
     updatedAt: number
@@ -20,6 +24,10 @@ export interface ScheduledTaskFormData {
     cronExpression: string
     scheduleLabel?: string
     skillId?: string
+    /** 可选关联项目ID */
+    projectId?: string
+    /** 目标设备ID, 绑定项目时必填 */
+    deviceId?: string
 }
 
 /** 定时任务执行记录 */
