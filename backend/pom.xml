@@ -168,6 +168,24 @@
         </dependency>
     </dependencies>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- 强制统一 okio 版本：AgentScope 依赖 okhttp 5.x（需 okio ≥3.10），
+                 而 mem0/dashscope 依赖 okhttp 4.12 会拉入过旧的 okio 3.6.0，
+                 导致运行时 NoSuchMethodError: okio.Okio.socket(java.net.Socket) -->
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio</artifactId>
+                <version>3.16.4</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-jvm</artifactId>
+                <version>3.16.4</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <build>
         <plugins>
             <plugin>

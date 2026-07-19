@@ -5,7 +5,7 @@ import lombok.*;
 import java.io.Serializable;
 
 /**
- * agent_state 表复合主键: session_id + state_key
+ * agent_state_v2 表复合主键: user_id + session_id + state_key
  *
  * @author Jion
  */

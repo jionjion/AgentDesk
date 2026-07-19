@@ -70,6 +70,8 @@ io.agentscope.extensions.model.dashscope.DashScopeChatModel
 
 旧的 `SseStreamingHook`、`DynamicAgentTool`、`DatabaseSession` 已删除。
 
+定时任务（`ScheduledTaskExecutor`）也已对接 v2：每次执行通过 `AgentFactory.createAgent()` 创建一次性 Agent（会话 ID 形如 `sched-{taskId}-{startTime}`），以 `AgentRunContext.of(userId, sessionId)` 阻塞式运行并用 try-with-resources 关闭，不经过 `AgentPool` 缓存。
+
 ### 专家团队
 
 当前以代码内声明方式注册：
@@ -120,9 +122,11 @@ HarnessAgent.streamEvents()
     -> SSE
 ```
 
-前端继续接收 `agent_start`、`text_chunk`、`thinking_chunk`、`tool_call_start`、`tool_call_end`、`reasoning_complete`、`agent_complete` 和 `error`。`tool_call_start` 现在等待 v2 `ToolCallEndEvent` 后发送，确保参数 JSON 已完整聚合，不再长期显示空参数；数据型工具结果、模型轮次结束、权限拒绝、提示块和停止原因也已映射。
+前端继续接收 `agent_start`、`text_chunk`、`thinking_chunk`、`tool_call_start`、`tool_call_end`、`reasoning_complete`、`agent_complete` 和 `error`，并新增 `subagent_event`。`tool_call_start` 现在等待 v2 `ToolCallEndEvent` 后发送，确保参数 JSON 已完整聚合，不再长期显示空参数；数据型工具结果、模型轮次结束、权限拒绝、提示块和停止原因也已映射。
 
-AgentScope 2.0.0 的 `HarnessAgent.streamEvents()` 暂不转发子智能体内部的完整事件流，因此 UI 当前展示主 Agent 的委派与最终汇总，不承诺逐 token 展示子智能体内部过程。
+AgentScope 2.0.0 的 `HarnessAgent.streamEvents()` **会**把子智能体的内部事件转发进同一事件流：`AgentSpawnTool` 通过 `event.withSource(sourcePath)` 打标（主 Agent 事件 `getSource()` 为 null，子智能体为斜杠路径如 `main/researcher`）。`AgentEventBridge` 据此分流：source 非 null 的事件不再混入主回复，而是翻译为独立的 `subagent_event`（payload `subagent: { source, agentId, eventType, content, toolName, toolId, arguments, result }`，eventType 为 `start` / `text_chunk` / `thinking_chunk` / `tool_call_start` / `tool_call_end` / `complete`），由前端按 source 分组渲染为可折叠面板。子智能体事件不影响主流程状态（lastReply、停止原因、最大轮次标记等）。
+
+Task List 进度通过 `task_progress` 事件推送。v2 框架没有 TaskList 专用事件（任务清单只由内置 `todo_write` 工具以全量替换语义维护），因此 `AgentEventBridge` 在 `ToolResultEndEvent` 处拦截 `todo_write` 的聚合参数，由 `TaskProgressTracker` 与上一次列表 diff 后翻译为 `plan_created` / `plan_revised` / `task_updated` / `task_completed` / `plan_finished` 增量事件（状态映射 `pending→todo`、`completed→done`；任务 ID 由 tracker 按内容维护稳定 UUID）。工具校验失败（结果以 `Error` 开头）时不推送。
 
 ## 3. 安全边界
 
@@ -142,7 +146,7 @@ AgentScope 2.0.0 的 `HarnessAgent.streamEvents()` 暂不转发子智能体内�
 5. **权限与工具隔离**：启用 `PermissionContextState`，禁止 Harness shell，并为七个专家配置最小工具集合。
 6. **专家提示词**：新增软件工程、数据分析、专业写作、知识管理、系统操作五份专用提示词；不再错误复用规划或摘要提示词。
 7. **重新生成回滚**：删除目标助手回复及其后的消息分支，删除旧 `agent_state_v2`，从目标用户消息之前的持久化聊天记录重建状态，再执行一次该用户消息。
-8. **技能偏好生效**：prompt 型已启用技能注入系统提示词；classpath / 用户文件系统技能仓库通过 `FilteredSkillRepository` 只暴露用户已启用的技能。启停技能仍会使用户 Agent 缓存失效。
+8. **技能偏好生效**：prompt 型已启用技能注入系统提示词；classpath / 用户文件系统技能仓库通过 `FilteredSkillRepository` 只暴露用户已启用的技能。注意 `FilteredSkillRepository` 是只读包装器：`save()` / `delete()` 静默返回 false，`setWriteable(true)` 抛异常，技能的安装与卸载必须走 `SkillService`，不要经由该仓库写入。启停技能仍会使用户 Agent 缓存失效。
 
 ## 5. 验证命令
 
@@ -197,7 +201,7 @@ cd backend
 2. 把工作目录和 userId/sessionId 改为工具从 `RuntimeContext` 读取，解除工具与 Agent 实例的会话绑定。
 3. 将专家定义迁到 `workspace/subagents/*.md`，允许用户编辑角色策略。
 4. 在现有 DONT_ASK + ALLOW/DENY 清单基础上增加用户可配置规则和通用 ASK/HITL 响应端点。
-5. 把 Harness Task List 事件完整映射到现有 `task_progress` UI。
+5. ~~把 Harness Task List 事件完整映射到现有 `task_progress` UI。~~ 已完成：`AgentEventBridge` 拦截 `todo_write` + `TaskProgressTracker` diff 推送（见"事件协议"一节）。
 6. 为 PostgreSQL `AgentStateStore` 增加 Testcontainers 集成测试和并发会话测试。
 7. 评估将聊天消息、工具轨迹和 AgentState 做统一版本快照，以便重新生成时恢复比聊天文本更完整的历史执行轨迹。
 

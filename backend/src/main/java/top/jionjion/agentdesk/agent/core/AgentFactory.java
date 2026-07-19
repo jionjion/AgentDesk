@@ -278,6 +278,7 @@ public class AgentFactory {
 
         Set<String> allowedTools = new LinkedHashSet<>(toolkit.getToolNames());
         allowedTools.addAll(List.of(
+                "todo_write",
                 "read_file", "write_file", "edit_file", "grep_files", "glob_files", "list_files",
                 "session_search", "session_list", "session_history",
                 "memory_get", "memory_search", "memory_save",

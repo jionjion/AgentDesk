@@ -246,7 +246,7 @@ public class ChatStreamOrchestrator {
 
         // 只有用户主动勾选知识库（传入 kbIds）时才进行检索
         if (kbIds == null || kbIds.isBlank()) {
-            log.info("未指定知识库, 跳过检索");
+            log.trace("未指定知识库, 跳过检索");
             return new RetrievalContext(augmented, results);
         }
 
