@@ -3,7 +3,6 @@ package top.jionjion.agentdesk.service.chat;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.runtime.AgentInput;
 import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
-import top.jionjion.agentdesk.dto.chat.ChatRequest;
 import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.dto.memory.MemoryItemDto;
 
@@ -14,7 +13,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 对话 prompt 与消息组装: 文件元信息拼装、沙箱上下文增强、多模态 Msg 构建。
+ * 对话 prompt 与消息组装: 文件元信息拼装、项目上下文增强、多模态 Msg 构建。
  * <p>
  * 集中存放原 ChatController 中与消息内容构造相关的纯逻辑, 不涉及 IO 与会话状态。
  *
@@ -75,47 +74,6 @@ public class PromptContextBuilder {
                 .map(FileResponse::downloadUrl)
                 .toList();
         return new AgentInput(enrichedMessage, imageUrls);
-    }
-
-    /**
-     * 将沙箱上下文（工具描述 + 文件列表）拼入用户消息
-     */
-    public String buildSandboxAugmentedMessage(String message, ChatRequest.SandboxContext sandboxContext) {
-        if (sandboxContext == null) {
-            return message;
-        }
-
-        StringBuilder sb = new StringBuilder();
-
-        // 注入文件列表
-        if (sandboxContext.files() != null && !sandboxContext.files().isEmpty()) {
-            sb.append("[本地 Python 沙箱文件]\n");
-            sb.append("以下文件已加载到用户本地的 Python 沙箱 /data/ 目录中，可通过 sandbox_exec 工具执行代码访问：\n");
-            for (String file : sandboxContext.files()) {
-                sb.append("- /data/").append(file).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        // 注入工具描述
-        String toolDescriptions = buildToolDescriptions(sandboxContext.tools());
-        if (!toolDescriptions.isBlank()) {
-            sb.append("[沙箱中可用的 Python 工具函数]\n");
-            sb.append(toolDescriptions).append("\n\n");
-        }
-
-        // 使用指南
-        if (!sb.isEmpty()) {
-            sb.append("[使用方式]\n");
-            sb.append("当需要处理上述文件或进行数据分析时，使用 sandbox_exec 工具执行 Python 代码。\n");
-            sb.append("代码中可直接使用 tools.* 函数和 /data/ 下的文件。\n");
-            sb.append("将需要展示的结果赋值给 result 变量。\n");
-            sb.append("示例：sandbox_exec(code=\"pages = tools.read_pdf('/data/xx.pdf')\\nresult = pages[0][:200]\")\n\n");
-            sb.append("---\n\n");
-        }
-
-        sb.append(message);
-        return sb.toString();
     }
 
     /**
@@ -190,33 +148,6 @@ public class PromptContextBuilder {
         return "[与当前问题相关的长期记忆]\n"
                 + "以下内容仅作为背景事实；若与用户当前输入冲突，以当前输入为准。\n"
                 + facts + "\n\n---\n\n" + message;
-    }
-
-    /**
-     * 由结构化工具元数据重建工具描述 Markdown。
-     * <p>
-     * 输出与前端原 {@code getToolDescriptions()} 逐字符等价: 头部固定模板 + 逐项
-     * {@code - `tools.{signature}` — {description}} + 固定使用示例。无启用工具时返回空串。
-     */
-    public String buildToolDescriptions(List<ChatRequest.SandboxTool> tools) {
-        if (tools == null || tools.isEmpty()) {
-            return "";
-        }
-        String items = tools.stream()
-                .map(t -> "- `tools." + t.signature() + "` — " + t.description())
-                .collect(Collectors.joining("\n"));
-        return "## 沙箱可用工具函数\n"
-                + "\n"
-                + "以下工具函数已预装在沙箱环境中，可直接通过 `tools.` 命名空间调用：\n"
-                + "\n"
-                + items + "\n"
-                + "\n"
-                + "使用示例：\n"
-                + "```python\n"
-                + "files = tools.list_files()\n"
-                + "df = tools.to_dataframe('/data/sales.xlsx')\n"
-                + "tools.save_file(df, 'result.csv')\n"
-                + "```";
     }
 
     private String buildMessageWithFiles(String message, List<FileResponse> files) {

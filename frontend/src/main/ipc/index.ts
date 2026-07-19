@@ -1,9 +1,10 @@
 import {app, dialog, ipcMain, shell} from 'electron'
 import {readdir, readFile, realpath, stat, writeFile} from 'fs/promises'
-import {spawn} from 'child_process'
 import os from 'os'
 import path from 'path'
-import {createJob} from './jobObject'
+import {cancelExecution, executePython, executeShell, RuntimeLimits, RuntimeResult} from '../runtime/localRuntime'
+import {handleLocalFs, LocalFsRequest} from '../runtime/localFs'
+import {listPythonCandidates} from '../projects/runtimeDiscovery'
 import {
     bindLocation,
     getDeviceId,
@@ -14,32 +15,22 @@ import {
     touchLocation
 } from '../projects/projectStore'
 
-/** 执行隔离策略（由渲染进程/后端下发） */
-interface ExecPolicy {
-    /** 允许执行的根目录树（绝对路径）。必须至少有一个授权根目录 */
-    allowedRoots?: string[]
-    /** 资源限制 */
-    resourceLimits?: {
-        /** 超时毫秒，超时后 kill 整个进程组 */
-        timeoutMs?: number
-        /** stdout/stderr 各自的字符上限 */
-        maxOutputChars?: number
-        /** 进程内存上限（MB），Windows Job Object 硬限制 */
-        memMB?: number
-        /** 活动进程数上限，Windows Job Object 硬限制 */
-        maxProcesses?: number
-    }
-    /** 隔离级别：boundary=目录边界+资源兜底 */
-    isolationLevel?: 'boundary'
+/** 本地执行请求（渲染进程转发后端 local_exec_request payload） */
+interface LocalExecRequest {
+    kind: 'shell' | 'python'
+    command?: string
+    code?: string
+    scriptPath?: string
+    args?: string[]
+    cwd?: string
+    /** Python 解释器路径（渲染进程从 ProjectLocation snapshot 获取） */
+    pythonExecutable?: string
+    limits?: RuntimeLimits
+    /** 用于取消的请求 ID */
+    requestId?: string
 }
 
-/** 默认资源限制 */
-const DEFAULT_TIMEOUT_MS = 120_000
-const DEFAULT_MAX_OUTPUT_CHARS = 1_000_000
-/** 全局并发执行上限 */
-const MAX_CONCURRENT_EXECUTIONS = 5
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
-let runningExecutions = 0
 
 const allowedReadFiles = new Set<string>()
 const allowedReadRoots = new Set<string>()
@@ -121,26 +112,6 @@ async function assertWriteAllowed(filePath: string): Promise<string> {
         throw new Error('未授权写入该路径')
     }
     return canonical
-}
-
-/**
- * 校验工作目录是否落在 allowedRoots 之内。返回钳制后的有效 cwd 或拒绝原因。
- */
-async function resolveCwd(workingDir: string | undefined, policy: ExecPolicy | undefined):
-    Promise<{ ok: true; cwd: string | undefined } | { ok: false; reason: string }> {
-    const roots = policy?.allowedRoots
-    if (!roots || roots.length === 0) {
-        return {ok: false, reason: '缺少授权工作目录，请先选择工作目录后再执行命令'}
-    }
-    const canonicalRoots = await Promise.all(roots.map(canonicalize))
-    // 未显式指定工作目录时，默认使用第一个授权根
-    const targetDir = workingDir && workingDir.trim() ? workingDir : roots[0]
-    const canonicalTarget = await canonicalize(targetDir)
-    const allowed = canonicalRoots.some(root => isWithin(root, canonicalTarget))
-    if (!allowed) {
-        return {ok: false, reason: `工作目录 "${targetDir}" 不在授权目录范围内。授权目录: ${roots.join(', ')}`}
-    }
-    return {ok: true, cwd: canonicalTarget}
 }
 
 export function registerIpcHandlers(): void {
@@ -231,10 +202,42 @@ export function registerIpcHandlers(): void {
         await shell.openExternal(url)
     })
 
-    // Shell 命令执行（远程执行功能）
-    ipcMain.handle('shell:execute', async (_event, command: string, workingDir?: string, policy?: ExecPolicy) => {
-        return executeShellCommand(command, workingDir, policy)
+    // 本地执行（统一 shell/python 运行器, 见开发计划 8.2/10.x）
+    ipcMain.handle('runtime:execute', async (_event, request: LocalExecRequest): Promise<RuntimeResult> => {
+        if (request.kind === 'python') {
+            if (!request.pythonExecutable) {
+                return {
+                    success: false, exitCode: -1, stdout: '',
+                    stderr: '缺少 Python 解释器路径, 请先在项目中配置或创建 .venv',
+                    durationMs: 0, cancelled: false, timedOut: false
+                }
+            }
+            return executePython({
+                code: request.code,
+                scriptPath: request.scriptPath,
+                args: request.args,
+                cwd: request.cwd,
+                pythonExecutable: request.pythonExecutable,
+                limits: request.limits
+            }, request.requestId)
+        }
+        if (!request.command) {
+            return {
+                success: false, exitCode: -1, stdout: '', stderr: '命令不能为空',
+                durationMs: 0, cancelled: false, timedOut: false
+            }
+        }
+        return executeShell(request.command, request.cwd, request.limits, request.requestId)
     })
+
+    // 取消正在执行的本地进程
+    ipcMain.handle('runtime:cancel', (_event, requestId: string) => cancelExecution(requestId))
+
+    // 本地文件 RPC（见开发计划 8.3）
+    ipcMain.handle('runtime:localFs', (_event, request: LocalFsRequest) => handleLocalFs(request))
+
+    // Python 候选发现（设置页/client_ready 上报）
+    ipcMain.handle('runtime:listPythonCandidates', () => listPythonCandidates())
 
     // 应用信息
     ipcMain.handle('app:getVersion', () => {
@@ -271,205 +274,3 @@ export function registerIpcHandlers(): void {
 
     ipcMain.handle('projects:getRuntimeSnapshot', (_event, projectId: string) => getRuntimeSnapshot(projectId))
 }
-
-/**
- * 执行 shell 命令并返回结果（带工作目录边界 + 资源兜底）
- */
-async function executeShellCommand(
-    command: string,
-    workingDir?: string,
-    policy?: ExecPolicy
-): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> {
-    const startTime = Date.now()
-
-    if (policy?.isolationLevel !== 'boundary') {
-        return {
-            exitCode: -1,
-            stdout: '',
-            stderr: '命令被拒绝: 缺少执行隔离策略',
-            durationMs: Date.now() - startTime
-        }
-    }
-
-    // 并发上限
-    if (runningExecutions >= MAX_CONCURRENT_EXECUTIONS) {
-        return {
-            exitCode: -1,
-            stdout: '',
-            stderr: `并发执行数已达上限 (${MAX_CONCURRENT_EXECUTIONS})，请等待当前命令完成。`,
-            durationMs: Date.now() - startTime
-        }
-    }
-    // 工作目录边界
-    const cwdResult = await resolveCwd(workingDir, policy)
-    if (!cwdResult.ok) {
-        return {
-            exitCode: -1,
-            stdout: '',
-            stderr: `命令被拒绝: ${cwdResult.reason}`,
-            durationMs: Date.now() - startTime
-        }
-    }
-    workingDir = cwdResult.cwd
-
-    runningExecutions++
-    try {
-        return await spawnCommand(command, workingDir, policy, startTime)
-    } finally {
-        runningExecutions--
-    }
-}
-
-/**
- * 实际 spawn 子进程，应用超时 kill 进程组与输出上限。
- */
-function spawnCommand(
-    command: string,
-    workingDir: string | undefined,
-    policy: ExecPolicy | undefined,
-    startTime: number
-): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> {
-    return new Promise((resolve) => {
-        const isWindows = process.platform === 'win32'
-        const timeoutMs = policy?.resourceLimits?.timeoutMs ?? DEFAULT_TIMEOUT_MS
-        const maxOutputChars = policy?.resourceLimits?.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS
-
-        let shellCmd: string
-        let shellArgs: string[]
-
-        if (isWindows) {
-            // 使用 PowerShell 执行，原生 UTF-8 支持，中文路径不乱码
-            shellCmd = 'powershell.exe'
-            shellArgs = [
-                '-NoProfile',
-                '-NonInteractive',
-                '-Command',
-                // 强制输出编码为 UTF-8
-                `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`
-            ]
-        } else {
-            shellCmd = '/bin/sh'
-            shellArgs = ['-c', command]
-        }
-
-        // 构建环境变量
-        const env = { ...process.env }
-        if (isWindows) {
-            env.PYTHONIOENCODING = env.PYTHONIOENCODING || 'utf-8'
-            env.PYTHONUTF8 = env.PYTHONUTF8 || '1'
-            env.JAVA_TOOL_OPTIONS = env.JAVA_TOOL_OPTIONS || '-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8'
-            env.LESSCHARSET = env.LESSCHARSET || 'utf-8'
-        }
-
-        const child = spawn(shellCmd, shellArgs, {
-            cwd: workingDir || undefined,
-            env,
-            windowsHide: true,
-            // 非 Windows 下独立进程组，便于 kill 整组（含子孙进程）
-            detached: !isWindows
-        })
-
-        // Windows：把子进程纳入 Job Object，获得内存/进程数硬上限 +
-        // KILL_ON_JOB_CLOSE（主进程崩溃时自动回收整组）。koffi 不可用时为 null，
-        // 回退到 taskkill /T 进程树回收。
-        const job = isWindows && child.pid
-            ? createJob({
-                memMB: policy?.resourceLimits?.memMB,
-                maxProcesses: policy?.resourceLimits?.maxProcesses
-            })
-            : null
-        if (job && child.pid) {
-            job.assignPid(child.pid)
-        }
-
-        let stdout = ''
-        let stderr = ''
-        let stdoutTruncated = false
-        let stderrTruncated = false
-        let finished = false
-
-        /** 终止本次执行的整组进程：优先靠 Job Object，否则回退 taskkill/进程组 */
-        const terminate = (): void => {
-            if (job) {
-                job.close()
-            } else {
-                killProcessTree(child.pid, isWindows)
-            }
-        }
-
-        const timer = setTimeout(() => {
-            terminate()
-            if (!finished) {
-                finished = true
-                resolve({
-                    exitCode: -1,
-                    stdout,
-                    stderr: stderr + `\n[命令执行超时 (${Math.round(timeoutMs / 1000)}秒)，已终止进程组]`,
-                    durationMs: Date.now() - startTime
-                })
-            }
-        }, timeoutMs)
-
-        child.stdout.on('data', (data: Buffer) => {
-            if (stdoutTruncated) return
-            stdout += data.toString()
-            if (stdout.length > maxOutputChars) {
-                stdout = stdout.slice(0, maxOutputChars) + '\n[输出已截断]'
-                stdoutTruncated = true
-                terminate()
-            }
-        })
-
-        child.stderr.on('data', (data: Buffer) => {
-            if (stderrTruncated) return
-            stderr += data.toString()
-            if (stderr.length > maxOutputChars) {
-                stderr = stderr.slice(0, maxOutputChars) + '\n[错误输出已截断]'
-                stderrTruncated = true
-            }
-        })
-
-        child.on('close', (code) => {
-            clearTimeout(timer)
-            // 正常结束也关闭 Job 句柄，释放内核对象
-            if (job) job.close()
-            if (finished) return
-            finished = true
-            resolve({
-                exitCode: code ?? -1,
-                stdout,
-                stderr,
-                durationMs: Date.now() - startTime
-            })
-        })
-
-        child.on('error', (err) => {
-            clearTimeout(timer)
-            if (job) job.close()
-            if (finished) return
-            finished = true
-            resolve({
-                exitCode: -1,
-                stdout: '',
-                stderr: err.message,
-                durationMs: Date.now() - startTime
-            })
-        })
-    })
-}
-
-/**
- * 终止整个进程树。Windows 用 taskkill /T，类 Unix 用进程组 kill。
- */
-function killProcessTree(pid: number | undefined, isWindows: boolean): void {
-    if (!pid) return
-    try {
-        if (isWindows) {
-            spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {windowsHide: true})
-        } else {
-            // detached 时子进程组 id 为 pid，负号表示整组
-            process.kill(-pid, 'SIGKILL')
-        }
-    } catch { /* 进程可能已退出 */ }
-}
-

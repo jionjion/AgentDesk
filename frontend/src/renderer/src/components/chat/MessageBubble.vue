@@ -164,8 +164,6 @@ class="shrink-0 rounded px-1.5 py-0.5 text-xs text-violet-600 dark:text-violet-4
               </button>
             </div>
           </div>
-          <!-- 代码执行结果 -->
-          <ExecutionResult v-if="executionResult" :result="executionResult" class="!mb-0 !mt-2 !rounded-t-none !border-t-0"/>
         </div>
         <!-- 知识库引用来源 -->
         <div
@@ -259,12 +257,9 @@ import DOMPurify from 'dompurify'
 import {api as viewerApi} from 'v-viewer'
 import {CheckCircle2, ChevronRight, Copy, Database, FileText, Loader2, RefreshCw, Settings2, Trash2, BookMarked} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
-import type {ExecuteResult} from '@/types/sandbox'
-import ExecutionResult from '@/components/sandbox/ExecutionResult.vue'
 import {useChatStore} from '@/stores/chat'
 import {useAppStore} from '@/stores/app'
 import {useSettingsStore} from '@/stores/settings'
-import {useSandboxStore} from '@/stores/sandbox'
 import {useRemoteExecStore} from '@/stores/remoteExec'
 import aiIcon from '@/assets/icon_255.png'
 import {formatFileSize, isImageType} from '@/utils/file'
@@ -283,7 +278,7 @@ function renderMarkdown(markdown: string): string {
   return DOMPurify.sanitize(marked.parse(markdown) as string, MARKDOWN_SANITIZE_CONFIG)
 }
 
-// 自定义 code block 渲染，注入复制按钮 + 运行按钮 + 高亮
+// 自定义 code block 渲染，注入复制按钮 + 高亮
 marked.use({
   renderer: {
     code({text, lang}) {
@@ -292,12 +287,7 @@ marked.use({
           : hljs.highlightAuto(text).value
       const langLabel = lang || ''
       const escaped = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      // Python 代码块添加运行按钮
-      const isPython = langLabel === 'python' || langLabel === 'py'
-      const runBtn = (isPython && sandboxStore.enabled)
-          ? `<button class="code-run-btn" data-code="${escaped}" title="运行"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`
-          : ''
-      return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><div class="code-block-actions">${runBtn}<button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
+      return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${langLabel}</span><div class="code-block-actions"><button class="code-copy-btn" data-code="${escaped}" title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div></div><pre><code class="hljs language-${langLabel}">${highlighted}</code></pre></div>`
     }
   }
 })
@@ -312,18 +302,11 @@ const props = defineProps<{
   subtaskCards?: Record<string, { name: string; outcome: string }>
   /** 工具调用消息，key 为 tool_call 消息 ID */
   toolCalls?: Record<string, ToolCallMessage>
-  /** 代码执行结果 */
-  executionResult?: ExecuteResult
-}>()
-
-const emit = defineEmits<{
-  'run-code': [code: string]
 }>()
 
 const chatStore = useChatStore()
 const appStore = useAppStore()
 const settingsStore = useSettingsStore()
-const sandboxStore = useSandboxStore()
 const remoteExecStore = useRemoteExecStore()
 
 const isUser = computed(() => props.message.role === 'user')
@@ -559,19 +542,9 @@ const bubbleRef = ref<HTMLElement>()
 function handleBubbleClick(e: Event) {
   const target = e.target as HTMLElement
 
-  // 运行按钮
-  const runBtn = target.closest('.code-run-btn') as HTMLButtonElement | null
-  if (runBtn) {
-    const code = runBtn.getAttribute('data-code')
-        ?.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-    if (!code) return
-    emit('run-code', code)
-    return
-  }
-
   // 折叠/展开：点击 header 区域触发
   const header = target.closest('.code-block-header') as HTMLElement | null
-  if (header && !target.closest('.code-copy-btn') && !target.closest('.code-run-btn')) {
+  if (header && !target.closest('.code-copy-btn')) {
     const wrapper = header.closest('.code-block-wrapper') as HTMLElement | null
     if (!wrapper) return
     wrapper.classList.toggle('collapsed')

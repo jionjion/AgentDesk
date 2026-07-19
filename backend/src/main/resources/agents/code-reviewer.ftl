@@ -8,7 +8,7 @@
 5. 最佳实践 — 违反 SOLID 原则、不符合语言惯用写法、过时的 API 使用
 
 工作流程:
-1. 阅读代码，理解其功能和上下文
+1. 阅读代码，理解其功能和上下文（本地项目文件优先用 local_read_file 读取、local_search_files 检索、local_list_files 浏览目录，不必通过 shell 的 cat/type）
 2. 逐维度检查，记录发现的问题
 3. 按严重程度排序输出
 

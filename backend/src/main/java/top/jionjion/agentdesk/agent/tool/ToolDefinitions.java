@@ -80,28 +80,49 @@ public final class ToolDefinitions {
     public static final String BATCH_WEB_RESEARCHER_DESC = "批量并行联网研究工具。对一个研究主题自动拆解为多个子查询并行搜索，合并去重后返回精简结果。" +
             "适用于开放性调研问题（如'XX的现状和趋势'），不适用于已知具体URL的抓取。";
 
-    // ==================== 远程执行工具 ====================
+    // ==================== 本地执行工具 ====================
 
-    public static final String REMOTE_EXEC = "remote_exec";
-    public static final String REMOTE_EXEC_DESC = "在用户本地机器上执行 shell 命令，是执行类任务的【默认首选】。" +
-            "命令通过网络发送到用户桌面客户端执行，拥有完整能力：访问真实文件系统、联网、安装并使用任意 Python 包（含 scipy、scikit-learn、PyTorch、opencv 等 C 扩展包）、运行项目命令、查看系统状态。" +
-            "跑 Python 时用 `python -c \"...\"` 或先写脚本文件再执行。" +
+    public static final String SHELL_EXEC = "shell_exec";
+    public static final String SHELL_EXEC_DESC = "在用户本地机器上执行 shell 命令。" +
+            "命令通过网络发送到用户桌面客户端执行，拥有完整能力：访问真实文件系统、联网、安装依赖、运行项目命令、查看系统状态。" +
             "重要：执行结果会包含客户端操作系统信息，请按目标系统使用正确语法 " +
             "(Windows 用 cmd/PowerShell 如 dir, type, del；macOS/Linux 用 Unix 命令如 ls, cat, rm)。" +
             "低风险命令（如 ls/dir, cat/type, git status）自动执行，高风险命令（如 rm/del, npm install, git push）需用户确认。" +
-            "【工作目录规则】working_dir 是逐次调用参数，不跨调用保持；默认使用当前项目根目录。" +
+            "运行 Python 代码时优先使用 python_exec 工具；读写/检索本地文件优先使用 local_read_file/local_write_file/local_edit_file/local_list_files/local_search_files。" +
+            "【工作目录规则】working_dir 是逐次调用参数，不跨工具调用保持；默认使用当前项目根目录。" +
             "单独执行 `cd subdir` 只影响该次短生命周期 shell，下一次调用不会继承；" +
-            "需要在子目录运行时，传 working_dir=\"subdir\"（相对路径按项目根解析），或在同一条命令中使用 `cd subdir && command`。" +
-            "【与 sandbox_exec 的选择】涉及真实文件读写、网络、第三方包、系统操作、运行项目时，一律用本工具；" +
-            "仅当任务是纯内存计算、画图、或使用 tools.* 数据处理函数，且不碰真实文件/网络/C扩展包时，才改用 sandbox_exec。";
+            "需要在子目录运行时，传 working_dir=\"subdir\"（相对路径按项目根解析），或在同一条命令中使用 `cd subdir && command`。";
 
-    // ==================== 沙箱执行工具 ====================
+    public static final String PYTHON_EXEC = "python_exec";
+    public static final String PYTHON_EXEC_DESC = "在用户本地机器上用项目配置的真实 Python 解释器执行代码。" +
+            "code 与 script_path 二选一：code 为内联代码（通过 stdin 传给解释器），script_path 为要执行的现有脚本路径。" +
+            "解释器由项目本地配置决定，可导入本机已安装的任意包（含 C 扩展包）、访问真实文件系统与网络。" +
+            "cwd 为空时使用项目根目录；相对 cwd 按项目根解析。执行需要用户确认（高风险）。" +
+            "缺少依赖包时会返回真实报错，此时可提出安装命令并通过 shell_exec 执行（需审批），不要假设包已安装。";
 
-    public static final String SANDBOX_EXEC = "sandbox_exec";
-    public static final String SANDBOX_EXEC_DESC = "在用户浏览器端的轻量 Python 沙箱（Pyodide/WASM）中执行 Python 代码，是 remote_exec 之外的【受限便捷选项】，无需用户确认即可自动执行。" +
-            "适用场景【且仅适用于】：纯内存的数据计算、用 matplotlib 画图、使用 tools.* 命名空间的数据处理函数（如 tools.read_pdf、tools.to_dataframe）。预装 pandas、numpy、matplotlib。" +
-            "可获取 stdout、stderr、返回值（result 变量）、matplotlib 图表。" +
-            "文件系统是虚拟的（MEMFS）：工作目录文件挂载在 /data/ 下，输出文件保存到 /data/output/。" +
-            "【硬限制，不满足请改用 remote_exec】不能访问用户真实文件系统、不能联网、只能装纯 Python 包（不支持 scipy、scikit-learn、PyTorch、opencv-python、lxml 等 C 扩展包）。" +
-            "判断标准：只要任务需要真实文件、网络、或上述受限包，就用 remote_exec，不要用本工具撞限制后再退回。";
+    public static final String LOCAL_READ_FILE = "local_read_file";
+    public static final String LOCAL_READ_FILE_DESC = "读取用户本地项目中的文本文件（UTF-8）。" +
+            "相对路径按项目根解析，绝对路径直接使用。支持 offset/limit 按行分块读取大文件；" +
+            "返回内容超限时带截断标记与可继续读取的 offset。二进制文件返回元数据错误而非内容。";
+
+    public static final String LOCAL_WRITE_FILE = "local_write_file";
+    public static final String LOCAL_WRITE_FILE_DESC = "在用户本地写入文本文件（UTF-8，整文件覆盖或新建）。" +
+            "相对路径按项目根解析。单次内容上限 2MB，超限请分块或改用脚本。" +
+            "项目目录外的写入会提升为高风险需用户确认。";
+
+    public static final String LOCAL_EDIT_FILE = "local_edit_file";
+    public static final String LOCAL_EDIT_FILE_DESC = "对用户本地文本文件做精确文本替换。" +
+            "old_text 必须在文件中精确出现预期次数（默认 1 次），0 次或次数不符将报错并不修改文件；" +
+            "replace_all=true 时替换全部出现。保留原文件的换行风格（CRLF/LF）与 BOM，原子写入。" +
+            "适合小范围修改；大规模重写请用 local_write_file。";
+
+    public static final String LOCAL_LIST_FILES = "local_list_files";
+    public static final String LOCAL_LIST_FILES_DESC = "列出用户本地目录内容或按 glob 模式匹配文件。" +
+            "相对路径按项目根解析。pattern 为空时列出目录直接子项；非空时按 glob（如 src/**/*.ts）递归匹配。" +
+            "结果超过条目上限时返回 truncated 标记。";
+
+    public static final String LOCAL_SEARCH_FILES = "local_search_files";
+    public static final String LOCAL_SEARCH_FILES_DESC = "在用户本地项目文件内容中按正则/文本搜索（类似 grep）。" +
+            "相对路径按项目根解析。可用 filePattern 限定文件范围（glob）。" +
+            "返回匹配行及行号，超过匹配数上限时返回 truncated 标记与实际扫描统计。";
 }

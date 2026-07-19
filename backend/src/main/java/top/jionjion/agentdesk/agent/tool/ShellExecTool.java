@@ -6,11 +6,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.jionjion.agentdesk.agent.exec.ClientExecException;
 import top.jionjion.agentdesk.agent.exec.ClientExecutor;
+import top.jionjion.agentdesk.agent.exec.ExecSpec;
 import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
 
 /**
- * 远程命令执行工具: Agent 通过此工具在用户的本地机器上执行 shell 命令。
+ * 本地 Shell 执行工具: Agent 通过此工具在用户的本地机器上执行 shell 命令。
  * <p>
  * 命令通过 WebSocket 发送到客户端执行, 根据风险等级决定是否需要用户确认。
  * 低风险命令（如 ls, cat, git status）自动执行, 高风险命令需要用户在客户端确认。
@@ -24,9 +25,9 @@ import top.jionjion.agentdesk.websocket.dto.CommandResult;
  *
  * @author Jion
  */
-public class RemoteExecTool {
+public class ShellExecTool {
 
-    private static final Logger log = LoggerFactory.getLogger(RemoteExecTool.class);
+    private static final Logger log = LoggerFactory.getLogger(ShellExecTool.class);
 
     private static final String PLATFORM_WIN = "win";
     private static final String PLATFORM_DARWIN = "darwin";
@@ -38,15 +39,15 @@ public class RemoteExecTool {
     private final Long userId;
     private final String sessionId;
 
-    public RemoteExecTool(ClientExecutor bridge, CommandRiskClassifier riskClassifier,
-                          Long userId, String sessionId) {
+    public ShellExecTool(ClientExecutor bridge, CommandRiskClassifier riskClassifier,
+                         Long userId, String sessionId) {
         this.bridge = bridge;
         this.riskClassifier = riskClassifier;
         this.userId = userId;
         this.sessionId = sessionId;
     }
 
-    @Tool(name = ToolDefinitions.REMOTE_EXEC, description = ToolDefinitions.REMOTE_EXEC_DESC)
+    @Tool(name = ToolDefinitions.SHELL_EXEC, description = ToolDefinitions.SHELL_EXEC_DESC)
     public String execute(
             @ToolParam(name = "command", description = "要在用户本地机器上执行的 shell 命令。注意: 必须使用与用户操作系统匹配的命令语法") String command,
             @ToolParam(name = "working_dir", description = "本次命令的工作目录, 可选。相对路径按当前项目根解析; 不传则使用项目根目录。该参数不跨调用保持", required = false) String workingDir,
@@ -58,11 +59,11 @@ public class RemoteExecTool {
 
         // 检查客户端连接
         if (!bridge.isConnected(userId)) {
-            return "错误: 用户的桌面客户端未连接, 无法执行远程命令。请提示用户启动桌面客户端并确保远程执行功能已开启。";
+            return "错误: 用户的桌面客户端未连接, 无法执行本地命令。请提示用户启动桌面客户端并确保远程执行功能已开启。";
         }
 
         // 解析工作目录: 显式传入(相对路径按项目根解析) > 项目默认 cwd > 客户端默认
-        String effectiveDir = resolveWorkingDir(workingDir, projectContext);
+        String effectiveDir = LocalPathResolver.resolveWorkingDir(workingDir, projectContext);
 
         // 获取客户端平台信息
         String platform = bridge.getClientPlatform(userId);
@@ -70,52 +71,18 @@ public class RemoteExecTool {
 
         // 风险分级
         String riskLevel = riskClassifier.classify(command);
-        log.info("远程执行命令: [{}] {} (userId={}, session={}, platform={}, cwd={})",
+        log.info("本地 shell 执行: [{}] {} (userId={}, session={}, platform={}, cwd={})",
                 riskLevel, command, userId, sessionId, platform, effectiveDir);
 
         try {
-            CommandResult result = bridge.executeCommand(userId, sessionId, command, effectiveDir, riskLevel);
+            ExecSpec spec = ExecSpec.shell(command, effectiveDir, riskLevel,
+                    projectContext != null ? projectContext.projectId() : null,
+                    projectContext != null ? projectContext.deviceId() : null);
+            CommandResult result = bridge.executeExec(userId, sessionId, spec);
             return formatResult(command, result, osHint);
         } catch (ClientExecException e) {
-            return "远程执行失败: " + e.getMessage();
+            return "本地执行失败: " + e.getMessage();
         }
-    }
-
-    /**
-     * 解析本次调用的有效工作目录。
-     * 显式传入优先 (相对路径以项目根为基准); 其次项目默认 cwd; 均无时为 null (客户端使用默认)。
-     */
-    private String resolveWorkingDir(String workingDir, ProjectRuntimeContext projectContext) {
-        String projectRoot = projectContext != null && projectContext.runtimeOnline()
-                ? projectContext.rootPath() : null;
-        if (workingDir != null && !workingDir.isBlank()) {
-            String dir = workingDir.trim();
-            if (projectRoot != null && isRelative(dir)) {
-                return joinPath(projectRoot, dir);
-            }
-            return dir;
-        }
-        if (projectContext != null && projectContext.runtimeOnline()) {
-            return projectContext.effectiveCwd();
-        }
-        return null;
-    }
-
-    /** 判断路径是否为相对路径 (非 Windows 盘符/UNC/Unix 绝对路径) */
-    private static boolean isRelative(String path) {
-        if (path.startsWith("/") || path.startsWith("\\")) {
-            return false;
-        }
-        // Windows 盘符: C:\ 或 C:/
-        return !(path.length() >= 2 && Character.isLetter(path.charAt(0)) && path.charAt(1) == ':');
-    }
-
-    /** 以项目根为基准拼接相对路径, 分隔符跟随项目根风格 */
-    private static String joinPath(String root, String relative) {
-        String sep = root.contains("\\") ? "\\" : "/";
-        String base = root.endsWith("/") || root.endsWith("\\")
-                ? root.substring(0, root.length() - 1) : root;
-        return base + sep + relative.replace(sep.equals("\\") ? "/" : "\\", sep);
     }
 
     /**

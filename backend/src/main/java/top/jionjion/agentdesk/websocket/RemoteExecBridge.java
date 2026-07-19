@@ -9,9 +9,9 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import top.jionjion.agentdesk.agent.exec.ClientExecException;
 import top.jionjion.agentdesk.agent.exec.ClientExecutor;
+import top.jionjion.agentdesk.agent.exec.ExecSpec;
 import top.jionjion.agentdesk.websocket.dto.CommandRequest;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
-import top.jionjion.agentdesk.websocket.dto.SandboxResult;
 import top.jionjion.agentdesk.websocket.dto.WsMessage;
 
 import java.io.IOException;
@@ -24,11 +24,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * 远程执行桥接器: 管理 WebSocket 连接, 协调命令下发与结果回收。
+ * 远程执行桥接器: 管理 WebSocket 连接, 协调统一本地执行请求 (shell/python)、
+ * 本地文件 RPC 与定时任务 runtime snapshot 的下发与结果回收。
  * <p>
  * 核心职责:
  * - 维护 userId → WebSocketSession 映射
- * - 发送命令到客户端并阻塞等待结果
+ * - 发送请求到客户端并阻塞等待结果
  * - 处理超时、拒绝、断连等异常场景
  *
  * @author Jion
@@ -44,6 +45,7 @@ public class RemoteExecBridge implements ClientExecutor {
     private final int maxResultSize;
     private final int execMemoryLimitMb;
     private final int execMaxProcesses;
+    private final long localFsTimeout;
 
     /**
      * userId → WebSocketSession 映射（每个用户最多一个活跃连接）
@@ -61,14 +63,19 @@ public class RemoteExecBridge implements ClientExecutor {
     private final ConcurrentHashMap<Long, String> clientDeviceIds = new ConcurrentHashMap<>();
 
     /**
-     * requestId → CompletableFuture 映射（等待客户端响应）
+     * userId → 客户端能力集（client_ready 上报, 如 shell/python/local_files）
+     */
+    private final ConcurrentHashMap<Long, java.util.List<String>> clientCapabilities = new ConcurrentHashMap<>();
+
+    /**
+     * requestId → CompletableFuture 映射（等待客户端执行结果）
      */
     private final ConcurrentHashMap<String, PendingCommand> pendingRequests = new ConcurrentHashMap<>();
 
     /**
-     * requestId → CompletableFuture 映射（沙箱执行等待）
+     * requestId → CompletableFuture 映射（本地文件 RPC 等待）
      */
-    private final ConcurrentHashMap<String, PendingSandbox> pendingSandboxRequests = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PendingFs> pendingFsRequests = new ConcurrentHashMap<>();
 
     /**
      * requestId → CompletableFuture 映射（runtime snapshot 等待, 定时任务用）
@@ -78,7 +85,7 @@ public class RemoteExecBridge implements ClientExecutor {
     private record PendingCommand(Long userId, CompletableFuture<CommandResult> future) {
     }
 
-    private record PendingSandbox(Long userId, CompletableFuture<SandboxResult> future) {
+    private record PendingFs(Long userId, CompletableFuture<Map<String, Object>> future) {
     }
 
     private record PendingSnapshot(Long userId, CompletableFuture<Map<String, Object>> future) {
@@ -89,13 +96,15 @@ public class RemoteExecBridge implements ClientExecutor {
                             @Value("${agentdesk.remote-exec.max-pending-commands:10}") int maxPendingCommands,
                             @Value("${agentdesk.remote-exec.max-result-size:262144}") int maxResultSize,
                             @Value("${agentdesk.remote-exec.exec-memory-limit-mb:2048}") int execMemoryLimitMb,
-                            @Value("${agentdesk.remote-exec.exec-max-processes:64}") int execMaxProcesses) {
+                            @Value("${agentdesk.remote-exec.exec-max-processes:64}") int execMaxProcesses,
+                            @Value("${agentdesk.remote-exec.local-fs-timeout:30000}") long localFsTimeout) {
         this.objectMapper = objectMapper;
         this.commandTimeout = commandTimeout;
         this.maxPendingCommands = maxPendingCommands;
         this.maxResultSize = maxResultSize;
         this.execMemoryLimitMb = execMemoryLimitMb;
         this.execMaxProcesses = execMaxProcesses;
+        this.localFsTimeout = localFsTimeout;
     }
 
     // ==================== 连接管理 ====================
@@ -137,6 +146,16 @@ public class RemoteExecBridge implements ClientExecutor {
     }
 
     /**
+     * 注册客户端能力集（由 CLIENT_READY 消息触发, 见开发计划 8.1）
+     */
+    public void registerClientCapabilities(Long userId, java.util.List<String> capabilities) {
+        if (capabilities != null && !capabilities.isEmpty()) {
+            clientCapabilities.put(userId, java.util.List.copyOf(capabilities));
+            log.info("用户 {} 客户端能力: {}", userId, capabilities);
+        }
+    }
+
+    /**
      * 获取客户端设备ID, 未上报时返回 null
      */
     public String getClientDeviceId(Long userId) {
@@ -159,6 +178,7 @@ public class RemoteExecBridge implements ClientExecutor {
         connections.remove(userId);
         clientPlatforms.remove(userId);
         clientDeviceIds.remove(userId);
+        clientCapabilities.remove(userId);
         // 完成该用户所有 pending 请求（以异常方式）
         pendingRequests.entrySet().removeIf(entry -> {
             PendingCommand pending = entry.getValue();
@@ -168,8 +188,8 @@ public class RemoteExecBridge implements ClientExecutor {
             }
             return false;
         });
-        pendingSandboxRequests.entrySet().removeIf(entry -> {
-            PendingSandbox pending = entry.getValue();
+        pendingFsRequests.entrySet().removeIf(entry -> {
+            PendingFs pending = entry.getValue();
             if (userId.equals(pending.userId()) && !pending.future().isDone()) {
                 pending.future().completeExceptionally(new IOException("客户端已断开连接"));
                 return true;
@@ -195,25 +215,16 @@ public class RemoteExecBridge implements ClientExecutor {
         return session != null && session.isOpen();
     }
 
-    // ==================== 命令执行 ====================
+    // ==================== 统一本地执行 (shell / python) ====================
 
     /**
-     * 向客户端发送命令并阻塞等待结果
-     *
-     * @param userId     用户 ID
-     * @param sessionId  聊天会话 ID
-     * @param command    要执行的命令
-     * @param workingDir 工作目录（可为 null）
-     * @param riskLevel  风险等级
-     * @return 命令执行结果
-     * @throws RemoteExecException 执行失败时抛出
+     * 向客户端发送统一本地执行请求并阻塞等待结果 (见开发计划 8.2)
      */
-    public CommandResult executeCommand(Long userId, String sessionId,
-                                        String command, String workingDir,
-                                        String riskLevel) throws RemoteExecException {
+    @Override
+    public CommandResult executeExec(Long userId, String sessionId, ExecSpec spec) throws ClientExecException {
         WebSocketSession ws = connections.get(userId);
         if (ws == null || !ws.isOpen()) {
-            throw new RemoteExecException("客户端未连接, 无法执行远程命令。请确保桌面客户端已启动并连接。");
+            throw new RemoteExecException("客户端未连接, 无法执行本地命令。请确保桌面客户端已启动并连接。");
         }
 
         // 检查并发限制
@@ -222,28 +233,30 @@ public class RemoteExecBridge implements ClientExecutor {
             throw new RemoteExecException("待执行命令数已达上限 (" + maxPendingCommands + "), 请等待当前命令完成。");
         }
 
+        long timeoutMs = spec.timeoutMs() != null && spec.timeoutMs() > 0
+                ? Math.min(spec.timeoutMs(), commandTimeout) : commandTimeout;
+
         String requestId = UUID.randomUUID().toString();
         CompletableFuture<CommandResult> future = new CompletableFuture<>();
         pendingRequests.put(requestId, new PendingCommand(userId, future));
 
         try {
-            // 构建执行隔离策略: 后端只下发服务端可控的资源限制与隔离档位,
-            // 目录边界 allowedRoots 由客户端依据用户授权工作目录自行掌握。
-            CommandRequest.ExecPolicy policy = new CommandRequest.ExecPolicy(
-                    null,
-                    new CommandRequest.ResourceLimits(commandTimeout, maxResultSize, execMemoryLimitMb, execMaxProcesses),
-                    CommandRequest.ExecPolicy.LEVEL_BOUNDARY
-            );
-
-            // 构建命令请求消息
-            CommandRequest request = new CommandRequest(command, workingDir, riskLevel, commandTimeout, null, policy);
+            // 资源限制由服务端下发; 目录不再作为安全边界 (见开发计划 10.1)
+            CommandRequest.ResourceLimits limits = new CommandRequest.ResourceLimits(
+                    timeoutMs, maxResultSize, execMemoryLimitMb, execMaxProcesses);
 
             Map<String, Object> payload = new HashMap<>();
-            payload.put("command", request.command());
-            payload.put("workingDir", request.workingDir() != null ? request.workingDir() : "");
-            payload.put("riskLevel", request.riskLevel());
-            payload.put("timeoutMs", request.timeoutMs());
-            payload.put("policy", request.policy());
+            payload.put("kind", spec.kind());
+            payload.put("command", spec.command());
+            payload.put("code", spec.code());
+            payload.put("scriptPath", spec.scriptPath());
+            payload.put("args", spec.args());
+            payload.put("cwd", spec.cwd() != null ? spec.cwd() : "");
+            payload.put("projectId", spec.projectId());
+            payload.put("deviceId", spec.deviceId());
+            payload.put("riskLevel", spec.riskLevel());
+            payload.put("timeoutMs", timeoutMs);
+            payload.put("resourceLimits", limits);
 
             WsMessage msg = WsMessage.of(
                     WsMessage.TYPE_COMMAND_REQUEST,
@@ -255,10 +268,10 @@ public class RemoteExecBridge implements ClientExecutor {
             // 发送到客户端
             String json = objectMapper.writeValueAsString(msg);
             ws.sendMessage(new TextMessage(json));
-            log.info("已向用户 {} 发送命令: [{}] {}", userId, riskLevel, command);
+            log.info("已向用户 {} 发送本地执行请求: kind={}, risk={}", userId, spec.kind(), spec.riskLevel());
 
             // 阻塞等待结果
-            CommandResult result = future.get(commandTimeout, TimeUnit.MILLISECONDS);
+            CommandResult result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
 
             // 截断过大的输出
             return truncateIfNeeded(result);
@@ -266,12 +279,12 @@ public class RemoteExecBridge implements ClientExecutor {
         } catch (TimeoutException e) {
             // 超时: 通知客户端取消
             sendCancel(ws, requestId, sessionId);
-            throw new RemoteExecException("命令执行超时 (" + (commandTimeout / 1000) + "秒): " + command);
+            throw new RemoteExecException("本地执行超时 (" + (timeoutMs / 1000) + "秒)");
         } catch (Exception e) {
             if (e.getCause() instanceof RemoteExecException re) {
                 throw re;
             }
-            throw new RemoteExecException("远程执行异常: " + e.getMessage());
+            throw new RemoteExecException("本地执行异常: " + e.getMessage());
         } finally {
             pendingRequests.remove(requestId);
         }
@@ -302,62 +315,53 @@ public class RemoteExecBridge implements ClientExecutor {
         }
     }
 
-    // ==================== 沙箱执行 ====================
+    // ==================== 本地文件 RPC ====================
 
     /**
-     * 向客户端发送 Python 代码，在浏览器端 Pyodide 沙箱中执行并等待结果
+     * 向客户端发送本地文件 RPC 请求并阻塞等待结果 (见开发计划 8.3)。
+     * 写入/编辑类操作可能进入客户端审批队列, 等待时间放宽到命令超时。
      */
-    public SandboxResult executeSandbox(Long userId, String sessionId, String code) throws RemoteExecException {
+    @Override
+    public Map<String, Object> executeLocalFs(Long userId, String sessionId,
+                                              Map<String, Object> request) throws ClientExecException {
         WebSocketSession ws = connections.get(userId);
         if (ws == null || !ws.isOpen()) {
-            throw new RemoteExecException("客户端未连接, 无法执行沙箱代码。");
+            throw new RemoteExecException("客户端未连接, 无法访问本地文件。请确保桌面客户端已启动并连接。");
         }
 
-        long userPendingCount = countPendingForUser(userId);
-        if (userPendingCount >= maxPendingCommands) {
-            throw new RemoteExecException("待执行命令数已达上限 (" + maxPendingCommands + "), 请等待当前命令完成。");
-        }
+        String op = String.valueOf(request.get("op"));
+        boolean needsApproval = "write".equals(op) || "edit".equals(op);
+        long timeoutMs = needsApproval ? commandTimeout : localFsTimeout;
 
         String requestId = UUID.randomUUID().toString();
-        CompletableFuture<SandboxResult> future = new CompletableFuture<>();
-        pendingSandboxRequests.put(requestId, new PendingSandbox(userId, future));
-
+        CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
+        pendingFsRequests.put(requestId, new PendingFs(userId, future));
         try {
-            WsMessage msg = WsMessage.of(
-                    WsMessage.TYPE_SANDBOX_EXEC_REQUEST,
-                    requestId,
-                    sessionId,
-                    Map.of("code", code)
-            );
-
-            String json = objectMapper.writeValueAsString(msg);
-            ws.sendMessage(new TextMessage(json));
-            log.info("已向用户 {} 发送沙箱代码执行请求, requestId={}", userId, requestId);
-
-            // 沙箱执行超时用 commandTimeout（默认 120s）
-            return future.get(commandTimeout, TimeUnit.MILLISECONDS);
-
+            WsMessage msg = WsMessage.of(WsMessage.TYPE_LOCAL_FS_REQUEST, requestId, sessionId, request);
+            ws.sendMessage(new TextMessage(objectMapper.writeValueAsString(msg)));
+            log.info("已向用户 {} 发送本地文件请求: op={}", userId, op);
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
-            throw new RemoteExecException("沙箱代码执行超时 (" + (commandTimeout / 1000) + "秒)");
+            throw new RemoteExecException("本地文件操作超时 (" + (timeoutMs / 1000) + "秒)");
         } catch (Exception e) {
             if (e.getCause() instanceof RemoteExecException re) {
                 throw re;
             }
-            throw new RemoteExecException("沙箱执行异常: " + e.getMessage());
+            throw new RemoteExecException("本地文件操作异常: " + e.getMessage());
         } finally {
-            pendingSandboxRequests.remove(requestId);
+            pendingFsRequests.remove(requestId);
         }
     }
 
     /**
-     * 处理客户端返回的沙箱执行结果
+     * 处理客户端返回的本地文件 RPC 结果
      */
-    public void onSandboxResult(String requestId, SandboxResult result) {
-        PendingSandbox pending = pendingSandboxRequests.get(requestId);
+    public void onLocalFsResult(String requestId, Map<String, Object> payload) {
+        PendingFs pending = pendingFsRequests.get(requestId);
         if (pending != null) {
-            pending.future().complete(result);
+            pending.future().complete(payload);
         } else {
-            log.warn("收到未知 requestId 的沙箱结果: {}", requestId);
+            log.warn("收到未知 requestId 的本地文件结果: {}", requestId);
         }
     }
 
@@ -460,13 +464,9 @@ public class RemoteExecBridge implements ClientExecutor {
     }
 
     private long countPendingForUser(Long userId) {
-        long commandCount = pendingRequests.values().stream()
+        return pendingRequests.values().stream()
                 .filter(pending -> userId.equals(pending.userId()))
                 .count();
-        long sandboxCount = pendingSandboxRequests.values().stream()
-                .filter(pending -> userId.equals(pending.userId()))
-                .count();
-        return commandCount + sandboxCount;
     }
 
     /**

@@ -24,18 +24,18 @@ public record WsMessage(
 ) {
 
     /**
-     * 消息类型常量
+     * 消息类型常量 (统一本地执行协议, 见开发计划 8.2/8.3)
      */
-    public static final String TYPE_COMMAND_REQUEST = "command_request";
-    public static final String TYPE_COMMAND_RESULT = "command_result";
-    public static final String TYPE_COMMAND_REJECTED = "command_rejected";
-    public static final String TYPE_COMMAND_CANCEL = "command_cancel";
+    public static final String TYPE_COMMAND_REQUEST = "local_exec_request";
+    public static final String TYPE_COMMAND_RESULT = "local_exec_result";
+    public static final String TYPE_COMMAND_REJECTED = "local_exec_rejected";
+    public static final String TYPE_COMMAND_CANCEL = "local_exec_cancel";
+    public static final String TYPE_LOCAL_FS_REQUEST = "local_fs_request";
+    public static final String TYPE_LOCAL_FS_RESULT = "local_fs_result";
     public static final String TYPE_PING = "ping";
     public static final String TYPE_PONG = "pong";
     public static final String TYPE_CONNECTED = "connected";
     public static final String TYPE_CLIENT_READY = "client_ready";
-    public static final String TYPE_SANDBOX_EXEC_REQUEST = "sandbox_exec_request";
-    public static final String TYPE_SANDBOX_EXEC_RESULT = "sandbox_exec_result";
     public static final String TYPE_RUNTIME_SNAPSHOT_REQUEST = "runtime_snapshot_request";
     public static final String TYPE_RUNTIME_SNAPSHOT_RESULT = "runtime_snapshot_result";
 

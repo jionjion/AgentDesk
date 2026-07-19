@@ -21,8 +21,9 @@ import top.jionjion.agentdesk.agent.tool.ApiCallTool;
 import top.jionjion.agentdesk.agent.tool.BatchWebResearchTool;
 import top.jionjion.agentdesk.agent.tool.CommandRiskClassifier;
 import top.jionjion.agentdesk.agent.tool.IpLocationTool;
-import top.jionjion.agentdesk.agent.tool.RemoteExecTool;
-import top.jionjion.agentdesk.agent.tool.SandboxExecTool;
+import top.jionjion.agentdesk.agent.tool.LocalFileTools;
+import top.jionjion.agentdesk.agent.tool.PythonExecTool;
+import top.jionjion.agentdesk.agent.tool.ShellExecTool;
 import top.jionjion.agentdesk.agent.tool.SimpleTools;
 import top.jionjion.agentdesk.agent.tool.ToolDefinitions;
 import top.jionjion.agentdesk.agent.tool.WebTools;
@@ -60,7 +61,9 @@ public class AgentFactory {
             简单问题直接回答；复杂任务先澄清目标、维护任务清单，再委派给合适的专家。
             当用户上传文件时，消息会包含文件元信息与 fileId。不要猜测文件内容，先使用工具读取。
             联网研究交给 researcher；代码实现与审查交给 software-engineer 或 code-reviewer；
-            数据分析交给 data-analyst；写作交给 writer；本机操作使用受审批保护的 remote_exec。
+            数据分析交给 data-analyst；写作交给 writer；本机 shell 操作使用受审批保护的 shell_exec，
+            本机 Python 代码使用 python_exec（用户项目的真实解释器，需审批），
+            本机文件读写检索优先使用 local_read_file / local_write_file / local_edit_file / local_list_files / local_search_files。
 
             在调用会产生外部影响的工具前，用一句话说明将执行什么。工具连续失败两次后停止重试，
             说明失败原因并给出可行替代方案。
@@ -192,10 +195,10 @@ public class AgentFactory {
         if (!remoteExecEnabled || userId == null) {
             return;
         }
-        RemoteExecTool remote = new RemoteExecTool(
-                remoteExecBridge, commandRiskClassifier, userId, sessionId);
-        toolkit.registerTool(remote);
-        toolkit.registerTool(new SandboxExecTool(remoteExecBridge, userId, sessionId));
+        toolkit.registerTool(new ShellExecTool(
+                remoteExecBridge, commandRiskClassifier, userId, sessionId));
+        toolkit.registerTool(new PythonExecTool(remoteExecBridge, userId, sessionId));
+        toolkit.registerTool(new LocalFileTools(remoteExecBridge, userId, sessionId));
     }
 
     private void registerResearchTool(Toolkit toolkit) {
@@ -250,14 +253,20 @@ public class AgentFactory {
                 ToolDefinitions.GET_CURRENT_TIME, ToolDefinitions.CALCULATE));
         builder.subagent(expert("software-engineer", "实现、调试和验证软件变更",
                 "agents/software-engineer.ftl", 20, false,
-                ToolDefinitions.REMOTE_EXEC, ToolDefinitions.READ_FILE,
-                ToolDefinitions.SANDBOX_EXEC, ToolDefinitions.CALCULATE));
+                ToolDefinitions.SHELL_EXEC, ToolDefinitions.PYTHON_EXEC,
+                ToolDefinitions.LOCAL_READ_FILE, ToolDefinitions.LOCAL_WRITE_FILE,
+                ToolDefinitions.LOCAL_EDIT_FILE, ToolDefinitions.LOCAL_LIST_FILES,
+                ToolDefinitions.LOCAL_SEARCH_FILES,
+                ToolDefinitions.READ_FILE, ToolDefinitions.CALCULATE));
         builder.subagent(expert("code-reviewer", "独立审查代码的正确性、安全性与可维护性",
                 "agents/code-reviewer.ftl", 10, false,
-                ToolDefinitions.REMOTE_EXEC, ToolDefinitions.READ_FILE));
+                ToolDefinitions.SHELL_EXEC,
+                ToolDefinitions.LOCAL_READ_FILE, ToolDefinitions.LOCAL_LIST_FILES,
+                ToolDefinitions.LOCAL_SEARCH_FILES, ToolDefinitions.READ_FILE));
         builder.subagent(expert("data-analyst", "执行数据清洗、统计分析并解释结果",
                 "agents/data-analyst.ftl", 12, false,
-                ToolDefinitions.SANDBOX_EXEC, ToolDefinitions.REMOTE_EXEC,
+                ToolDefinitions.PYTHON_EXEC, ToolDefinitions.SHELL_EXEC,
+                ToolDefinitions.LOCAL_READ_FILE, ToolDefinitions.LOCAL_LIST_FILES,
                 ToolDefinitions.READ_FILE, ToolDefinitions.CALCULATE));
         builder.subagent(expert("writer", "撰写、编辑和结构化交付文档",
                 "agents/writer.ftl", 8, false,
@@ -268,7 +277,9 @@ public class AgentFactory {
                 ToolDefinitions.URL_FETCH));
         builder.subagent(expert("system-operator", "在明确授权下执行本机操作并报告影响",
                 "agents/system-operator.ftl", 12, false,
-                ToolDefinitions.REMOTE_EXEC, ToolDefinitions.SANDBOX_EXEC));
+                ToolDefinitions.SHELL_EXEC, ToolDefinitions.PYTHON_EXEC,
+                ToolDefinitions.LOCAL_READ_FILE, ToolDefinitions.LOCAL_LIST_FILES,
+                ToolDefinitions.LOCAL_SEARCH_FILES));
     }
 
     private SubagentDeclaration expert(

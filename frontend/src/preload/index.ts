@@ -1,15 +1,57 @@
 import {contextBridge, ipcRenderer} from 'electron'
 
-/** 执行隔离策略 */
-export interface ExecPolicy {
-    allowedRoots?: string[]
-    resourceLimits?: {
-        timeoutMs?: number
-        maxOutputChars?: number
-        memMB?: number
-        maxProcesses?: number
-    }
-    isolationLevel?: 'boundary'
+/** 本地执行资源限制 */
+export interface RuntimeLimits {
+    timeoutMs?: number
+    maxOutputChars?: number
+    memMB?: number
+    maxProcesses?: number
+}
+
+/** 统一本地执行请求 (shell/python) */
+export interface LocalExecRequest {
+    kind: 'shell' | 'python'
+    command?: string
+    code?: string
+    scriptPath?: string
+    args?: string[]
+    cwd?: string
+    pythonExecutable?: string
+    limits?: RuntimeLimits
+    requestId?: string
+}
+
+/** 统一本地执行结果 */
+export interface RuntimeResult {
+    success: boolean
+    exitCode: number
+    stdout: string
+    stderr: string
+    durationMs: number
+    cancelled: boolean
+    timedOut: boolean
+}
+
+/** 本地文件 RPC 请求 */
+export interface LocalFsRequest {
+    op: 'read' | 'write' | 'edit' | 'list' | 'glob' | 'grep' | 'stat'
+    path: string
+    offset?: number
+    limit?: number
+    content?: string
+    oldText?: string
+    newText?: string
+    replaceAll?: boolean
+    expectedReplacements?: number
+    pattern?: string
+    query?: string
+    filePattern?: string
+}
+
+/** Python 解释器候选 */
+export interface PythonCandidate {
+    path: string
+    version: string
 }
 
 /** 项目在当前设备上的位置配置 */
@@ -56,9 +98,17 @@ const electronAPI = {
     },
     shell: {
         openExternal: (url: string): Promise<void> =>
-            ipcRenderer.invoke('shell:openExternal', url),
-        execute: (command: string, workingDir?: string, policy?: ExecPolicy): Promise<{ exitCode: number; stdout: string; stderr: string; durationMs: number }> =>
-            ipcRenderer.invoke('shell:execute', command, workingDir, policy)
+            ipcRenderer.invoke('shell:openExternal', url)
+    },
+    runtime: {
+        execute: (request: LocalExecRequest): Promise<RuntimeResult> =>
+            ipcRenderer.invoke('runtime:execute', request),
+        cancel: (requestId: string): Promise<boolean> =>
+            ipcRenderer.invoke('runtime:cancel', requestId),
+        localFs: (request: LocalFsRequest): Promise<Record<string, unknown>> =>
+            ipcRenderer.invoke('runtime:localFs', request),
+        listPythonCandidates: (): Promise<PythonCandidate[]> =>
+            ipcRenderer.invoke('runtime:listPythonCandidates')
     },
     app: {
         getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),

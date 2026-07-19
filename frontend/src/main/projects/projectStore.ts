@@ -3,6 +3,7 @@ import {randomUUID} from 'crypto'
 import {mkdir, readFile, rename, stat, writeFile} from 'fs/promises'
 import {realpathSync} from 'fs'
 import path from 'path'
+import {discoverPython} from './runtimeDiscovery'
 
 /**
  * 项目在当前 PC 上的位置与解释器配置（设备级数据, 不进入服务器数据库）。
@@ -146,7 +147,7 @@ export interface RuntimeSnapshot {
 /**
  * 生成项目的 runtime snapshot。
  * 重新检查目录是否仍存在；缺失时返回 found=false，不返回过期路径。
- * Python 发现属于 Phase 3（runtimeDiscovery），当前仅透传已配置的解释器。
+ * Python 通过 runtimeDiscovery 发现: 已配置解释器 → .venv → 系统默认。
  */
 export async function getRuntimeSnapshot(projectId: string): Promise<RuntimeSnapshot> {
     const store = await load()
@@ -168,12 +169,13 @@ export async function getRuntimeSnapshot(projectId: string): Promise<RuntimeSnap
     } catch {
         return base
     }
+    const python = await discoverPython(location.rootPath, location.pythonExecutable)
     return {
         ...base,
         found: true,
         rootPath: location.rootPath,
         cwd: location.defaultCwd,
-        pythonExecutable: location.pythonExecutable,
-        pythonVersion: undefined
+        pythonExecutable: python?.path,
+        pythonVersion: python?.version
     }
 }

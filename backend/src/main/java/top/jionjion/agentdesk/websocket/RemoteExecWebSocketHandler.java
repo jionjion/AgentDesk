@@ -10,7 +10,6 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
-import top.jionjion.agentdesk.websocket.dto.SandboxResult;
 import top.jionjion.agentdesk.websocket.dto.WsMessage;
 
 import java.io.IOException;
@@ -81,16 +80,21 @@ public class RemoteExecWebSocketHandler extends TextWebSocketHandler {
             }
             case WsMessage.TYPE_COMMAND_RESULT -> handleCommandResult(wsMsg);
             case WsMessage.TYPE_COMMAND_REJECTED -> handleCommandRejected(wsMsg);
-            case WsMessage.TYPE_SANDBOX_EXEC_RESULT -> handleSandboxResult(wsMsg);
+            case WsMessage.TYPE_LOCAL_FS_RESULT -> handleLocalFsResult(wsMsg);
             case WsMessage.TYPE_RUNTIME_SNAPSHOT_RESULT -> handleRuntimeSnapshotResult(wsMsg);
             case WsMessage.TYPE_CLIENT_READY -> {
                 log.info("用户 {} 客户端就绪, payload={}", userId, wsMsg.payload());
-                // 提取并存储客户端平台信息与设备ID
+                // 提取并存储客户端平台信息、设备ID与能力集
                 if (wsMsg.payload() != null) {
                     String platform = (String) wsMsg.payload().get("platform");
                     bridge.registerClientPlatform(userId, platform);
                     String deviceId = (String) wsMsg.payload().get("deviceId");
                     bridge.registerClientDeviceId(userId, deviceId);
+                    Object capabilities = wsMsg.payload().get("capabilities");
+                    if (capabilities instanceof java.util.List<?> list) {
+                        bridge.registerClientCapabilities(userId,
+                                list.stream().map(String::valueOf).toList());
+                    }
                 }
             }
             default -> log.warn("未知消息类型: {}", wsMsg.type());
@@ -143,21 +147,11 @@ public class RemoteExecWebSocketHandler extends TextWebSocketHandler {
         bridge.onCommandRejected(msg.requestId(), reason);
     }
 
-    private void handleSandboxResult(WsMessage msg) {
-        Map<String, Object> payload = msg.payload();
-        if (payload == null || msg.requestId() == null) {
+    private void handleLocalFsResult(WsMessage msg) {
+        if (msg.requestId() == null) {
             return;
         }
-
-        boolean success = Boolean.TRUE.equals(payload.get("success"));
-        String stdout = (String) payload.getOrDefault("stdout", "");
-        String stderr = (String) payload.getOrDefault("stderr", "");
-        String result = (String) payload.getOrDefault("result", "");
-        int figureCount = ((Number) payload.getOrDefault("figureCount", 0)).intValue();
-        long durationMs = ((Number) payload.getOrDefault("durationMs", 0)).longValue();
-
-        SandboxResult sandboxResult = new SandboxResult(success, stdout, stderr, result, figureCount, durationMs);
-        bridge.onSandboxResult(msg.requestId(), sandboxResult);
+        bridge.onLocalFsResult(msg.requestId(), msg.payload());
     }
 
     private void handleRuntimeSnapshotResult(WsMessage msg) {

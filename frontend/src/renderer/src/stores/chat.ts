@@ -5,8 +5,6 @@ import {batchDeleteSessions, createSession, deleteSession, getSession, getSessio
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type ChatRuntimeSnapshot, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
-import {useSandboxStore} from '@/stores/sandbox'
-import {useRemoteExecStore} from '@/stores/remoteExec'
 import {useProjectsStore} from '@/stores/projects'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
@@ -660,17 +658,11 @@ export const useChatStore = defineStore('chat', () => {
 
         // 4. 创建 SSE 连接
         isStreaming.value = true
-        const sandboxStore = useSandboxStore()
-        const sandboxContext = sandboxStore.getSandboxContext()
-
-        // 获取当前工作目录（过渡逻辑, Phase 3 移除; 由 runtimeSnapshot 取代）
-        const remoteExecStore = useRemoteExecStore()
-        const workingDir = remoteExecStore.settings.defaultWorkDir || sandboxStore.workdir || undefined
 
         // 构造项目 runtime snapshot: 会话绑定项目且本机有位置时上报
         const runtimeSnapshot = await buildRuntimeSnapshot(sessionId)
 
-        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, sandboxContext, workingDir, runtimeSnapshot)
+        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, runtimeSnapshot)
         eventSource.value = es
 
         // 5. 设置监听

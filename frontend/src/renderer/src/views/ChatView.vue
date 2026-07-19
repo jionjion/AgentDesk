@@ -45,8 +45,6 @@
             <MessageBubble
                 v-else :message="msg" :after-plan-created="isAfterPlanCreated(idx)" :subtask-output="isSubtaskOutput(idx)" :subtask-name="getSubtaskName(idx)" :subtask-done="isSubtaskDone(idx)"
                 :subtask-cards="getSubtaskCardsMap(idx)" :tool-calls="getToolCallsMap(idx)"
-                :execution-result="codeExecutionResults[msg.id]"
-                @run-code="(code) => handleRunCode(code, msg.id)"
             />
           </template>
           <div ref="scrollAnchorRef"/>
@@ -246,14 +244,9 @@ import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
 import {formatFileSize, isImageType} from '@/utils/file'
 import type {PlanMessage, SubagentMessage, ToolCallMessage} from '@/types/chat'
-import type {ExecuteResult} from '@/types/sandbox'
-import {useSandboxStore} from '@/stores/sandbox'
-import {useRemoteExecStore} from '@/stores/remoteExec'
 
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
-const sandboxStore = useSandboxStore()
-const remoteExecStore = useRemoteExecStore()
 const route = useRoute()
 const {planState, hasPlan} = usePlanSubtasks()
 
@@ -264,39 +257,6 @@ const planMessages = computed(() =>
 const subagentMessages = computed(() =>
     chatStore.currentMessages.filter((m): m is SubagentMessage => m.role === 'subagent')
 )
-
-// === Python 沙箱执行 ===
-const codeExecutionResults = ref<Record<string, ExecuteResult>>({})
-
-async function handleRunCode(code: string, msgId: string) {
-  const sessionId = chatStore.currentSessionId || 'default'
-  const result = await sandboxStore.execute(sessionId, code)
-  codeExecutionResults.value[msgId] = result
-}
-
-// Agent 通过 sandbox_exec 触发的执行结果：绑定到当前流式助手消息并累加图表
-watch(() => remoteExecStore.lastSandboxResult?.seq, () => {
-  const payload = remoteExecStore.lastSandboxResult
-  if (!payload) return
-
-  // 找到当前会话最后一条助手消息作为承载对象
-  const msgs = chatStore.currentMessages
-  const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant')
-  if (!lastAssistant) return
-
-  const incoming = payload.result
-  const existing = codeExecutionResults.value[lastAssistant.id]
-  if (existing) {
-    // 同一条消息多次执行：累加图表与输出文件，其余字段取最新一次
-    codeExecutionResults.value[lastAssistant.id] = {
-      ...incoming,
-      figures: [...(existing.figures ?? []), ...(incoming.figures ?? [])],
-      outputFiles: { ...(existing.outputFiles ?? {}), ...(incoming.outputFiles ?? {}) }
-    }
-  } else {
-    codeExecutionResults.value[lastAssistant.id] = incoming
-  }
-})
 
 /**
  * 获取 index 处的助手消息对应的子任务名称

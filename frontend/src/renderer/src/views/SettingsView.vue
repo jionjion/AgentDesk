@@ -153,7 +153,7 @@
           <KnowledgeSection v-else-if="activeSection === 'knowledge'"/>
           <ObsidianSection v-else-if="activeSection === 'obsidian'"/>
           <McpSection v-else-if="activeSection === 'mcp'"/>
-          <SandboxSection v-else-if="activeSection === 'sandbox'"/>
+          <LocalRuntimeSection v-else-if="activeSection === 'runtime'"/>
           <UpdateSection v-else-if="activeSection === 'update'"/>
           <AboutSection v-else-if="activeSection === 'about'"/>
           <div v-else class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-12 text-center">
@@ -176,7 +176,7 @@ import MemorySection from '@/components/settings/MemorySection.vue'
 import ObsidianSection from '@/components/settings/ObsidianSection.vue'
 import McpSection from '@/components/settings/McpSection.vue'
 import KnowledgeSection from '@/components/settings/KnowledgeSection.vue'
-import SandboxSection from '@/components/settings/SandboxSection.vue'
+import LocalRuntimeSection from '@/components/settings/LocalRuntimeSection.vue'
 import UpdateSection from '@/components/settings/UpdateSection.vue'
 import AboutSection from '@/components/settings/AboutSection.vue'
 import {Button} from '@/components/ui/button'
@@ -216,7 +216,7 @@ const extensionItems = [
 const advancedItems = [
   {key: 'knowledge', label: '知识库检索', icon: Database},
   {key: 'memory', label: '长期记忆', icon: Brain},
-  {key: 'sandbox', label: '虚拟机沙盒', icon: Box}
+  {key: 'runtime', label: '本地运行环境', icon: Box}
 ]
 
 const developerItems = [
@@ -237,7 +237,7 @@ const sectionMeta: Record<string, { label: string; description: string }> = {
   obsidian: {label: 'Obsidian 笔记', description: '配置知识沉淀到本地 Obsidian 笔记库。'},
   knowledge: {label: '知识库检索', description: '配置 RAG 知识库自动检索与参数调优。'},
   memory: {label: '长期记忆', description: '管理 AI 助手的跨会话记忆。'},
-  sandbox: {label: '虚拟机沙盒', description: '配置安全沙盒环境。'},
+  runtime: {label: '本地运行环境', description: '设备信息、Python 检测与命令审批策略。'},
   experimental: {label: '实验特性', description: '启用或关闭实验性功能。'},
   update: {label: '更新应用', description: '检查并安装应用更新。'},
   about: {label: '关于应用', description: '版本信息与相关链接。'}

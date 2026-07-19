@@ -1000,6 +1000,8 @@ frontend/src/renderer/public/pyodide/  # copy 脚本生成的运行时资源目�
 
 完成标准：Agent 可在项目根运行真实 Python，导入本机已安装包、读取真实项目文件，并正确返回 stdout/stderr/退出码。
 
+**Phase 3 已完成（2026-07-20）**：统一 local_exec_request/result/cancel 协议；localRuntime.ts 共用运行器（UTF-8 StringDecoder、Job Object、并发/超时/截断/取消）；python_exec 后端工具（code 经 stdin 传 python -，解释器由 ProjectLocation 决定）；runtimeDiscovery 按配置→.venv→py -3/python3→PATH 顺序发现；client_ready 上报 capabilities 与 pythonCandidates；代码块运行按钮已移除（不保留两套运行语义）。
+
 ### Phase 4：本地文件工具
 
 - 实现本地 read/write/edit/list/search RPC。
@@ -1010,6 +1012,8 @@ frontend/src/renderer/public/pyodide/  # copy 脚本生成的运行时资源目�
 - 仅结构化文件工具可根据路径将项目外写入/删除提升审批等级；Shell/Python 不承诺检测。
 
 完成标准：代码审查和软件工程 Agent 不需要通过 shell 的 `cat/type` 才能读取本地文件。
+
+**Phase 4 已完成（2026-07-20）**：local_fs_request/result 协议与 localFs.ts 实现（read/write/edit/list/glob/grep/stat，含字节/行/条目/匹配上限与 truncated/nextOffset）；local_read_file/local_write_file/local_edit_file/local_list_files/local_search_files 五个工具注册并加入专家白名单；local_edit_file 精确匹配 + expected_replacements + CRLF/LF 保留 + 原子写入；python_exec 默认高风险，结构化文件工具项目外写入提升为高风险。
 
 ### Phase 5：移除 Pyodide Agent 路径
 
@@ -1023,12 +1027,16 @@ frontend/src/renderer/public/pyodide/  # copy 脚本生成的运行时资源目�
 
 完成标准：代码库中除历史变更记录外不再存在 `sandbox_exec`、Pyodide `/data`、MEMFS 工作目录同步逻辑。
 
+**Phase 5 已完成（2026-07-20）**：删除 SandboxExecTool/SandboxResult/sandbox_exec 协议、buildSandboxAugmentedMessage、ChatRequest.SandboxContext；前端删除 pyodide-worker/usePythonEngine/sandbox stores/Sandbox 设置组件/ExecutionResult/copy-pyodide 脚本与 pyodide 依赖；4 个专家 .ftl 更新为 shell_exec/python_exec/local_* 工具组合；SSE_EVENT_PROTOCOL.md 无 sandbox_exec 引用无需修改。
+
 ### Phase 6：收尾与兼容
 
 - 清理旧 `sandbox_settings` 和 `remote_exec_settings.defaultWorkDir`。
 - 可选：若旧 defaultWorkDir 存在，首次启动提示用户将其创建为 Project，不要静默迁移。
 - 补齐单元测试和手工测试。
 - 更新开发与用户文档。
+
+**Phase 6 已完成（2026-07-20）**：settingsVersion 升到 3 并在迁移中丢弃 defaultWorkDir；App 启动清理 sandbox_settings/sandbox_tools；设置页新增 LocalRuntimeSection（连接状态/设备信息/Python 检测/审批策略/执行历史）替代虚拟机沙盒；ChatRequest.workingDir 与前端 workingDir 过渡逻辑移除；后端全部测试与前端 typecheck/lint/build 通过。
 
 ## 14. 测试计划
 

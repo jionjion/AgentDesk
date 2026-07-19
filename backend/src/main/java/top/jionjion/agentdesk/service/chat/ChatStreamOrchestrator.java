@@ -113,13 +113,9 @@ public class ChatStreamOrchestrator {
             String memoryAugmented = promptContextBuilder.buildMemoryAugmentedMessage(
                     retrieval.augmentedMessage(), memory.items());
 
-            // 沙箱上下文增强
-            String sandboxAugmented = promptContextBuilder.buildSandboxAugmentedMessage(
-                    memoryAugmented, chatRequest.sandboxContext());
-
             // 项目上下文增强 (最外层, 模型每轮可见)
             String augmentedMessage = promptContextBuilder.buildProjectAugmentedMessage(
-                    sandboxAugmented, projectContext);
+                    memoryAugmented, projectContext);
 
             sseEmitterManager.configureCallbacks(emitter, sessionId, handle, () -> agentPool.release(sessionId, lockToken));
             sseEmitterManager.sendKnowledgeRetrieved(emitter, retrieval.results());

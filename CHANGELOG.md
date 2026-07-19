@@ -1,5 +1,25 @@
 # Changelog
 
+## 未发布
+
+> 本地运行集：项目实体 + 真实本地执行，全面取代 Pyodide 浏览器沙箱。
+
+### 🚀 新功能
+
+- **项目（Project）实体** — 会话可绑定项目，Agent 每轮自动感知项目根目录、操作系统与 Python 环境，无需重复粘贴路径
+- **真实 Python 执行（python_exec）** — 使用项目配置/自动发现的本机解释器执行代码（配置 → .venv → 系统），可用本机全部已安装包；默认需用户审批
+- **本地文件工具** — 新增 local_read_file / local_write_file / local_edit_file / local_list_files / local_search_files，代码审查与工程专家无需再借助 shell 读取文件；项目目录外写入自动提升为高风险
+- **统一本地执行协议** — shell 与 Python 共用同一套审批、取消、超时、输出截断与 Windows Job Object 资源限制；全链路 UTF-8（中文与 emoji 输出不乱码）
+- **定时任务项目支持** — 项目型定时任务通过 runtime snapshot 在指定设备上获取运行环境，离线/设备变更返回稳定错误码
+
+### 🔧 变更
+
+- 设置页“虚拟机沙盒”改为“本地运行环境”（设备信息、Python 检测、审批策略）
+- remote_exec 更名为 shell_exec，工作目录改为逐次调用参数（不再跨调用保持伪 cd 状态）
+- 移除 Pyodide/WASM 浏览器沙箱（sandbox_exec）及相关运行按钮、依赖与构建脚本
+
+---
+
 ## AgentDesk v3.0.0
 
 > 专家团协作正式升级！本次更新引入全新的多智能体架构，让首席助理能够按任务需要调度不同领域专家，并实时展示专家执行状态与任务进度。
