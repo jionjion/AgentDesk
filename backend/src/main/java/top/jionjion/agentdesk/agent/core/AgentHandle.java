@@ -14,7 +14,7 @@ import reactor.core.publisher.Flux;
 import top.jionjion.agentdesk.agent.runtime.AgentEventBridge;
 import top.jionjion.agentdesk.agent.runtime.AgentInput;
 import top.jionjion.agentdesk.agent.runtime.AgentRunContext;
-import top.jionjion.agentdesk.agent.tool.RemoteExecTool;
+import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
 import top.jionjion.agentdesk.entity.ChatMessage;
 
 import java.util.ArrayList;
@@ -26,22 +26,23 @@ public final class AgentHandle implements AutoCloseable {
 
     private final HarnessAgent agent;
     private final AgentEventBridge eventBridge;
-    private final RemoteExecTool remoteExecTool;
 
-    public AgentHandle(HarnessAgent agent, AgentEventBridge eventBridge, RemoteExecTool remoteExecTool) {
+    public AgentHandle(HarnessAgent agent, AgentEventBridge eventBridge) {
         this.agent = Objects.requireNonNull(agent);
         this.eventBridge = Objects.requireNonNull(eventBridge);
-        this.remoteExecTool = remoteExecTool;
     }
 
     public Flux<AgentEvent> stream(AgentInput input, AgentRunContext context) {
         Objects.requireNonNull(context, "context");
-        RuntimeContext runtimeContext = RuntimeContext.builder()
+        RuntimeContext.Builder builder = RuntimeContext.builder()
                 .userId(context.userId() == null ? null : String.valueOf(context.userId()))
                 .sessionId(context.sessionId())
-                .putAll(context.attributes())
-                .build();
-        return agent.streamEvents(toUserMessage(input), runtimeContext)
+                .putAll(context.attributes());
+        if (context.projectContext() != null) {
+            // 类型化注入: 工具方法声明 ProjectRuntimeContext 参数即可获得本次调用的项目上下文
+            builder.put(ProjectRuntimeContext.class, context.projectContext());
+        }
+        return agent.streamEvents(toUserMessage(input), builder.build())
                 .doOnNext(eventBridge::accept);
     }
 
@@ -59,12 +60,6 @@ public final class AgentHandle implements AutoCloseable {
 
     public boolean isClientDisconnected() {
         return eventBridge.isClientDisconnected();
-    }
-
-    public void setWorkingDirectory(String workingDirectory) {
-        if (remoteExecTool != null && workingDirectory != null) {
-            remoteExecTool.setWorkingDir(workingDirectory);
-        }
     }
 
     public String lastReply() {

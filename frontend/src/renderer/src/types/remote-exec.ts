@@ -78,6 +78,8 @@ export const WS_MESSAGE_TYPES = {
   COMMAND_CANCEL: 'command_cancel',
   SANDBOX_EXEC_REQUEST: 'sandbox_exec_request',
   SANDBOX_EXEC_RESULT: 'sandbox_exec_result',
+  RUNTIME_SNAPSHOT_REQUEST: 'runtime_snapshot_request',
+  RUNTIME_SNAPSHOT_RESULT: 'runtime_snapshot_result',
   PING: 'ping',
   PONG: 'pong',
   CONNECTED: 'connected',

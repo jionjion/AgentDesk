@@ -36,6 +36,8 @@ public record WsMessage(
     public static final String TYPE_CLIENT_READY = "client_ready";
     public static final String TYPE_SANDBOX_EXEC_REQUEST = "sandbox_exec_request";
     public static final String TYPE_SANDBOX_EXEC_RESULT = "sandbox_exec_result";
+    public static final String TYPE_RUNTIME_SNAPSHOT_REQUEST = "runtime_snapshot_request";
+    public static final String TYPE_RUNTIME_SNAPSHOT_RESULT = "runtime_snapshot_result";
 
     public static WsMessage of(String type, String requestId, String sessionId, Map<String, Object> payload) {
         return new WsMessage(type, requestId, sessionId, System.currentTimeMillis(), payload);

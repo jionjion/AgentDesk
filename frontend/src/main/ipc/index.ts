@@ -8,6 +8,7 @@ import {
     bindLocation,
     getDeviceId,
     getLocation,
+    getRuntimeSnapshot,
     listLocations,
     removeLocation,
     touchLocation
@@ -267,6 +268,8 @@ export function registerIpcHandlers(): void {
     ipcMain.handle('projects:removeLocation', (_event, projectId: string) => removeLocation(projectId))
 
     ipcMain.handle('projects:touchLocation', (_event, projectId: string) => touchLocation(projectId))
+
+    ipcMain.handle('projects:getRuntimeSnapshot', (_event, projectId: string) => getRuntimeSnapshot(projectId))
 }
 
 /**

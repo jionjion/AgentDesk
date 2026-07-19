@@ -2,7 +2,7 @@ import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
 import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, PlanState, SSEEventData, SubagentEventData, SubagentMessage, TaskProgressEventData} from '@/types/chat'
 import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
-import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type FetchSSE} from '@/api/chat'
+import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type ChatRuntimeSnapshot, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
 import {useSandboxStore} from '@/stores/sandbox'
@@ -663,15 +663,41 @@ export const useChatStore = defineStore('chat', () => {
         const sandboxStore = useSandboxStore()
         const sandboxContext = sandboxStore.getSandboxContext()
 
-        // 获取当前工作目录（优先用 remoteExec 的 defaultWorkDir，其次用 sandbox 的 workdir）
+        // 获取当前工作目录（过渡逻辑, Phase 3 移除; 由 runtimeSnapshot 取代）
         const remoteExecStore = useRemoteExecStore()
         const workingDir = remoteExecStore.settings.defaultWorkDir || sandboxStore.workdir || undefined
 
-        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, sandboxContext, workingDir)
+        // 构造项目 runtime snapshot: 会话绑定项目且本机有位置时上报
+        const runtimeSnapshot = await buildRuntimeSnapshot(sessionId)
+
+        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, sandboxContext, workingDir, runtimeSnapshot)
         eventSource.value = es
 
         // 5. 设置监听
         setupSSEListeners(es, sessionId, assistantMsgId)
+    }
+
+    /** 构造当前会话所绑项目的 runtime snapshot (未绑定/无本机位置时返回 null) */
+    async function buildRuntimeSnapshot(sessionId: string): Promise<ChatRuntimeSnapshot | null> {
+        const session = sessions.value.find(s => s.id === sessionId)
+        const projectId = session?.projectId
+        if (!projectId) return null
+        try {
+            const snapshot = await window.electronAPI.projects.getRuntimeSnapshot(projectId)
+            if (!snapshot.found || !snapshot.rootPath) return null
+            return {
+                projectId: snapshot.projectId,
+                deviceId: snapshot.deviceId,
+                rootPath: snapshot.rootPath,
+                cwd: snapshot.cwd,
+                platform: snapshot.platform,
+                pythonExecutable: snapshot.pythonExecutable,
+                pythonVersion: snapshot.pythonVersion
+            }
+        } catch (e) {
+            console.warn('获取项目 runtime snapshot 失败', e)
+            return null
+        }
     }
 
     /** 中断 Agent */

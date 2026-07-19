@@ -1,6 +1,6 @@
 import {app} from 'electron'
 import {randomUUID} from 'crypto'
-import {mkdir, readFile, rename, writeFile} from 'fs/promises'
+import {mkdir, readFile, rename, stat, writeFile} from 'fs/promises'
 import {realpathSync} from 'fs'
 import path from 'path'
 
@@ -128,5 +128,52 @@ export async function touchLocation(projectId: string): Promise<void> {
     if (location) {
         location.lastOpenedAt = Date.now()
         await persist(store)
+    }
+}
+
+/** 项目 runtime snapshot: 上报给后端构造 ProjectRuntimeContext（见开发计划 5.3/8.4） */
+export interface RuntimeSnapshot {
+    found: boolean
+    projectId: string
+    deviceId: string
+    rootPath?: string
+    cwd?: string
+    platform: string
+    pythonExecutable?: string
+    pythonVersion?: string
+}
+
+/**
+ * 生成项目的 runtime snapshot。
+ * 重新检查目录是否仍存在；缺失时返回 found=false，不返回过期路径。
+ * Python 发现属于 Phase 3（runtimeDiscovery），当前仅透传已配置的解释器。
+ */
+export async function getRuntimeSnapshot(projectId: string): Promise<RuntimeSnapshot> {
+    const store = await load()
+    const location = store.locations[projectId]
+    const base: RuntimeSnapshot = {
+        found: false,
+        projectId,
+        deviceId: store.deviceId,
+        platform: process.platform
+    }
+    if (!location) {
+        return base
+    }
+    try {
+        const s = await stat(location.rootPath)
+        if (!s.isDirectory()) {
+            return base
+        }
+    } catch {
+        return base
+    }
+    return {
+        ...base,
+        found: true,
+        rootPath: location.rootPath,
+        cwd: location.defaultCwd,
+        pythonExecutable: location.pythonExecutable,
+        pythonVersion: undefined
     }
 }

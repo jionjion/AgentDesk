@@ -56,6 +56,11 @@ public class RemoteExecBridge implements ClientExecutor {
     private final ConcurrentHashMap<Long, String> clientPlatforms = new ConcurrentHashMap<>();
 
     /**
+     * userId → 客户端设备ID（client_ready 上报; MVP 每用户最多一个在线设备）
+     */
+    private final ConcurrentHashMap<Long, String> clientDeviceIds = new ConcurrentHashMap<>();
+
+    /**
      * requestId → CompletableFuture 映射（等待客户端响应）
      */
     private final ConcurrentHashMap<String, PendingCommand> pendingRequests = new ConcurrentHashMap<>();
@@ -65,10 +70,18 @@ public class RemoteExecBridge implements ClientExecutor {
      */
     private final ConcurrentHashMap<String, PendingSandbox> pendingSandboxRequests = new ConcurrentHashMap<>();
 
+    /**
+     * requestId → CompletableFuture 映射（runtime snapshot 等待, 定时任务用）
+     */
+    private final ConcurrentHashMap<String, PendingSnapshot> pendingSnapshotRequests = new ConcurrentHashMap<>();
+
     private record PendingCommand(Long userId, CompletableFuture<CommandResult> future) {
     }
 
     private record PendingSandbox(Long userId, CompletableFuture<SandboxResult> future) {
+    }
+
+    private record PendingSnapshot(Long userId, CompletableFuture<Map<String, Object>> future) {
     }
 
     public RemoteExecBridge(ObjectMapper objectMapper,
@@ -114,6 +127,23 @@ public class RemoteExecBridge implements ClientExecutor {
     }
 
     /**
+     * 注册客户端设备ID（由 CLIENT_READY 消息触发）
+     */
+    public void registerClientDeviceId(Long userId, String deviceId) {
+        if (deviceId != null && !deviceId.isBlank()) {
+            clientDeviceIds.put(userId, deviceId);
+            log.info("用户 {} 客户端设备: {}", userId, deviceId);
+        }
+    }
+
+    /**
+     * 获取客户端设备ID, 未上报时返回 null
+     */
+    public String getClientDeviceId(Long userId) {
+        return clientDeviceIds.get(userId);
+    }
+
+    /**
      * 获取客户端平台信息
      *
      * @return 平台描述（如 "Windows", "macOS", "Linux"），未知时返回 null
@@ -128,6 +158,7 @@ public class RemoteExecBridge implements ClientExecutor {
     public void removeConnection(Long userId) {
         connections.remove(userId);
         clientPlatforms.remove(userId);
+        clientDeviceIds.remove(userId);
         // 完成该用户所有 pending 请求（以异常方式）
         pendingRequests.entrySet().removeIf(entry -> {
             PendingCommand pending = entry.getValue();
@@ -139,6 +170,14 @@ public class RemoteExecBridge implements ClientExecutor {
         });
         pendingSandboxRequests.entrySet().removeIf(entry -> {
             PendingSandbox pending = entry.getValue();
+            if (userId.equals(pending.userId()) && !pending.future().isDone()) {
+                pending.future().completeExceptionally(new IOException("客户端已断开连接"));
+                return true;
+            }
+            return false;
+        });
+        pendingSnapshotRequests.entrySet().removeIf(entry -> {
+            PendingSnapshot pending = entry.getValue();
             if (userId.equals(pending.userId()) && !pending.future().isDone()) {
                 pending.future().completeExceptionally(new IOException("客户端已断开连接"));
                 return true;
@@ -322,6 +361,73 @@ public class RemoteExecBridge implements ClientExecutor {
         }
     }
 
+    // ==================== Runtime Snapshot (定时任务) ====================
+
+    /**
+     * 向指定用户在线客户端请求项目 runtime snapshot (定时任务用, 见开发计划 8.4)。
+     *
+     * @param userId    任务所属用户
+     * @param projectId 项目ID
+     * @param deviceId  任务保存的目标设备ID
+     * @param taskId    定时任务ID
+     * @param timeoutMs snapshot 独立短超时 (不占用 Agent 执行超时)
+     * @return snapshot payload (rootPath/cwd/platform/pythonExecutable/pythonVersion 等)
+     * @throws SnapshotException 稳定错误码: RUNTIME_OFFLINE / DEVICE_MISMATCH / PROJECT_LOCATION_NOT_FOUND / SNAPSHOT_TIMEOUT
+     */
+    public Map<String, Object> requestRuntimeSnapshot(Long userId, String projectId, String deviceId,
+                                                      Long taskId, long timeoutMs) throws SnapshotException {
+        WebSocketSession ws = connections.get(userId);
+        if (ws == null || !ws.isOpen()) {
+            throw new SnapshotException(SnapshotException.RUNTIME_OFFLINE, "客户端不在线");
+        }
+        String onlineDeviceId = clientDeviceIds.get(userId);
+        if (deviceId != null && onlineDeviceId != null && !deviceId.equals(onlineDeviceId)) {
+            throw new SnapshotException(SnapshotException.DEVICE_MISMATCH,
+                    "任务目标设备 " + deviceId + " 与当前在线设备 " + onlineDeviceId + " 不一致");
+        }
+
+        String requestId = UUID.randomUUID().toString();
+        CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
+        pendingSnapshotRequests.put(requestId, new PendingSnapshot(userId, future));
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("taskId", taskId);
+            payload.put("projectId", projectId);
+            payload.put("deviceId", deviceId);
+            WsMessage msg = WsMessage.of(WsMessage.TYPE_RUNTIME_SNAPSHOT_REQUEST, requestId, null, payload);
+            ws.sendMessage(new TextMessage(objectMapper.writeValueAsString(msg)));
+            log.info("已向用户 {} 请求项目 {} runtime snapshot (task={})", userId, projectId, taskId);
+
+            Map<String, Object> result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+            if (result == null || Boolean.FALSE.equals(result.get("found"))) {
+                throw new SnapshotException(SnapshotException.PROJECT_LOCATION_NOT_FOUND,
+                        "设备上未找到项目 " + projectId + " 的本地位置");
+            }
+            return result;
+        } catch (TimeoutException e) {
+            throw new SnapshotException(SnapshotException.SNAPSHOT_TIMEOUT,
+                    "snapshot 请求超时 (" + timeoutMs + "ms)");
+        } catch (SnapshotException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SnapshotException(SnapshotException.RUNTIME_OFFLINE, "snapshot 请求异常: " + e.getMessage());
+        } finally {
+            pendingSnapshotRequests.remove(requestId);
+        }
+    }
+
+    /**
+     * 处理客户端返回的 runtime snapshot 结果
+     */
+    public void onRuntimeSnapshotResult(String requestId, Map<String, Object> payload) {
+        PendingSnapshot pending = pendingSnapshotRequests.get(requestId);
+        if (pending != null) {
+            pending.future().complete(payload);
+        } else {
+            log.warn("收到未知 requestId 的 snapshot 结果: {}", requestId);
+        }
+    }
+
     // ==================== 内部方法 ====================
 
     private void sendCancel(WebSocketSession ws, String requestId, String sessionId) {
@@ -369,6 +475,27 @@ public class RemoteExecBridge implements ClientExecutor {
     public static class RemoteExecException extends ClientExecException {
         public RemoteExecException(String message) {
             super(message);
+        }
+    }
+
+    /**
+     * Runtime snapshot 请求异常, 携带稳定错误码 (见开发计划 8.4)
+     */
+    public static class SnapshotException extends Exception {
+        public static final String RUNTIME_OFFLINE = "RUNTIME_OFFLINE";
+        public static final String DEVICE_MISMATCH = "DEVICE_MISMATCH";
+        public static final String PROJECT_LOCATION_NOT_FOUND = "PROJECT_LOCATION_NOT_FOUND";
+        public static final String SNAPSHOT_TIMEOUT = "SNAPSHOT_TIMEOUT";
+
+        private final String code;
+
+        public SnapshotException(String code, String message) {
+            super(code + ": " + message);
+            this.code = code;
+        }
+
+        public String getCode() {
+            return code;
         }
     }
 }

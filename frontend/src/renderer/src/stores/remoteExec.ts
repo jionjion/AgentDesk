@@ -117,12 +117,16 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     ws.onopen = async () => {
       status.value = 'connected'
       reconnectAttempts = 0
-      // 获取详细平台信息并发送 client_ready
+      // 获取详细平台信息与设备ID并发送 client_ready
       let platformInfo: string = navigator.platform
+      let deviceId = ''
       try {
         const info = await window.electronAPI.app.getPlatformInfo()
         platformInfo = `${info.platform}|${info.arch}|${info.release}`
       } catch { /* fallback to navigator.platform */ }
+      try {
+        deviceId = await window.electronAPI.projects.getDeviceId()
+      } catch { /* 设备ID不可用时留空 */ }
       sendMessage({
         type: WS_MESSAGE_TYPES.CLIENT_READY,
         requestId: null,
@@ -130,6 +134,7 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
         timestamp: Date.now(),
         payload: {
           platform: platformInfo,
+          deviceId,
           version: '1.0'
         }
       })
@@ -195,6 +200,10 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
 
       case WS_MESSAGE_TYPES.SANDBOX_EXEC_REQUEST:
         handleSandboxExecRequest(msg)
+        break
+
+      case WS_MESSAGE_TYPES.RUNTIME_SNAPSHOT_REQUEST:
+        handleRuntimeSnapshotRequest(msg)
         break
 
       case WS_MESSAGE_TYPES.COMMAND_CANCEL:
@@ -296,6 +305,26 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
         }
       })
     }
+  }
+
+  /** 处理定时任务的 runtime snapshot 请求：查本机 ProjectLocation 并回传（见开发计划 8.4） */
+  async function handleRuntimeSnapshotRequest(msg: WsMessage) {
+    const payload = msg.payload as { projectId?: string } | null
+    if (!msg.requestId) return
+    const projectId = payload?.projectId || ''
+    let snapshot: Record<string, unknown> = { found: false, projectId }
+    try {
+      snapshot = { ...(await window.electronAPI.projects.getRuntimeSnapshot(projectId)) }
+    } catch (e) {
+      console.warn('[RemoteExec] 获取 runtime snapshot 失败:', e)
+    }
+    sendMessage({
+      type: WS_MESSAGE_TYPES.RUNTIME_SNAPSHOT_RESULT,
+      requestId: msg.requestId,
+      sessionId: msg.sessionId,
+      timestamp: Date.now(),
+      payload: snapshot
+    })
   }
 
   // === 命令执行 ===

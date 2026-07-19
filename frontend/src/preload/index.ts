@@ -25,6 +25,18 @@ export interface ProjectLocation {
 }
 
 
+/** 项目 runtime snapshot */
+export interface RuntimeSnapshot {
+    found: boolean
+    projectId: string
+    deviceId: string
+    rootPath?: string
+    cwd?: string
+    platform: string
+    pythonExecutable?: string
+    pythonVersion?: string
+}
+
 const electronAPI = {
     dialog: {
         openFile: (): Promise<string[]> => ipcRenderer.invoke('dialog:openFile'),
@@ -84,7 +96,9 @@ const electronAPI = {
         removeLocation: (projectId: string): Promise<boolean> =>
             ipcRenderer.invoke('projects:removeLocation', projectId),
         touchLocation: (projectId: string): Promise<void> =>
-            ipcRenderer.invoke('projects:touchLocation', projectId)
+            ipcRenderer.invoke('projects:touchLocation', projectId),
+        getRuntimeSnapshot: (projectId: string): Promise<RuntimeSnapshot> =>
+            ipcRenderer.invoke('projects:getRuntimeSnapshot', projectId)
     },
     updater: {
         check: (): Promise<unknown> => ipcRenderer.invoke('updater:check'),

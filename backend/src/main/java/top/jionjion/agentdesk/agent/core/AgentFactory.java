@@ -134,7 +134,7 @@ public class AgentFactory {
         toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService, userId));
 
         registerMcpTools(toolkit, userId, sessionId);
-        RemoteExecTool remoteExecTool = registerDesktopTools(toolkit, userId, sessionId);
+        registerDesktopTools(toolkit, userId, sessionId);
         registerResearchTool(toolkit);
 
         List<Skill> enabledSkills = userId == null ? List.of() : skillService.getEnabledSkills(userId);
@@ -172,7 +172,7 @@ public class AgentFactory {
         log.info("AgentScope v2 Harness ready: session={}, user={}, tools={}",
                 sessionId, userId, toolkit.getToolNames());
         return new AgentHandle(builder.build(),
-                new AgentEventBridge(objectMapper, EXPERT_DISPLAY_NAMES), remoteExecTool);
+                new AgentEventBridge(objectMapper, EXPERT_DISPLAY_NAMES));
     }
 
     private void registerMcpTools(Toolkit toolkit, Long userId, String sessionId) {
@@ -188,15 +188,14 @@ public class AgentFactory {
         log.info("已为会话 {} 注册 {} 个 MCP 服务器", sessionId, servers.size());
     }
 
-    private RemoteExecTool registerDesktopTools(Toolkit toolkit, Long userId, String sessionId) {
+    private void registerDesktopTools(Toolkit toolkit, Long userId, String sessionId) {
         if (!remoteExecEnabled || userId == null) {
-            return null;
+            return;
         }
         RemoteExecTool remote = new RemoteExecTool(
                 remoteExecBridge, commandRiskClassifier, userId, sessionId);
         toolkit.registerTool(remote);
         toolkit.registerTool(new SandboxExecTool(remoteExecBridge, userId, sessionId));
-        return remote;
     }
 
     private void registerResearchTool(Toolkit toolkit) {

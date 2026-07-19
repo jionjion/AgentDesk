@@ -83,12 +83,15 @@ public final class ToolDefinitions {
     // ==================== 远程执行工具 ====================
 
     public static final String REMOTE_EXEC = "remote_exec";
-    public static final String REMOTE_EXEC_DESC = "在用户本地机器上执行 shell 命令或真实 Python 代码，是执行类任务的【默认首选】。" +
+    public static final String REMOTE_EXEC_DESC = "在用户本地机器上执行 shell 命令，是执行类任务的【默认首选】。" +
             "命令通过网络发送到用户桌面客户端执行，拥有完整能力：访问真实文件系统、联网、安装并使用任意 Python 包（含 scipy、scikit-learn、PyTorch、opencv 等 C 扩展包）、运行项目命令、查看系统状态。" +
             "跑 Python 时用 `python -c \"...\"` 或先写脚本文件再执行。" +
             "重要：执行结果会包含客户端操作系统信息，请按目标系统使用正确语法 " +
             "(Windows 用 cmd/PowerShell 如 dir, type, del；macOS/Linux 用 Unix 命令如 ls, cat, rm)。" +
             "低风险命令（如 ls/dir, cat/type, git status）自动执行，高风险命令（如 rm/del, npm install, git push）需用户确认。" +
+            "【工作目录规则】working_dir 是逐次调用参数，不跨调用保持；默认使用当前项目根目录。" +
+            "单独执行 `cd subdir` 只影响该次短生命周期 shell，下一次调用不会继承；" +
+            "需要在子目录运行时，传 working_dir=\"subdir\"（相对路径按项目根解析），或在同一条命令中使用 `cd subdir && command`。" +
             "【与 sandbox_exec 的选择】涉及真实文件读写、网络、第三方包、系统操作、运行项目时，一律用本工具；" +
             "仅当任务是纯内存计算、画图、或使用 tools.* 数据处理函数，且不碰真实文件/网络/C扩展包时，才改用 sandbox_exec。";
 

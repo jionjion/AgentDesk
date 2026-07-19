@@ -2,6 +2,7 @@ package top.jionjion.agentdesk.service.chat;
 
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.runtime.AgentInput;
+import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
 import top.jionjion.agentdesk.dto.chat.ChatRequest;
 import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.dto.memory.MemoryItemDto;
@@ -115,6 +116,61 @@ public class PromptContextBuilder {
 
         sb.append(message);
         return sb.toString();
+    }
+
+    /**
+     * 将当前项目上下文注入用户消息 (见开发计划 9.3)。
+     * <p>
+     * 数据来自服务器已验证的 Session->Project 关系与在线客户端 snapshot;
+     * 原始用户消息仍按原文持久化, 本增强只影响送入模型的内容。
+     * projectContext 为 null (会话未绑定项目) 时原样返回。
+     */
+    public String buildProjectAugmentedMessage(String message, ProjectRuntimeContext projectContext) {
+        if (projectContext == null) {
+            return message;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("<project_context>\n");
+        sb.append("项目：").append(projectContext.projectName()).append("\n");
+        sb.append("项目 ID：").append(projectContext.projectId()).append("\n");
+        if (projectContext.runtimeOnline()) {
+            sb.append("本地根目录：").append(projectContext.rootPath()).append("\n");
+            sb.append("默认工作目录：").append(projectContext.effectiveCwd()).append("\n");
+            sb.append("系统：").append(describePlatform(projectContext.platform())).append("\n");
+            if (projectContext.pythonExecutable() != null && !projectContext.pythonExecutable().isBlank()) {
+                sb.append("Python：")
+                        .append(projectContext.pythonVersion() != null ? projectContext.pythonVersion() : "未知版本")
+                        .append(" (").append(projectContext.pythonExecutable()).append(")\n");
+            } else {
+                sb.append("Python：未检测到\n");
+            }
+            sb.append("本地运行环境：已连接\n");
+        } else {
+            sb.append("本地运行环境：未连接（本地路径与解释器信息不可用，本地执行类工具将失败）\n");
+        }
+        if (projectContext.instructions() != null && !projectContext.instructions().isBlank()) {
+            sb.append("项目指令：").append(projectContext.instructions()).append("\n");
+        }
+        sb.append("</project_context>\n\n");
+        sb.append(message);
+        return sb.toString();
+    }
+
+    private String describePlatform(String platform) {
+        if (platform == null || platform.isBlank()) {
+            return "未知";
+        }
+        String p = platform.toLowerCase();
+        if (p.contains("win")) {
+            return "Windows";
+        }
+        if (p.contains("darwin") || p.contains("mac")) {
+            return "macOS";
+        }
+        if (p.contains("linux")) {
+            return "Linux";
+        }
+        return platform;
     }
 
     /** Adds relevant cross-session facts retrieved from Mem0 to the current turn. */

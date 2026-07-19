@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.jionjion.agentdesk.agent.exec.ClientExecException;
 import top.jionjion.agentdesk.agent.exec.ClientExecutor;
+import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
 import top.jionjion.agentdesk.websocket.dto.CommandResult;
 
 /**
@@ -13,6 +14,13 @@ import top.jionjion.agentdesk.websocket.dto.CommandResult;
  * <p>
  * 命令通过 WebSocket 发送到客户端执行, 根据风险等级决定是否需要用户确认。
  * 低风险命令（如 ls, cat, git status）自动执行, 高风险命令需要用户在客户端确认。
+ * <p>
+ * 工作目录规则 (见开发计划 9.4):
+ * <ul>
+ *   <li>working_dir 是逐次调用参数, 不跨工具调用保持</li>
+ *   <li>默认工作目录来自本次调用注入的 {@link ProjectRuntimeContext}</li>
+ *   <li>不拦截裸 cd、不伪造持久目录状态</li>
+ * </ul>
  *
  * @author Jion
  */
@@ -20,13 +28,6 @@ public class RemoteExecTool {
 
     private static final Logger log = LoggerFactory.getLogger(RemoteExecTool.class);
 
-    private static final String CHAIN_AND = "&&";
-    private static final String CHAIN_SEMICOLON = ";";
-    private static final String PIPE = "|";
-    private static final String CMD_CD = "cd ";
-    private static final String CMD_SET_LOCATION = "Set-Location ";
-    private static final String QUOTE_DOUBLE = "\"";
-    private static final String QUOTE_SINGLE = "'";
     private static final String PLATFORM_WIN = "win";
     private static final String PLATFORM_DARWIN = "darwin";
     private static final String PLATFORM_MAC = "mac";
@@ -37,11 +38,6 @@ public class RemoteExecTool {
     private final Long userId;
     private final String sessionId;
 
-    /**
-     * 会话级当前工作目录: 记住上一次 cd 或 working_dir 的路径, 后续命令默认使用
-     */
-    private volatile String currentWorkingDir;
-
     public RemoteExecTool(ClientExecutor bridge, CommandRiskClassifier riskClassifier,
                           Long userId, String sessionId) {
         this.bridge = bridge;
@@ -50,19 +46,11 @@ public class RemoteExecTool {
         this.sessionId = sessionId;
     }
 
-    /**
-     * 设置当前工作目录（供外部在每次请求时注入前端选择的工作目录）
-     */
-    public void setWorkingDir(String workingDir) {
-        if (workingDir != null && !workingDir.isBlank()) {
-            this.currentWorkingDir = workingDir;
-        }
-    }
-
     @Tool(name = ToolDefinitions.REMOTE_EXEC, description = ToolDefinitions.REMOTE_EXEC_DESC)
     public String execute(
             @ToolParam(name = "command", description = "要在用户本地机器上执行的 shell 命令。注意: 必须使用与用户操作系统匹配的命令语法") String command,
-            @ToolParam(name = "working_dir", description = "命令的工作目录路径, 可选。不传则使用会话中上一次的工作目录", required = false) String workingDir
+            @ToolParam(name = "working_dir", description = "本次命令的工作目录, 可选。相对路径按当前项目根解析; 不传则使用项目根目录。该参数不跨调用保持", required = false) String workingDir,
+            ProjectRuntimeContext projectContext
     ) {
         if (command == null || command.isBlank()) {
             return "错误: 命令不能为空";
@@ -73,21 +61,8 @@ public class RemoteExecTool {
             return "错误: 用户的桌面客户端未连接, 无法执行远程命令。请提示用户启动桌面客户端并确保远程执行功能已开启。";
         }
 
-        // 解析工作目录: 显式传入 > 会话记忆 > 客户端默认
-        String effectiveDir = resolveWorkingDir(workingDir);
-
-        // 处理 cd 命令: 更新会话级工作目录
-        String cdTarget = extractCdTarget(command);
-        if (cdTarget != null) {
-            currentWorkingDir = cdTarget;
-            log.info("会话工作目录切换为: {} (userId={}, session={})", cdTarget, userId, sessionId);
-            return "工作目录已切换到: " + cdTarget;
-        }
-
-        // 如果显式传入了 working_dir, 同时更新会话记忆
-        if (workingDir != null && !workingDir.isBlank()) {
-            currentWorkingDir = workingDir;
-        }
+        // 解析工作目录: 显式传入(相对路径按项目根解析) > 项目默认 cwd > 客户端默认
+        String effectiveDir = resolveWorkingDir(workingDir, projectContext);
 
         // 获取客户端平台信息
         String platform = bridge.getClientPlatform(userId);
@@ -107,47 +82,40 @@ public class RemoteExecTool {
     }
 
     /**
-     * 解析有效工作目录: 显式传入优先, 其次会话记忆, 最后为 null（客户端使用默认）
+     * 解析本次调用的有效工作目录。
+     * 显式传入优先 (相对路径以项目根为基准); 其次项目默认 cwd; 均无时为 null (客户端使用默认)。
      */
-    private String resolveWorkingDir(String workingDir) {
+    private String resolveWorkingDir(String workingDir, ProjectRuntimeContext projectContext) {
+        String projectRoot = projectContext != null && projectContext.runtimeOnline()
+                ? projectContext.rootPath() : null;
         if (workingDir != null && !workingDir.isBlank()) {
-            return workingDir;
-        }
-        return currentWorkingDir;
-    }
-
-    /**
-     * 提取 cd 命令的目标路径。仅处理纯 cd 命令（不含 && 或 ;），返回 null 表示非 cd 命令。
-     */
-    private String extractCdTarget(String command) {
-        String trimmed = command.trim();
-        // 仅匹配纯 cd 命令, 不处理组合命令（如 cd /path && ls）
-        if (trimmed.contains(CHAIN_AND) || trimmed.contains(CHAIN_SEMICOLON) || trimmed.contains(PIPE)) {
-            return null;
-        }
-        if (trimmed.startsWith(CMD_CD) || trimmed.startsWith(CMD_SET_LOCATION)) {
-            String target = trimmed.startsWith(CMD_CD)
-                    ? trimmed.substring(CMD_CD.length()).trim()
-                    : trimmed.substring(CMD_SET_LOCATION.length()).trim();
-            // 去掉引号
-            if (isQuoted(target)) {
-                target = target.substring(1, target.length() - 1);
+            String dir = workingDir.trim();
+            if (projectRoot != null && isRelative(dir)) {
+                return joinPath(projectRoot, dir);
             }
-            return target.isEmpty() ? null : target;
+            return dir;
+        }
+        if (projectContext != null && projectContext.runtimeOnline()) {
+            return projectContext.effectiveCwd();
         }
         return null;
     }
 
-    /**
-     * 判断字符串是否被成对的双引号或单引号包裹
-     *
-     * @param value 待判断的字符串
-     * @return 被成对引号包裹返回 true
-     */
-    private static boolean isQuoted(String value) {
-        boolean doubleQuoted = value.startsWith(QUOTE_DOUBLE) && value.endsWith(QUOTE_DOUBLE);
-        boolean singleQuoted = value.startsWith(QUOTE_SINGLE) && value.endsWith(QUOTE_SINGLE);
-        return doubleQuoted || singleQuoted;
+    /** 判断路径是否为相对路径 (非 Windows 盘符/UNC/Unix 绝对路径) */
+    private static boolean isRelative(String path) {
+        if (path.startsWith("/") || path.startsWith("\\")) {
+            return false;
+        }
+        // Windows 盘符: C:\ 或 C:/
+        return !(path.length() >= 2 && Character.isLetter(path.charAt(0)) && path.charAt(1) == ':');
+    }
+
+    /** 以项目根为基准拼接相对路径, 分隔符跟随项目根风格 */
+    private static String joinPath(String root, String relative) {
+        String sep = root.contains("\\") ? "\\" : "/";
+        String base = root.endsWith("/") || root.endsWith("\\")
+                ? root.substring(0, root.length() - 1) : root;
+        return base + sep + relative.replace(sep.equals("\\") ? "/" : "\\", sep);
     }
 
     /**

@@ -82,12 +82,15 @@ public class RemoteExecWebSocketHandler extends TextWebSocketHandler {
             case WsMessage.TYPE_COMMAND_RESULT -> handleCommandResult(wsMsg);
             case WsMessage.TYPE_COMMAND_REJECTED -> handleCommandRejected(wsMsg);
             case WsMessage.TYPE_SANDBOX_EXEC_RESULT -> handleSandboxResult(wsMsg);
+            case WsMessage.TYPE_RUNTIME_SNAPSHOT_RESULT -> handleRuntimeSnapshotResult(wsMsg);
             case WsMessage.TYPE_CLIENT_READY -> {
                 log.info("用户 {} 客户端就绪, payload={}", userId, wsMsg.payload());
-                // 提取并存储客户端平台信息
+                // 提取并存储客户端平台信息与设备ID
                 if (wsMsg.payload() != null) {
                     String platform = (String) wsMsg.payload().get("platform");
                     bridge.registerClientPlatform(userId, platform);
+                    String deviceId = (String) wsMsg.payload().get("deviceId");
+                    bridge.registerClientDeviceId(userId, deviceId);
                 }
             }
             default -> log.warn("未知消息类型: {}", wsMsg.type());
@@ -155,6 +158,13 @@ public class RemoteExecWebSocketHandler extends TextWebSocketHandler {
 
         SandboxResult sandboxResult = new SandboxResult(success, stdout, stderr, result, figureCount, durationMs);
         bridge.onSandboxResult(msg.requestId(), sandboxResult);
+    }
+
+    private void handleRuntimeSnapshotResult(WsMessage msg) {
+        if (msg.requestId() == null) {
+            return;
+        }
+        bridge.onRuntimeSnapshotResult(msg.requestId(), msg.payload());
     }
 
     // ==================== 心跳管理 ====================

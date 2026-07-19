@@ -8,6 +8,7 @@ import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.agent.runtime.AgentInput;
 import top.jionjion.agentdesk.agent.runtime.AgentRunContext;
+import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
 import top.jionjion.agentdesk.dto.chat.ChatRequest;
 import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.dto.knowledge.RetrievalResultDto;
@@ -50,6 +51,7 @@ public class ChatStreamOrchestrator {
     private final FileService fileService;
     private final ChatMessageService chatMessageService;
     private final PromptContextBuilder promptContextBuilder;
+    private final ProjectRuntimeContextResolver projectContextResolver;
     private final SseEmitterManager sseEmitterManager;
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final RetrievalIntentService retrievalIntentService;
@@ -60,6 +62,7 @@ public class ChatStreamOrchestrator {
                                   FileService fileService,
                                   ChatMessageService chatMessageService,
                                   PromptContextBuilder promptContextBuilder,
+                                  ProjectRuntimeContextResolver projectContextResolver,
                                   SseEmitterManager sseEmitterManager,
                                   KnowledgeRetrievalService knowledgeRetrievalService,
                                   RetrievalIntentService retrievalIntentService,
@@ -69,6 +72,7 @@ public class ChatStreamOrchestrator {
         this.fileService = fileService;
         this.chatMessageService = chatMessageService;
         this.promptContextBuilder = promptContextBuilder;
+        this.projectContextResolver = projectContextResolver;
         this.sseEmitterManager = sseEmitterManager;
         this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.retrievalIntentService = retrievalIntentService;
@@ -87,9 +91,6 @@ public class ChatStreamOrchestrator {
             SseEmitter emitter = sseEmitterManager.create();
             handle.attachEmitter(emitter);
 
-            // 注入前端传入的工作目录到 RemoteExecTool
-            handle.setWorkingDirectory(chatRequest.workingDir());
-
             // 解析文件并持久化用户消息
             List<Long> parsedFileIds = promptContextBuilder.parseFileIds(chatRequest.fileIds());
             List<FileResponse> files = parsedFileIds.isEmpty()
@@ -102,6 +103,9 @@ public class ChatStreamOrchestrator {
             chatMessageService.saveUserMessage(sessionId, message, parsedFileIds);
 
             Long userId = UserContext.getUserId();
+            // 解析会话绑定项目 + 客户端 snapshot -> 调用级项目上下文
+            ProjectRuntimeContext projectContext = projectContextResolver.resolve(
+                    userId, sessionId, chatRequest.runtimeSnapshot());
             MemoryContext memory = performMemoryRecall(userId, message);
 
             // 知识库检索增强
@@ -110,15 +114,19 @@ public class ChatStreamOrchestrator {
                     retrieval.augmentedMessage(), memory.items());
 
             // 沙箱上下文增强
-            String augmentedMessage = promptContextBuilder.buildSandboxAugmentedMessage(
+            String sandboxAugmented = promptContextBuilder.buildSandboxAugmentedMessage(
                     memoryAugmented, chatRequest.sandboxContext());
+
+            // 项目上下文增强 (最外层, 模型每轮可见)
+            String augmentedMessage = promptContextBuilder.buildProjectAugmentedMessage(
+                    sandboxAugmented, projectContext);
 
             sseEmitterManager.configureCallbacks(emitter, sessionId, handle, () -> agentPool.release(sessionId, lockToken));
             sseEmitterManager.sendKnowledgeRetrieved(emitter, retrieval.results());
             sseEmitterManager.sendMemoryRecalled(emitter, memory.items().size());
             // 构建用户消息并启动 Agent 流
             AgentInput input = promptContextBuilder.buildAgentInput(augmentedMessage, imageFiles, nonImageFiles);
-            AgentRunContext runContext = AgentRunContext.of(userId, sessionId);
+            AgentRunContext runContext = AgentRunContext.of(userId, sessionId, projectContext);
             subscribe(handle, input, runContext, sessionId, message, emitter, lockToken,
                     memory.enabled(), userId);
 
@@ -151,11 +159,15 @@ public class ChatStreamOrchestrator {
 
             sseEmitterManager.configureCallbacks(emitter, sessionId, handle, () -> agentPool.release(sessionId, lockToken));
             MemoryContext memory = performMemoryRecall(userId, userMessage.getContent());
-            String augmentedMessage = promptContextBuilder.buildMemoryAugmentedMessage(
+            // 重新生成读取 Session 当前绑定的 Project (GET 端点无 snapshot, 运行环境标记为离线)
+            ProjectRuntimeContext projectContext = projectContextResolver.resolve(userId, sessionId, null);
+            String memoryAugmented = promptContextBuilder.buildMemoryAugmentedMessage(
                     userMessage.getContent(), memory.items());
+            String augmentedMessage = promptContextBuilder.buildProjectAugmentedMessage(
+                    memoryAugmented, projectContext);
             sseEmitterManager.sendMemoryRecalled(emitter, memory.items().size());
             AgentInput input = AgentInput.text(augmentedMessage);
-            AgentRunContext runContext = AgentRunContext.of(userId, sessionId);
+            AgentRunContext runContext = AgentRunContext.of(userId, sessionId, projectContext);
             subscribe(handle, input, runContext, sessionId, userMessage.getContent(), emitter,
                     lockToken, memory.enabled(), userId);
 
