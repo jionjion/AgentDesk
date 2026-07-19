@@ -42,6 +42,8 @@ public final class AgentEventBridge {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
+    /** 子智能体 agentId -> 中文显示名, 用于 subagent_event 的 displayName */
+    private final Map<String, String> subagentDisplayNames;
     private final TaskProgressTracker taskProgressTracker = new TaskProgressTracker();
     private final Map<String, StringBuilder> toolArguments = new ConcurrentHashMap<>();
     private final Map<String, StringBuilder> toolResults = new ConcurrentHashMap<>();
@@ -56,7 +58,12 @@ public final class AgentEventBridge {
     private volatile String stopReason;
 
     public AgentEventBridge(ObjectMapper objectMapper) {
+        this(objectMapper, Map.of());
+    }
+
+    public AgentEventBridge(ObjectMapper objectMapper, Map<String, String> subagentDisplayNames) {
         this.objectMapper = objectMapper;
+        this.subagentDisplayNames = Map.copyOf(subagentDisplayNames);
     }
 
     public void attach(SseEmitter emitter) {
@@ -161,13 +168,14 @@ public final class AgentEventBridge {
      */
     private void handleSubagentEvent(String source, AgentEvent event) {
         String agentId = source.substring(source.lastIndexOf('/') + 1);
+        String displayName = subagentDisplayNames.getOrDefault(agentId, agentId);
         switch (event) {
             case AgentStartEvent e -> sendSubagent(new SubagentEventDto(
-                    source, agentId, "start", e.getName(), null, null, null, null));
+                    source, agentId, displayName, "start", e.getName(), null, null, null, null));
             case TextBlockDeltaEvent e -> sendSubagent(new SubagentEventDto(
-                    source, agentId, "text_chunk", e.getDelta(), null, null, null, null));
+                    source, agentId, displayName, "text_chunk", e.getDelta(), null, null, null, null));
             case ThinkingBlockDeltaEvent e -> sendSubagent(new SubagentEventDto(
-                    source, agentId, "thinking_chunk", e.getDelta(), null, null, null, null));
+                    source, agentId, displayName, "thinking_chunk", e.getDelta(), null, null, null, null));
             case ToolCallStartEvent e -> {
                 toolArguments.put(e.getToolCallId(), new StringBuilder());
                 toolNames.put(e.getToolCallId(), e.getToolCallName());
@@ -179,7 +187,7 @@ public final class AgentEventBridge {
             case ToolCallEndEvent e -> {
                 if (announcedToolCalls.add(e.getToolCallId())) {
                     sendSubagent(new SubagentEventDto(
-                            source, agentId, "tool_call_start", null,
+                            source, agentId, displayName, "tool_call_start", null,
                             e.getToolCallName(), e.getToolCallId(),
                             parseArguments(e.getToolCallId()), null));
                 }
@@ -193,7 +201,7 @@ public final class AgentEventBridge {
             case ToolResultEndEvent e -> {
                 String result = toolResults.getOrDefault(e.getToolCallId(), new StringBuilder()).toString();
                 sendSubagent(new SubagentEventDto(
-                        source, agentId, "tool_call_end", null,
+                        source, agentId, displayName, "tool_call_end", null,
                         e.getToolCallName(), e.getToolCallId(), null, result));
                 toolArguments.remove(e.getToolCallId());
                 toolResults.remove(e.getToolCallId());
@@ -201,7 +209,7 @@ public final class AgentEventBridge {
                 announcedToolCalls.remove(e.getToolCallId());
             }
             case AgentResultEvent e -> sendSubagent(new SubagentEventDto(
-                    source, agentId, "complete",
+                    source, agentId, displayName, "complete",
                     e.getResult() != null ? e.getResult().getTextContent() : "",
                     null, null, null, null));
             default -> {

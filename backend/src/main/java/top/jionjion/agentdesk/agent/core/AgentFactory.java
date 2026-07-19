@@ -167,7 +167,8 @@ public class AgentFactory {
 
         log.info("AgentScope v2 Harness ready: session={}, user={}, tools={}",
                 sessionId, userId, toolkit.getToolNames());
-        return new AgentHandle(builder.build(), new AgentEventBridge(objectMapper), remoteExecTool);
+        return new AgentHandle(builder.build(),
+                new AgentEventBridge(objectMapper, EXPERT_DISPLAY_NAMES), remoteExecTool);
     }
 
     private void registerMcpTools(Toolkit toolkit, Long userId, String sessionId) {
@@ -227,6 +228,16 @@ public class AgentFactory {
             builder.skillRepository(new FilteredSkillRepository(repository, enabledSkillNames));
         }
     }
+
+    /** 专家 agentId -> 中文显示名, 随 subagent_event 下发给前端展示 */
+    private static final Map<String, String> EXPERT_DISPLAY_NAMES = Map.of(
+            "researcher", "研究员",
+            "software-engineer", "软件工程师",
+            "code-reviewer", "代码审查员",
+            "data-analyst", "数据分析师",
+            "writer", "撰稿人",
+            "knowledge-curator", "知识管理员",
+            "system-operator", "系统操作员");
 
     private void registerExpertTeam(HarnessAgent.Builder builder) {
         builder.subagent(expert("researcher", "联网研究、交叉验证并整理来源",

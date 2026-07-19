@@ -13,6 +13,7 @@ import java.util.Map;
  *
  * @param source    来源路径, 如 "main/researcher"
  * @param agentId   子智能体名(source 末段), 如 "researcher", 前端分组键
+ * @param displayName 子智能体中文显示名, 如 "研究员", 未注册时回退为 agentId
  * @param eventType 事件子类型: start / text_chunk / thinking_chunk / tool_call_start / tool_call_end / complete
  * @param content   文本增量(text_chunk/thinking_chunk)、专家名(start)或最终结果(complete)
  * @param toolName  工具名称(tool_call_* 事件)
@@ -25,6 +26,7 @@ import java.util.Map;
 public record SubagentEventDto(
         String source,
         String agentId,
+        String displayName,
         String eventType,
         String content,
         String toolName,
