@@ -1,6 +1,6 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
-import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, SSEEventData} from '@/types/chat'
+import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, PlanState, SSEEventData, SubagentEventData, SubagentMessage, TaskProgressEventData} from '@/types/chat'
 import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
@@ -58,6 +58,10 @@ export const useChatStore = defineStore('chat', () => {
     const memoryRecalledCount = ref(0)
     /** 当前对话知识库检索结果 */
     const knowledgeRetrievedResults = ref<{count: number; sources: string[]; references: {documentName: string; score: number; chunkIndex: number}[]}>({count: 0, sources: [], references: []})
+
+    /** 服务端推送的任务进度（task_progress 事件），按会话保存；null 表示后端未推送，走前端解析兜底 */
+    const taskProgressBySession = ref<Record<string, PlanState | null>>({})
+
     // === Computed ===
     const currentSession = computed(() =>
         sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -186,6 +190,8 @@ export const useChatStore = defineStore('chat', () => {
             await deleteSession(id)
             sessions.value = sessions.value.filter(s => s.id !== id)
             delete messagesBySession.value[id]
+            delete taskProgressBySession.value[id]
+            delete subtaskIdIndex[id]
             if (currentSessionId.value === id) {
                 currentSessionId.value = sessions.value.length > 0 ? sessions.value[0].id : null
             }
@@ -245,6 +251,133 @@ export const useChatStore = defineStore('chat', () => {
             if (p.localPreviewUrl) URL.revokeObjectURL(p.localPreviewUrl)
         })
         pendingAttachments.value = []
+    }
+
+    /** 各会话的子任务 ID → 下标映射（task_progress 事件按 ID 更新子任务） */
+    const subtaskIdIndex: Record<string, Record<string, number>> = {}
+
+    /** 应用服务端推送的任务进度事件，增量维护 PlanState */
+    function applyTaskProgress(sessionId: string, progress: TaskProgressEventData) {
+        const prev = taskProgressBySession.value[sessionId]
+        const state: PlanState = prev
+            ? {title: prev.title, subtasks: [...prev.subtasks], isFinished: prev.isFinished}
+            : {title: '任务计划', subtasks: [], isFinished: false}
+
+        switch (progress.eventType) {
+            case 'plan_created':
+            case 'plan_revised': {
+                if (progress.planTitle) state.title = progress.planTitle
+                if (progress.subtasks) {
+                    state.subtasks = progress.subtasks.map(s => ({name: s.title, state: s.state || 'todo'}))
+                    subtaskIdIndex[sessionId] = Object.fromEntries(progress.subtasks.map((s, i) => [s.id, i]))
+                }
+                state.isFinished = false
+                break
+            }
+            case 'task_updated':
+            case 'task_completed': {
+                const idx = progress.subtaskId != null ? subtaskIdIndex[sessionId]?.[progress.subtaskId] : undefined
+                const newState = progress.eventType === 'task_completed' ? 'done' : (progress.newState || 'in_progress')
+                if (idx != null && state.subtasks[idx]) {
+                    state.subtasks[idx] = {
+                        name: progress.subtaskTitle || state.subtasks[idx].name,
+                        state: newState
+                    }
+                } else if (progress.subtaskTitle) {
+                    // 未知 ID：按标题匹配，匹配不到则追加
+                    const byTitle = state.subtasks.findIndex(s => s.name === progress.subtaskTitle)
+                    if (byTitle >= 0) {
+                        state.subtasks[byTitle] = {...state.subtasks[byTitle], state: newState}
+                    } else {
+                        state.subtasks.push({name: progress.subtaskTitle, state: newState})
+                        if (progress.subtaskId != null) {
+                            (subtaskIdIndex[sessionId] ??= {})[progress.subtaskId] = state.subtasks.length - 1
+                        }
+                    }
+                }
+                break
+            }
+            case 'plan_finished': {
+                state.isFinished = true
+                // 完结时将未完成的子任务标记为 done（与后端 completedCount 对齐）
+                if (progress.completedCount != null && progress.totalCount != null
+                    && progress.completedCount === progress.totalCount) {
+                    state.subtasks = state.subtasks.map(s =>
+                        s.state === 'done' || s.state === 'abandoned' ? s : {...s, state: 'done' as const})
+                }
+                break
+            }
+        }
+
+        taskProgressBySession.value[sessionId] = state
+    }
+
+    /** 应用 subagent_event：按 source 聚合到 SubagentMessage，插入在助手占位消息之前 */
+    function applySubagentEvent(sessionId: string, assistantMsgId: string, event: SubagentEventData) {
+        const msgs = messagesBySession.value[sessionId]
+        if (!msgs) return
+
+        // 找到该 source 未完成的面板；complete 后同一专家再次启动则新建面板
+        let panel = msgs.findLast(
+            (m): m is SubagentMessage => m.role === 'subagent' && m.source === event.source && !m.isCompleted
+        )
+
+        if (!panel) {
+            if (event.eventType === 'complete') return
+            panel = {
+                id: generateId(),
+                role: 'subagent',
+                source: event.source,
+                agentId: event.agentId,
+                name: event.displayName || event.agentId,
+                content: '',
+                thinking: '',
+                toolCalls: [],
+                isCompleted: false
+            }
+            const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)
+            if (assistantIdx >= 0) {
+                msgs.splice(assistantIdx, 0, panel)
+            } else {
+                msgs.push(panel)
+            }
+        }
+
+        // 任意事件带 displayName 都更新专家显示名
+        if (event.displayName) panel.name = event.displayName
+
+        switch (event.eventType) {
+            case 'start':
+                break
+            case 'text_chunk':
+                panel.content += event.content || ''
+                break
+            case 'thinking_chunk':
+                panel.thinking += event.content || ''
+                break
+            case 'tool_call_start':
+                if (event.toolId) {
+                    panel.toolCalls.push({
+                        toolId: event.toolId,
+                        toolName: event.toolName || '',
+                        arguments: event.arguments || {},
+                        status: 'calling'
+                    })
+                }
+                break
+            case 'tool_call_end': {
+                const call = panel.toolCalls.find(t => t.toolId === event.toolId && t.status === 'calling')
+                if (call) {
+                    call.result = event.result
+                    call.status = 'done'
+                }
+                break
+            }
+            case 'complete':
+                panel.isCompleted = true
+                panel.finalResult = event.content
+                break
+        }
     }
 
     /** 设置 SSE 事件监听 (sendMessage 和 regenerateMessage 共用) */
@@ -420,6 +553,27 @@ export const useChatStore = defineStore('chat', () => {
             }
         })
 
+        es.addEventListener('task_progress', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data)
+                // 后端 ChatEventDto 将载荷放在 taskProgress 字段，也兼容平铺格式
+                const progress: TaskProgressEventData = data.taskProgress || data
+                if (!progress.eventType) return
+                applyTaskProgress(sessionId, progress)
+            } catch { /* ignore */
+            }
+        })
+
+        es.addEventListener('subagent_event', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data)
+                const sub: SubagentEventData = data.subagent || data
+                if (!sub.eventType || !sub.source) return
+                applySubagentEvent(sessionId, assistantMsgId, sub)
+            } catch { /* ignore */
+            }
+        })
+
         es.addEventListener('error', (e: MessageEvent) => {
             try {
                 const data: SSEEventData = JSON.parse(e.data)
@@ -452,6 +606,11 @@ export const useChatStore = defineStore('chat', () => {
             isStreaming.value = false
             memoryRecalledCount.value = 0
             knowledgeRetrievedResults.value = {count: 0, sources: [], references: []}
+            // 收尾未完成的子智能体面板，避免结束后仍显示进行中
+            const msgs = messagesBySession.value[sessionId]
+            msgs?.forEach(m => {
+                if (m.role === 'subagent' && !m.isCompleted) m.isCompleted = true
+            })
             es.close()
             eventSource.value = null
         }
@@ -647,6 +806,8 @@ export const useChatStore = defineStore('chat', () => {
             sessions.value = sessions.value.filter(s => !idSet.has(s.id))
             for (const id of ids) {
                 delete messagesBySession.value[id]
+                delete taskProgressBySession.value[id]
+                delete subtaskIdIndex[id]
             }
             if (currentSessionId.value && idSet.has(currentSessionId.value)) {
                 currentSessionId.value = sessions.value.length > 0 ? sessions.value[0].id : null
@@ -673,6 +834,7 @@ export const useChatStore = defineStore('chat', () => {
         isLoadingSession,
         memoryRecalledCount,
         knowledgeRetrievedResults,
+        taskProgressBySession,
         pendingAttachments,
         pinnedSessionIds,
         // computed

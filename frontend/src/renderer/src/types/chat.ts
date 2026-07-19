@@ -87,6 +87,51 @@ export interface Subtask {
     state: 'todo' | 'in_progress' | 'done' | 'abandoned'
 }
 
+/** 子智能体面板内的工具调用 */
+export interface SubagentToolCall {
+    toolId: string
+    toolName: string
+    arguments: Record<string, unknown>
+    result?: string
+    status: 'calling' | 'done'
+}
+
+/** 子智能体执行面板消息（按 source 聚合 subagent_event 事件流） */
+export interface SubagentMessage {
+    id: string
+    role: 'subagent'
+    /** 分组键（完整路径，如 main/researcher） */
+    source: string
+    /** 末段名，如 researcher */
+    agentId: string
+    /** start 事件携带的专家显示名 */
+    name: string
+    /** 子智能体的正文输出（text_chunk 聚合） */
+    content: string
+    /** 思考输出（thinking_chunk 聚合） */
+    thinking: string
+    /** 工具调用列表 */
+    toolCalls: SubagentToolCall[]
+    /** 是否已完成（complete 事件） */
+    isCompleted: boolean
+    /** complete 事件携带的最终结论 */
+    finalResult?: string
+}
+
+/** SSE subagent_event 事件载荷（对应后端 SubagentEventDto） */
+export interface SubagentEventData {
+    source: string
+    agentId: string
+    /** 专家中文显示名 */
+    displayName?: string
+    eventType: 'start' | 'text_chunk' | 'thinking_chunk' | 'tool_call_start' | 'tool_call_end' | 'complete'
+    content?: string
+    toolName?: string
+    toolId?: string
+    arguments?: Record<string, unknown>
+    result?: string
+}
+
 /** 计划状态 */
 export interface PlanState {
     title: string
@@ -94,8 +139,28 @@ export interface PlanState {
     isFinished: boolean
 }
 
+/** SSE task_progress 事件载荷（对应后端 TaskProgressDto） */
+export interface TaskProgressEventData {
+    /** 事件子类型 */
+    eventType: 'plan_created' | 'task_updated' | 'task_completed' | 'plan_revised' | 'plan_finished'
+    /** 计划标题 */
+    planTitle?: string
+    /** 子任务列表（create/revise 时发送完整列表） */
+    subtasks?: {id: string; title: string; state: Subtask['state']}[]
+    /** 被更新的子任务 ID */
+    subtaskId?: string
+    /** 被更新的子任务标题 */
+    subtaskTitle?: string
+    /** 新状态 */
+    newState?: Subtask['state']
+    /** 已完成子任务数 */
+    completedCount?: number
+    /** 子任务总数 */
+    totalCount?: number
+}
+
 /** 聊天消息联合类型 */
-export type ChatMessage = UserMessage | AssistantMessage | ToolCallMessage | ThinkingMessage | PlanMessage | CommandApprovalMessage
+export type ChatMessage = UserMessage | AssistantMessage | ToolCallMessage | ThinkingMessage | PlanMessage | CommandApprovalMessage | SubagentMessage
 
 /** 后端返回的聊天消息 */
 export interface BackendChatMessage {

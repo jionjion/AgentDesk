@@ -11,15 +11,15 @@
           <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" :size="16"/>
           <Input v-model="skillsStore.searchQuery" placeholder="搜索技能" class="pl-8"/>
         </div>
-        <Button variant="outline" @click="handleInstallPackage">
+        <Button variant="outline" size="sm" @click="handleInstallPackage">
           <Package :size="16" class="mr-1"/>
           安装技能包
         </Button>
-        <Button variant="outline" @click="handleImport">
+        <Button variant="outline" size="sm" @click="handleImport">
           <Upload :size="16" class="mr-1"/>
           导入技能
         </Button>
-        <Button @click="openCreateDialog">
+        <Button size="sm" @click="openCreateDialog">
           <Plus :size="16" class="mr-1"/>
           创建技能
         </Button>

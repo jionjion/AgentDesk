@@ -6,9 +6,9 @@
         <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">知识库</h1>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">管理本地文档，聊天时自动检索相关知识</p>
       </div>
-      <Button @click="showCreateDialog = true">
+      <Button size="sm" @click="showCreateDialog = true">
         <Plus :size="16" class="mr-1"/>
-        新建知识库
+        新建
       </Button>
     </div>
 

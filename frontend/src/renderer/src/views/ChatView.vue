@@ -38,6 +38,7 @@
         <div class="max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
           <template v-for="(msg, idx) in chatStore.currentMessages" :key="msg.id">
             <ThinkingBlock v-if="msg.role === 'thinking'" :message="msg"/>
+            <template v-else-if="msg.role === 'subagent'"/>
             <template v-else-if="msg.role === 'tool_call'"/>
             <template v-else-if="msg.role === 'plan'"/>
             <template v-else-if="msg.role === 'command_approval'"/>
@@ -93,7 +94,10 @@
         <KnowledgeIndicator/>
 
         <!-- 任务状态栏（输入框上方） -->
-        <PlanStatusBar v-if="planMessages.length > 0" :plan-messages="planMessages" :plan-state="planState"/>
+        <PlanStatusBar v-if="planMessages.length > 0 || hasPlan" :plan-messages="planMessages" :plan-state="planState"/>
+
+        <!-- 专家团状态栏（输入框上方） -->
+        <SubagentStatusBar v-if="subagentMessages.length > 0" :messages="subagentMessages"/>
 
         <!-- 输入框 -->
         <div class="border border-gray-200 dark:border-gray-700 rounded-xl p-4 relative">
@@ -229,6 +233,7 @@ import {Button} from '@/components/ui/button'
 import {Textarea} from '@/components/ui/textarea'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ThinkingBlock from '@/components/chat/ThinkingBlock.vue'
+import SubagentStatusBar from '@/components/chat/SubagentStatusBar.vue'
 import PlanStatusBar from '@/components/chat/PlanStatusBar.vue'
 import MessageSkeleton from '@/components/chat/MessageSkeleton.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
@@ -242,7 +247,7 @@ import ChatNavRail from '@/components/chat/ChatNavRail.vue'
 import {usePlanSubtasks} from '@/composables/usePlanSubtasks'
 import {useSlashCommand} from '@/composables/useSlashCommand'
 import {formatFileSize, isImageType} from '@/utils/file'
-import type {PlanMessage, ToolCallMessage} from '@/types/chat'
+import type {PlanMessage, SubagentMessage, ToolCallMessage} from '@/types/chat'
 import type {ExecuteResult} from '@/types/sandbox'
 import {useSandboxStore} from '@/stores/sandbox'
 import {useRemoteExecStore} from '@/stores/remoteExec'
@@ -252,10 +257,14 @@ const settingsStore = useSettingsStore()
 const sandboxStore = useSandboxStore()
 const remoteExecStore = useRemoteExecStore()
 const route = useRoute()
-const {planState} = usePlanSubtasks()
+const {planState, hasPlan} = usePlanSubtasks()
 
 const planMessages = computed(() =>
     chatStore.currentMessages.filter((m): m is PlanMessage => m.role === 'plan')
+)
+
+const subagentMessages = computed(() =>
+    chatStore.currentMessages.filter((m): m is SubagentMessage => m.role === 'subagent')
 )
 
 // === Python 沙箱执行 ===

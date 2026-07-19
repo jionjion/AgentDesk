@@ -7,12 +7,13 @@
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">按计划自动执行任务，也可随时手动触发</p>
       </div>
       <div class="flex items-center gap-2">
-        <Button variant="ghost" size="icon" @click="handleRefresh">
-          <RefreshCw :size="16"/>
+        <Button variant="outline" size="sm" @click="handleRefresh">
+          <RefreshCw :size="16" class="mr-1"/>
+          刷新
         </Button>
-        <Button @click="openCreateDialog">
+        <Button size="sm" @click="openCreateDialog">
           <Plus :size="16" class="mr-1"/>
-          新建定时任务
+          新建
         </Button>
       </div>
     </div>

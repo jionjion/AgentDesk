@@ -106,11 +106,13 @@ function mapState(raw: string): Subtask['state'] {
 
 /**
  * 从当前消息中解析计划状态
+ * 优先使用服务端 task_progress 事件推送的状态，无推送时回退到前端解析 plan 工具消息
  */
 export function usePlanSubtasks() {
     const chatStore = useChatStore()
 
-    const planState = computed<PlanState>(() => {
+    /** 前端解析 plan 工具消息的兜底状态 */
+    const parsedPlanState = computed<PlanState>(() => {
         const messages = chatStore.currentMessages
         let title = '任务计划'
         let subtasks: Subtask[] = []
@@ -224,6 +226,14 @@ export function usePlanSubtasks() {
         }
 
         return {title, subtasks, isFinished}
+    })
+
+    /** 服务端推送状态优先，未推送时回退前端解析 */
+    const planState = computed<PlanState>(() => {
+        const sessionId = chatStore.currentSessionId
+        const pushed = sessionId ? chatStore.taskProgressBySession[sessionId] : null
+        if (pushed && pushed.subtasks.length > 0) return pushed
+        return parsedPlanState.value
     })
 
     const hasPlan = computed(() => planState.value.subtasks.length > 0)
