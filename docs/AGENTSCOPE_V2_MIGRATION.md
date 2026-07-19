@@ -113,6 +113,8 @@ psql -f backend/src/main/resources/db/migration-v2.sql
 
 ### 事件协议
 
+完整 SSE 事件契约见 `docs/reference/SSE_EVENT_PROTOCOL.md`。
+
 后端链路：
 
 ```text
