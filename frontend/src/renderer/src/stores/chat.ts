@@ -30,6 +30,15 @@ function generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substring(2, 8)
 }
 
+/** 429 限流后队列重试的延迟 (对应后端滑动窗口 10次/70秒) */
+const RATE_LIMIT_RETRY_DELAY_MS = 15_000
+
+/** 409 会话忙 (后端 Agent 锁尚未释放) 重试延迟 */
+const SESSION_BUSY_RETRY_DELAY_MS = 2_000
+
+/** 队列自动续发前的等待, 给后端 SSE 完成回调释放会话锁留出时间 */
+const QUEUE_DRAIN_DELAY_MS = 800
+
 interface PendingFile {
     id: number
     name: string
@@ -39,6 +48,13 @@ interface PendingFile {
     failed: boolean
     localPreviewUrl?: string
     url?: string
+}
+
+/** 排队待发送的消息 (等待回复期间用户输入的内容) */
+export interface QueuedMessage {
+    id: string
+    content: string
+    kbIds?: number[]
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -52,6 +68,9 @@ export const useChatStore = defineStore('chat', () => {
     const pinnedSessionIds = ref<Set<string>>(new Set())
 
     const pendingAttachments = ref<PendingFile[]>([])
+
+    /** 当前会话的消息发送队列 (按会话隔离; 流式结束后自动依次发送) */
+    const messageQueueBySession = ref<Record<string, QueuedMessage[]>>({})
 
     /** 当前对话长期记忆召回数量 (0 表示未召回) */
     const memoryRecalledCount = ref(0)
@@ -68,6 +87,11 @@ export const useChatStore = defineStore('chat', () => {
 
     const currentMessages = computed(() =>
         currentSessionId.value ? (messagesBySession.value[currentSessionId.value] || []) : []
+    )
+
+    /** 当前会话的待发送队列 */
+    const currentQueue = computed(() =>
+        currentSessionId.value ? (messageQueueBySession.value[currentSessionId.value] || []) : []
     )
 
     const sortedSessions = computed(() => {
@@ -377,8 +401,9 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
-    /** 设置 SSE 事件监听 (sendMessage 和 regenerateMessage 共用) */
-    function setupSSEListeners(es: EventSource | FetchSSE, sessionId: string, assistantMsgId: string) {
+    /** 设置 SSE 事件监听 (sendMessage 和 regenerateMessage 共用)
+     * @param retry 本次发送的原始内容; 提供时若遇 429 限流将回滚消息并重新入队延迟重试 */
+    function setupSSEListeners(es: EventSource | FetchSSE, sessionId: string, assistantMsgId: string, retry?: {content: string; kbIds?: number[]}) {
         const getAssistantMsg = (): AssistantMessage | undefined => {
             const msgs = messagesBySession.value[sessionId]
             return msgs?.findLast(m => m.role === 'assistant') as AssistantMessage | undefined
@@ -586,30 +611,57 @@ export const useChatStore = defineStore('chat', () => {
             cleanup()
         })
 
-        es.onerror = () => {
-            if (isStreaming.value) {
-                const msg = getAssistantMsg()
-                if (msg && msg.isStreaming) {
-                    msg.isStreaming = false
-                    if (!msg.content) {
-                        msg.content = '[连接中断]'
-                    }
+        es.onerror = (statusOrEvent?: number | Event) => {
+            if (!isStreaming.value) return
+            const status = typeof statusOrEvent === 'number' ? statusOrEvent : undefined
+            // 429 限流 / 409 会话忙: 回滚刚推入的用户/助手消息, 将内容重新放回队首延迟重试
+            if ((status === 429 || status === 409) && retry) {
+                const msgs = messagesBySession.value[sessionId]
+                if (msgs) {
+                    const assistantIdx = msgs.findLastIndex(m => m.id === assistantMsgId)
+                    if (assistantIdx >= 0) msgs.splice(assistantIdx, 1)
+                    const userIdx = msgs.findLastIndex(m => m.role === 'user' && m.content === retry.content)
+                    if (userIdx >= 0) msgs.splice(userIdx, 1)
                 }
-                cleanup()
+                const queue = messageQueueBySession.value[sessionId] || []
+                queue.unshift({id: generateId(), content: retry.content, kbIds: retry.kbIds})
+                messageQueueBySession.value[sessionId] = queue
+                cleanupSilent()
+                // 延迟后重试: 409 等锁释放 (短), 429 等限流窗口 (长)
+                const delay = status === 409 ? SESSION_BUSY_RETRY_DELAY_MS : RATE_LIMIT_RETRY_DELAY_MS
+                setTimeout(() => {
+                    if (!isStreaming.value) drainQueue(sessionId)
+                }, delay)
+                return
             }
+            const msg = getAssistantMsg()
+            if (msg && msg.isStreaming) {
+                msg.isStreaming = false
+                if (!msg.content) {
+                    msg.content = '[连接中断]'
+                }
+            }
+            cleanup()
         }
 
-        function cleanup() {
+        /** 清理连接状态但不触发队列续发 (429 重试场景) */
+        function cleanupSilent() {
             isStreaming.value = false
             memoryRecalledCount.value = 0
             knowledgeRetrievedResults.value = {count: 0, sources: [], references: []}
+            es.close()
+            eventSource.value = null
+        }
+
+        function cleanup() {
+            cleanupSilent()
             // 收尾未完成的子智能体面板，避免结束后仍显示进行中
             const msgs = messagesBySession.value[sessionId]
             msgs?.forEach(m => {
                 if (m.role === 'subagent' && !m.isCompleted) m.isCompleted = true
             })
-            es.close()
-            eventSource.value = null
+            // 回复结束后自动发送队列中的下一条消息
+            drainQueue(sessionId)
         }
     }
 
@@ -665,8 +717,54 @@ export const useChatStore = defineStore('chat', () => {
         const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, runtimeSnapshot)
         eventSource.value = es
 
-        // 5. 设置监听
-        setupSSEListeners(es, sessionId, assistantMsgId)
+        // 5. 设置监听 (携带 retry 信息, 429 时回滚并重新入队)
+        setupSSEListeners(es, sessionId, assistantMsgId, {content: messageContent, kbIds})
+    }
+
+    // === 消息发送队列 ===
+
+    /** 入队一条待发送消息 (等待回复期间输入的内容) */
+    function enqueueMessage(content: string, kbIds?: number[]) {
+        if (!content.trim() || !currentSessionId.value) return
+        const queue = messageQueueBySession.value[currentSessionId.value] || []
+        queue.push({id: generateId(), content: content.trim(), kbIds})
+        messageQueueBySession.value[currentSessionId.value] = queue
+    }
+
+    /** 删除队列中的消息 */
+    function removeQueuedMessage(id: string) {
+        if (!currentSessionId.value) return
+        const queue = messageQueueBySession.value[currentSessionId.value]
+        if (queue) {
+            messageQueueBySession.value[currentSessionId.value] = queue.filter(q => q.id !== id)
+        }
+    }
+
+    /** 编辑队列中的消息 (返回内容并从队列移除, 由输入框接管) */
+    function takeQueuedMessage(id: string): QueuedMessage | null {
+        if (!currentSessionId.value) return null
+        const queue = messageQueueBySession.value[currentSessionId.value]
+        const item = queue?.find(q => q.id === id) || null
+        if (item) {
+            messageQueueBySession.value[currentSessionId.value] = queue!.filter(q => q.id !== id)
+        }
+        return item
+    }
+
+    /** 流式结束后取出队首消息自动发送 (稍作延迟, 等后端释放会话锁) */
+    function drainQueue(sessionId: string) {
+        const queue = messageQueueBySession.value[sessionId]
+        if (!queue || queue.length === 0) return
+        // 仅当仍停留在该会话时自动发送, 避免打断用户在其他会话的操作
+        if (currentSessionId.value !== sessionId) return
+        setTimeout(() => {
+            if (isStreaming.value || currentSessionId.value !== sessionId) return
+            const q = messageQueueBySession.value[sessionId]
+            if (!q || q.length === 0) return
+            const next = q.shift()!
+            messageQueueBySession.value[sessionId] = q
+            void sendMessage(next.content, next.kbIds)
+        }, QUEUE_DRAIN_DELAY_MS)
     }
 
     /** 构造当前会话所绑项目的 runtime snapshot (未绑定/无本机位置时返回 null) */
@@ -854,9 +952,11 @@ export const useChatStore = defineStore('chat', () => {
         taskProgressBySession,
         pendingAttachments,
         pinnedSessionIds,
+        messageQueueBySession,
         // computed
         currentSession,
         currentMessages,
+        currentQueue,
         sortedSessions,
         // actions
         loadSessions,
@@ -866,6 +966,9 @@ export const useChatStore = defineStore('chat', () => {
         batchRemoveSessions,
         renameSession,
         sendMessage,
+        enqueueMessage,
+        removeQueuedMessage,
+        takeQueuedMessage,
         interrupt,
         addAttachment,
         removeAttachment,

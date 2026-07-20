@@ -383,15 +383,10 @@ function toggleToolCall(id: string) {
   expandedToolCalls.value = new Set(expandedToolCalls.value)
 }
 
-/** remote_exec 审批: 查找匹配的 pending command */
+/** 本地执行审批: 查找匹配的 pending command (shell_exec/python_exec/local_write_file/local_edit_file) */
 function getRemoteExecPending(toolCall: ToolCallMessage) {
-  if (toolCall.toolName !== 'remote_exec' || toolCall.status !== 'calling') return null
-  const cmd = toolCall.arguments?.command as string
-  if (cmd) {
-    const exact = remoteExecStore.pendingCommands.find(p => p.command === cmd)
-    if (exact) return exact
-  }
-  return remoteExecStore.pendingCommands.length > 0 ? remoteExecStore.pendingCommands[0] : null
+  if (toolCall.status !== 'calling') return null
+  return remoteExecStore.findPendingForToolCall(toolCall.toolName, toolCall.arguments)
 }
 
 function handleApproveCommand(toolCall: ToolCallMessage) {

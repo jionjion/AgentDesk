@@ -134,46 +134,67 @@
               <span class="flex-1 truncate text-gray-600 dark:text-gray-400">{{ session.title }}</span>
             </div>
           </template>
-          <!-- 正常模式 -->
+          <!-- 正常模式: 项目分组在前, 未关联项目的会话在后 -->
           <template v-else>
-            <ContextMenu v-for="session in filteredSessions" :key="session.id">
-              <ContextMenuTrigger as-child>
-                <div
-                    class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer"
-                    :class="chatStore.currentSessionId === session.id
-                      ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
-                    :title="session.title"
-                    @click="handleSwitchSession(session.id)"
-                >
-                  <Pin v-if="chatStore.isPinned(session.id)" :size="12" class="flex-shrink-0 text-amber-500"/>
-                  <span class="flex-1 min-w-0 truncate">{{ session.title }}</span>
-                </div>
-              </ContextMenuTrigger>
-              <ContextMenuContent class="w-40">
-                <ContextMenuItem class="cursor-pointer" @select="handleRenameSession(session.id, session.title)">
-                  <Edit3 :size="14"/>
-                  <span>重命名</span>
-                </ContextMenuItem>
-                <ContextMenuItem class="cursor-pointer" @select="chatStore.togglePin(session.id)">
-                  <component :is="chatStore.isPinned(session.id) ? PinOff : Pin" :size="14"/>
-                  <span>{{ chatStore.isPinned(session.id) ? '取消置顶' : '置顶' }}</span>
-                </ContextMenuItem>
-                <ContextMenuItem class="cursor-pointer" @select="chatStore.exportSession(session.id)">
-                  <Download :size="14"/>
-                  <span>导出</span>
-                </ContextMenuItem>
-                <ContextMenuItem class="cursor-pointer" @select="chatStore.archiveToObsidian(session.id)">
-                  <Archive :size="14"/>
-                  <span>归档</span>
-                </ContextMenuItem>
-                <ContextMenuSeparator/>
-                <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(session.id)">
-                  <Trash2 :size="14"/>
-                  <span>删除</span>
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+            <template v-for="item in sidebarItems" :key="item.kind === 'session' ? item.session.id : 'project-' + item.projectId">
+              <!-- 项目分组标题 -->
+              <div
+                  v-if="item.kind === 'header'"
+                  class="flex items-center gap-1.5 px-2 py-1.5 text-sm rounded cursor-pointer select-none text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  @click="toggleProjectCollapse(item.projectId)"
+              >
+                <FolderOpen :size="14" class="flex-shrink-0 text-violet-500"/>
+                <span class="flex-1 min-w-0 truncate font-medium">{{ item.name }}</span>
+                <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ item.count }}</span>
+                <ChevronRight
+                    :size="12"
+                    class="flex-shrink-0 text-gray-400 transition-transform"
+                    :class="collapsedProjects.has(item.projectId) ? '' : 'rotate-90'"
+                />
+              </div>
+              <!-- 会话条目 -->
+              <ContextMenu v-else>
+                <ContextMenuTrigger as-child>
+                  <div
+                      class="group flex items-center gap-1 px-2 py-1.5 text-sm rounded cursor-pointer"
+                      :class="[
+                        item.inProject ? 'ml-4' : '',
+                        chatStore.currentSessionId === item.session.id
+                          ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 font-medium'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ]"
+                      :title="item.session.title"
+                      @click="handleSwitchSession(item.session.id)"
+                  >
+                    <Pin v-if="chatStore.isPinned(item.session.id)" :size="12" class="flex-shrink-0 text-amber-500"/>
+                    <span class="flex-1 min-w-0 truncate">{{ item.session.title }}</span>
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent class="w-40">
+                  <ContextMenuItem class="cursor-pointer" @select="handleRenameSession(item.session.id, item.session.title)">
+                    <Edit3 :size="14"/>
+                    <span>重命名</span>
+                  </ContextMenuItem>
+                  <ContextMenuItem class="cursor-pointer" @select="chatStore.togglePin(item.session.id)">
+                    <component :is="chatStore.isPinned(item.session.id) ? PinOff : Pin" :size="14"/>
+                    <span>{{ chatStore.isPinned(item.session.id) ? '取消置顶' : '置顶' }}</span>
+                  </ContextMenuItem>
+                  <ContextMenuItem class="cursor-pointer" @select="chatStore.exportSession(item.session.id)">
+                    <Download :size="14"/>
+                    <span>导出</span>
+                  </ContextMenuItem>
+                  <ContextMenuItem class="cursor-pointer" @select="chatStore.archiveToObsidian(item.session.id)">
+                    <Archive :size="14"/>
+                    <span>归档</span>
+                  </ContextMenuItem>
+                  <ContextMenuSeparator/>
+                  <ContextMenuItem class="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" @select="handleDeleteSession(item.session.id)">
+                    <Trash2 :size="14"/>
+                    <span>删除</span>
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            </template>
           </template>
           <div v-if="filteredSessions.length === 0" class="px-2 py-4 text-center">
             <span class="text-xs text-gray-400">{{ filterKeyword ? '无匹配会话' : '暂无会话' }}</span>
@@ -242,7 +263,7 @@ import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {useAppStore} from '@/stores/app'
 import {useChatStore} from '@/stores/chat'
-import {Archive, Check, Download, Edit3, Library, ListChecks, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
+import {Archive, Check, ChevronRight, Download, Edit3, FolderOpen, Library, ListChecks, Pin, PinOff, Plus, Search, Settings as SettingsIcon, Ticket, Timer, Trash2, User, X} from 'lucide-vue-next'
 import {ScrollArea} from '@/components/ui/scroll-area'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -250,6 +271,7 @@ import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, 
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from '@/components/ui/dialog'
 import {Input} from '@/components/ui/input'
+import type {ChatSession} from '@/types/chat'
 
 const route = useRoute()
 const router = useRouter()
@@ -273,6 +295,50 @@ const filteredSessions = computed(() => {
   const kw = filterKeyword.value.trim().toLowerCase()
   if (!kw) return chatStore.sortedSessions
   return chatStore.sortedSessions.filter(s => s.title.toLowerCase().includes(kw))
+})
+
+// === 会话按项目分组 (类似 ChatGPT Projects) ===
+
+/** 已折叠的项目分组 */
+const collapsedProjects = ref(new Set<string>())
+
+function toggleProjectCollapse(projectId: string) {
+  const set = new Set(collapsedProjects.value)
+  if (set.has(projectId)) set.delete(projectId)
+  else set.add(projectId)
+  collapsedProjects.value = set
+}
+
+type SidebarItem =
+    | { kind: 'header'; projectId: string; name: string; count: number }
+    | { kind: 'session'; session: ChatSession; inProject: boolean }
+
+/** 侧边栏渲染列表: 项目分组(标题+缩进会话)在前, 未关联项目的会话平铺在后 */
+const sidebarItems = computed<SidebarItem[]>(() => {
+  const items: SidebarItem[] = []
+  const grouped = new Map<string, { name: string; sessions: ChatSession[] }>()
+  const ungrouped: ChatSession[] = []
+  for (const session of filteredSessions.value) {
+    if (session.projectId) {
+      const group = grouped.get(session.projectId)
+      if (group) group.sessions.push(session)
+      else grouped.set(session.projectId, {name: session.projectName || '未知项目', sessions: [session]})
+    } else {
+      ungrouped.push(session)
+    }
+  }
+  for (const [projectId, group] of grouped) {
+    items.push({kind: 'header', projectId, name: group.name, count: group.sessions.length})
+    if (!collapsedProjects.value.has(projectId)) {
+      for (const session of group.sessions) {
+        items.push({kind: 'session', session, inProject: true})
+      }
+    }
+  }
+  for (const session of ungrouped) {
+    items.push({kind: 'session', session, inProject: false})
+  }
+  return items
 })
 
 watch(showFilter, (val) => {

@@ -19,7 +19,7 @@ export function getMessages(sessionId: string) {
 export interface FetchSSE {
     addEventListener(event: string, handler: (e: MessageEvent) => void): void
     close(): void
-    set onerror(handler: (() => void) | null)
+    set onerror(handler: ((status?: number) => void) | null)
 }
 
 /** 项目 runtime snapshot（随聊天请求上报, 供后端构造 ProjectRuntimeContext） */
@@ -38,7 +38,7 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
     const url = `${BASE_URL}/api/chat/stream`
 
     const listeners: Record<string, ((e: MessageEvent) => void)[]> = {}
-    let errorHandler: (() => void) | null = null as (() => void) | null
+    let errorHandler: ((status?: number) => void) | null = null as ((status?: number) => void) | null
     let abortController: AbortController | null = new AbortController()
 
     const instance: FetchSSE = {
@@ -50,7 +50,7 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
             abortController?.abort()
             abortController = null
         },
-        set onerror(handler: (() => void) | null) {
+        set onerror(handler: ((status?: number) => void) | null) {
             errorHandler = handler
         }
     }
@@ -73,7 +73,7 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
             })
 
             if (!response.ok || !response.body) {
-                errorHandler?.()
+                errorHandler?.(response.status)
                 return
             }
 

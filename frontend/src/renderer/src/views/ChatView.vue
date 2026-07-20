@@ -168,12 +168,36 @@
               </div>
             </template>
           </div>
+          <!-- 待发送消息队列 -->
+          <div v-if="chatStore.currentQueue.length > 0" class="flex flex-col gap-1.5 mb-2 px-1">
+            <div
+                v-for="queued in chatStore.currentQueue"
+                :key="queued.id"
+                class="flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300"
+            >
+              <ListPlus :size="14" class="shrink-0 text-violet-500"/>
+              <span class="flex-1 truncate">{{ queued.content }}</span>
+              <button
+                  class="shrink-0 text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                  title="编辑"
+                  @click="handleEditQueued(queued.id)"
+              >
+                <Pencil :size="13"/>
+              </button>
+              <button
+                  class="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                  title="删除"
+                  @click="chatStore.removeQueuedMessage(queued.id)"
+              >
+                <X :size="14"/>
+              </button>
+            </div>
+          </div>
           <Textarea
               ref="inputRef"
               v-model="inputText"
               :rows="2"
-              :placeholder="chatStore.isStreaming ? '等待回复中...' : '描述任务，/ 调用技能与工具'"
-              :disabled="chatStore.isStreaming"
+              :placeholder="chatStore.isStreaming ? '回复中… 输入内容回车加入发送队列' : '描述任务，/ 调用技能与工具'"
               class="resize-none border-none shadow-none focus-visible:ring-0"
               @keydown="handleKeydown"
           />
@@ -221,7 +245,7 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
-import {AlertCircle, ArrowUp, BarChart3, Camera, FileText, Loader2, Paintbrush, Paperclip, Square, X} from 'lucide-vue-next'
+import {AlertCircle, ArrowUp, BarChart3, Camera, FileText, ListPlus, Loader2, Paintbrush, Paperclip, Pencil, Square, X} from 'lucide-vue-next'
 import {useChatStore} from '@/stores/chat'
 import {useSettingsStore} from '@/stores/settings'
 import {Button} from '@/components/ui/button'
@@ -548,11 +572,31 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function handleSend() {
+  // 流式回复中: 输入内容进入发送队列
+  if (chatStore.isStreaming) {
+    if (inputText.value.trim()) {
+      chatStore.enqueueMessage(inputText.value, selectedKbIds.value.length > 0 ? selectedKbIds.value : undefined)
+      inputText.value = ''
+    }
+    return
+  }
   const hasAttachments = chatStore.pendingAttachments.some(p => !p.uploading && p.id > 0)
-  if ((!inputText.value.trim() && !hasAttachments) || chatStore.isStreaming) return
+  if (!inputText.value.trim() && !hasAttachments) return
   isStickToBottom.value = true
   chatStore.sendMessage(inputText.value, selectedKbIds.value.length > 0 ? selectedKbIds.value : undefined)
   inputText.value = ''
+}
+
+/** 编辑队列消息: 取出内容放回输入框 */
+function handleEditQueued(id: string) {
+  const item = chatStore.takeQueuedMessage(id)
+  if (item) {
+    inputText.value = item.content
+    nextTick(() => {
+      const el = inputRef.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | undefined
+      el?.focus()
+    })
+  }
 }
 
 function triggerSlashMenu() {
