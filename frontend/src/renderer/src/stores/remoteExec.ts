@@ -72,6 +72,14 @@ function summarizeFs(payload: LocalFsRequestPayload): string {
   return `${opText}: ${payload.path}`
 }
 
+/** 需要审批 UI 的工具名 -> pending 队列 kind 映射 */
+const APPROVAL_TOOL_KINDS: Record<string, PendingCommand['kind']> = {
+  shell_exec: 'shell',
+  python_exec: 'python',
+  local_write_file: 'fs',
+  local_edit_file: 'fs'
+}
+
 export const useRemoteExecStore = defineStore('remoteExec', () => {
   // === State ===
   const settings = ref<RemoteExecSettings>(loadSettings())
@@ -451,6 +459,29 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
 
   // === 工具方法 ===
 
+  /**
+   * 根据 tool_call 消息查找匹配的待审批命令 (用于聊天气泡渲染审批按钮)。
+   * 优先按载荷内容精确匹配, fallback 到同 kind 的第一个 pending。
+   */
+  function findPendingForToolCall(toolName: string, args?: Record<string, unknown>): PendingCommand | null {
+    const kind = APPROVAL_TOOL_KINDS[toolName]
+    if (!kind) return null
+    const candidates = pendingCommands.value.filter(c => c.kind === kind)
+    if (candidates.length === 0) return null
+    if (args) {
+      const exact = candidates.find(c => {
+        if (kind === 'shell') return c.execPayload?.command === args.command
+        if (kind === 'python') {
+          return (args.code && c.execPayload?.code === args.code)
+              || (args.script_path && c.execPayload?.scriptPath === args.script_path)
+        }
+        return c.fsPayload?.path === args.path
+      })
+      if (exact) return exact
+    }
+    return candidates[0]
+  }
+
   function sendMessage(msg: WsMessage) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(msg))
@@ -484,6 +515,7 @@ export const useRemoteExecStore = defineStore('remoteExec', () => {
     approveCommand,
     approveSession,
     rejectCommand,
+    findPendingForToolCall,
     updateSettings
   }
 })

@@ -72,22 +72,10 @@ const formattedArgs = computed(() =>
     JSON.stringify(props.message.arguments, null, 2)
 )
 
-/** 找到与当前 tool_call 匹配的待审批命令 */
+/** 找到与当前 tool_call 匹配的待审批命令 (shell_exec/python_exec/local_write_file/local_edit_file) */
 const pendingCommand = computed(() => {
-  if (props.message.toolName !== 'remote_exec' || props.message.status !== 'calling') {
-    return null
-  }
-  // 优先按命令内容匹配，fallback 到取第一个 pending
-  const cmd = props.message.arguments?.command as string
-  if (cmd) {
-    const exact = remoteExecStore.pendingCommands.find(p => p.command === cmd)
-    if (exact) return exact
-  }
-  // 如果只有一个 pending 且当前是唯一 calling 的 remote_exec，直接关联
-  if (remoteExecStore.pendingCommands.length > 0) {
-    return remoteExecStore.pendingCommands[0]
-  }
-  return null
+  if (props.message.status !== 'calling') return null
+  return remoteExecStore.findPendingForToolCall(props.message.toolName, props.message.arguments)
 })
 
 function handleApprove() {
