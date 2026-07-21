@@ -21,6 +21,8 @@ import java.util.List;
  * @param enabled      是否启用
  * @param skillType    技能类型
  * @param installPath  安装路径
+ * @param source       来源: builtin/modelscope/local/legacy
+ * @param sourceRef    来源中的原始 ID
  * @author Jion
  */
 public record SkillResponseDto(
@@ -39,6 +41,8 @@ public record SkillResponseDto(
         boolean builtin,
         boolean enabled,
         String skillType,
-        String installPath
+        String installPath,
+        String source,
+        String sourceRef
 ) {
 }

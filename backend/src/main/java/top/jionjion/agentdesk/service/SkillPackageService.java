@@ -10,11 +10,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -38,18 +38,16 @@ public class SkillPackageService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillPackageService.class);
 
-    /** 最大 ZIP 文件大小: 10MB */
-    private static final long MAX_ZIP_SIZE = 10 * 1024 * 1024;
-    /** 最大解压后大小: 50MB */
-    private static final long MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024;
-    private static final int MAX_ENTRIES = 100;
+    /** 最大 ZIP 文件大小: 20MB */
+    private static final long MAX_ZIP_SIZE = 20 * 1024 * 1024;
+    /** 最大解压后大小: 100MB */
+    private static final long MAX_UNCOMPRESSED_SIZE = 100 * 1024 * 1024;
+    private static final int MAX_ENTRIES = 1000;
     private static final int MAX_SKILL_ID_LENGTH = 64;
     private static final String SKILL_MANIFEST = "SKILL.md";
     private static final String ZIP_EXTENSION = ".zip";
     private static final String FRONTMATTER_DELIMITER = "---";
     private static final Pattern SKILL_NAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
-    private static final Pattern FRONTMATTER_NAME = Pattern.compile("^name:\\s*(.+)$", Pattern.MULTILINE);
-    private static final Pattern FRONTMATTER_DESC = Pattern.compile("^description:\\s*(.+)$", Pattern.MULTILINE);
 
     private final String skillsBaseDir;
 
@@ -65,59 +63,48 @@ public class SkillPackageService {
      * @return 安装结果（技能 ID 和名称）
      */
     public SkillInstallResult install(MultipartFile file, Long userId) {
-        // 1. 基本验证
         validateUpload(file);
+        try {
+            return installArchive(file.getInputStream(), file.getSize(), file.getOriginalFilename(), userId);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "无法读取技能包", e);
+        }
+    }
 
-        // 2. 解压到临时目录, 验证结构
+    /**
+     * 从输入流安装技能包。社区下载与本地上传共用同一套验证和安全解压逻辑。
+     */
+    public SkillInstallResult installArchive(InputStream inputStream, long archiveSize,
+                                             String fileName, Long userId) {
+        validateArchive(inputStream, archiveSize, fileName);
+
         Path userSkillsDir = Path.of(skillsBaseDir, String.valueOf(userId));
         Path tempDir = null;
         try {
             Files.createDirectories(userSkillsDir);
             tempDir = Files.createTempDirectory(userSkillsDir, ".installing-");
 
-            // 3. 安全解压 ZIP
-            String skillId = extractZip(file.getInputStream(), tempDir);
+            // 按实际读取的压缩字节数二次限流，防止上游未报告 Content-Length（如 chunked 传输）时绕过大小校验
+            extractZip(new LimitedInputStream(inputStream, MAX_ZIP_SIZE), tempDir);
+            Path skillDir = locateSkillDirectory(tempDir);
 
-            // 4. 验证技能包结构
-            Path skillDir = tempDir.resolve(skillId);
-            if (!Files.exists(skillDir)) {
-                // ZIP 内容可能直接是文件（没有外层目录）
-                if (Files.exists(tempDir.resolve(SKILL_MANIFEST))) {
-                    skillDir = tempDir;
-                    skillId = inferSkillId(skillDir);
-                } else {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "技能包结构错误: 缺少 SKILL.md 入口文件");
-                }
-            }
-
-            validateSkillStructure(skillDir);
-
-            // 5. 从 SKILL.md 提取元数据
             SkillMetadata metadata = parseSkillMetadata(skillDir);
-            if (metadata.name() != null && !metadata.name().isBlank()) {
-                skillId = metadata.name();
-            }
+            String skillId = metadata.name();
 
-            // 6. 验证技能 ID 格式
-            if (!SKILL_NAME_PATTERN.matcher(skillId).matches() || skillId.length() > MAX_SKILL_ID_LENGTH) {
+            if (skillId == null || !SKILL_NAME_PATTERN.matcher(skillId).matches()
+                    || skillId.length() > MAX_SKILL_ID_LENGTH) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "技能 ID 格式错误: 只能包含小写字母、数字和连字符, 不能以连字符开头, 最长 64 字符");
+                        "SKILL.md 中的 name 格式错误: 只能包含小写字母、数字和连字符, 最长 64 字符");
             }
 
-            // 7. 移动到最终位置
             Path targetDir = userSkillsDir.resolve(skillId);
             if (Files.exists(targetDir)) {
-                // 删除旧版本
                 deleteDirectory(targetDir);
             }
             Files.move(skillDir, targetDir, StandardCopyOption.REPLACE_EXISTING);
 
-            // 8. 收集资源文件列表
             List<String> resources = listResources(targetDir);
-
             log.info("技能包安装成功: userId={}, skillId={}, resources={}", userId, skillId, resources.size());
-
             return new SkillInstallResult(skillId, metadata.name(), metadata.description(), resources);
 
         } catch (ResponseStatusException e) {
@@ -196,22 +183,34 @@ public class SkillPackageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
         if (file.getSize() > MAX_ZIP_SIZE) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "ZIP 文件过大, 最大 10MB, 当前 " + (file.getSize() / 1024 / 1024) + "MB");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ZIP 文件过大, 最大 20MB");
         }
-        String name = file.getOriginalFilename();
-        if (name == null || !name.toLowerCase().endsWith(ZIP_EXTENSION)) {
+        String fileName = file.getOriginalFilename();
+        if (fileName == null || !fileName.toLowerCase().endsWith(ZIP_EXTENSION)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "仅支持 .zip 格式的技能包");
+        }
+    }
+
+    private void validateArchive(InputStream inputStream, long archiveSize, String fileName) {
+        if (inputStream == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
+        }
+        if (archiveSize > MAX_ZIP_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "ZIP 文件过大, 最大 20MB");
+        }
+        if (fileName == null || !fileName.toLowerCase().endsWith(ZIP_EXTENSION)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "仅支持 .zip 格式的技能包");
         }
     }
 
     /**
-     * 安全解压 ZIP, 返回技能根目录名
+     * 安全解压 ZIP。
      */
-    private String extractZip(InputStream inputStream, Path targetDir) throws IOException {
-        String rootDirName = null;
+    private void extractZip(InputStream inputStream, Path targetDir) throws IOException {
         long totalSize = 0;
         int entryCount = 0;
+        byte[] buffer = new byte[8192];
 
         try (ZipInputStream zis = new ZipInputStream(inputStream, StandardCharsets.UTF_8)) {
             ZipEntry entry;
@@ -224,8 +223,7 @@ public class SkillPackageService {
 
                 String entryName = entry.getName();
 
-                // 安全检查: 防止 Zip Slip 攻击
-                if (entryName.contains("..") || entryName.startsWith("/") || entryName.startsWith("\\")) {
+                if (entryName.startsWith("/") || entryName.startsWith("\\")) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                             "技能包包含非法路径: " + entryName);
                 }
@@ -233,14 +231,6 @@ public class SkillPackageService {
                 // 跳过 macOS 系统文件
                 if (entryName.startsWith("__MACOSX") || entryName.contains(".DS_Store")) {
                     continue;
-                }
-
-                // 提取根目录名
-                if (rootDirName == null) {
-                    int sep = entryName.indexOf('/');
-                    if (sep > 0) {
-                        rootDirName = entryName.substring(0, sep);
-                    }
                 }
 
                 Path entryPath = targetDir.resolve(entryName).normalize();
@@ -253,57 +243,90 @@ public class SkillPackageService {
                     Files.createDirectories(entryPath);
                 } else {
                     Files.createDirectories(entryPath.getParent());
-                    totalSize += entry.getSize();
-                    if (totalSize > MAX_UNCOMPRESSED_SIZE) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                "技能包解压后过大, 最大 50MB");
+                    try (OutputStream output = Files.newOutputStream(entryPath,
+                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                        int read;
+                        while ((read = zis.read(buffer)) != -1) {
+                            totalSize += read;
+                            if (totalSize > MAX_UNCOMPRESSED_SIZE) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "技能包解压后过大, 最大 100MB");
+                            }
+                            output.write(buffer, 0, read);
+                        }
                     }
-                    Files.copy(zis, entryPath, StandardCopyOption.REPLACE_EXISTING);
                 }
+                zis.closeEntry();
             }
         }
-
-        return rootDirName != null ? rootDirName : "";
     }
 
-    private void validateSkillStructure(Path skillDir) {
-        Path skillMd = skillDir.resolve("SKILL.md");
-        if (!Files.exists(skillMd)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "技能包结构错误: 缺少 SKILL.md 入口文件");
+    private Path locateSkillDirectory(Path tempDir) throws IOException {
+        if (Files.isRegularFile(tempDir.resolve(SKILL_MANIFEST))) {
+            return tempDir;
         }
+        try (var stream = Files.list(tempDir)) {
+            List<Path> candidates = stream
+                    .filter(Files::isDirectory)
+                    .filter(path -> Files.isRegularFile(path.resolve(SKILL_MANIFEST)))
+                    .toList();
+            if (candidates.size() == 1) {
+                return candidates.getFirst();
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "技能包结构错误: 根目录中必须包含且只能包含一个 SKILL.md");
     }
 
     private SkillMetadata parseSkillMetadata(Path skillDir) throws IOException {
         String content = Files.readString(skillDir.resolve(SKILL_MANIFEST), StandardCharsets.UTF_8);
-        String name = null;
-        String description = null;
-
-        // 解析 YAML frontmatter
-        if (content.startsWith(FRONTMATTER_DELIMITER)) {
-            int end = content.indexOf(FRONTMATTER_DELIMITER, 3);
-            if (end > 0) {
-                String frontmatter = content.substring(3, end);
-                Matcher nameMatcher = FRONTMATTER_NAME.matcher(frontmatter);
-                if (nameMatcher.find()) {
-                    name = nameMatcher.group(1).trim();
-                }
-                Matcher descMatcher = FRONTMATTER_DESC.matcher(frontmatter);
-                if (descMatcher.find()) {
-                    description = descMatcher.group(1).trim();
-                }
-            }
+        if (!content.startsWith(FRONTMATTER_DELIMITER)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "SKILL.md 缺少 YAML frontmatter");
         }
-
+        int end = content.indexOf(FRONTMATTER_DELIMITER, FRONTMATTER_DELIMITER.length());
+        if (end < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "SKILL.md 的 YAML frontmatter 未闭合");
+        }
+        String frontmatter = content.substring(FRONTMATTER_DELIMITER.length(), end);
+        String name = readFrontmatterValue(frontmatter, "name");
+        String description = readFrontmatterValue(frontmatter, "description");
         return new SkillMetadata(name, description);
     }
 
-    private String inferSkillId(Path skillDir) throws IOException {
-        SkillMetadata metadata = parseSkillMetadata(skillDir);
-        if (metadata.name() != null && !metadata.name().isBlank()) {
-            return metadata.name();
+    private String readFrontmatterValue(String frontmatter, String key) {
+        String[] lines = frontmatter.replace("\r\n", "\n").split("\n");
+        String prefix = key + ":";
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (!line.startsWith(prefix)) {
+                continue;
+            }
+            String value = line.substring(prefix.length()).trim();
+            if ("|".equals(value) || ">".equals(value)) {
+                StringBuilder block = new StringBuilder();
+                for (int j = i + 1; j < lines.length; j++) {
+                    String continuation = lines[j];
+                    if (!continuation.isBlank() && !Character.isWhitespace(continuation.charAt(0))) {
+                        break;
+                    }
+                    if (!continuation.isBlank()) {
+                        if (!block.isEmpty()) {
+                            block.append(' ');
+                        }
+                        block.append(continuation.trim());
+                    }
+                }
+                return block.toString();
+            }
+            if (value.length() >= 2 && ((value.startsWith("\"") && value.endsWith("\""))
+                    || (value.startsWith("'") && value.endsWith("'")))) {
+                return value.substring(1, value.length() - 1);
+            }
+            return value;
         }
-        return skillDir.getFileName().toString();
+        return null;
     }
 
     private List<String> listResources(Path skillDir) throws IOException {
@@ -355,5 +378,43 @@ public class SkillPackageService {
      * @param description 技能描述
      */
     private record SkillMetadata(String name, String description) {
+    }
+
+    /**
+     * 限制累计读取字节数的输入流。超过上限即拒绝，用于压缩包大小的实际字节兜底校验。
+     */
+    private static class LimitedInputStream extends java.io.FilterInputStream {
+        private final long maxBytes;
+        private long readBytes;
+
+        LimitedInputStream(InputStream in, long maxBytes) {
+            super(in);
+            this.maxBytes = maxBytes;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int value = super.read();
+            if (value != -1) {
+                count(1);
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int read = super.read(b, off, len);
+            if (read > 0) {
+                count(read);
+            }
+            return read;
+        }
+
+        private void count(long n) {
+            readBytes += n;
+            if (readBytes > maxBytes) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ZIP 文件过大, 最大 20MB");
+            }
+        }
     }
 }

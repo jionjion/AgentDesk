@@ -1,72 +1,46 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
-import type {Skill, SkillFormData} from '@/types/skill'
+import type {MarketplaceSkill, Skill, SkillFormData} from '@/types/skill'
 import {
     deleteSkill as apiDeleteSkill,
     getSkills,
+    installMarketplaceSkill as apiInstallMarketplaceSkill,
     installSkillPackage as apiInstallPackage,
+    searchMarketplaceSkills as apiSearchMarketplaceSkills,
     setSkillEnabled as apiSetSkillEnabled,
     syncSkill as apiSyncSkill
 } from '@/api/skills'
 
 export const useSkillsStore = defineStore('skills', () => {
-    // === State ===
     const skills = ref<Skill[]>([])
     const loading = ref(false)
-    const installing = ref(false)
+    const localInstalling = ref(false)
     const searchQuery = ref('')
-    const selectedCategory = ref<string | null>(null)
 
-    // === Computed ===
+    const marketplaceSkills = ref<MarketplaceSkill[]>([])
+    const marketplaceQuery = ref('')
+    const marketplaceLoading = ref(false)
+    const marketplaceError = ref('')
+    const marketplacePage = ref(1)
+    const marketplaceTotal = ref(0)
+    const marketplaceInstallingId = ref<string | null>(null)
+    const marketplacePageSize = 12
 
-    /** 所有分类 */
-    const categories = computed(() => {
-        const cats = new Set<string>()
-        for (const s of skills.value) {
-            if (s.category) cats.add(s.category)
-        }
-        return Array.from(cats).sort()
-    })
-
-    /** 按搜索词和分类过滤后的技能列表 */
     const filteredSkills = computed(() => {
-        let list = skills.value
         const q = searchQuery.value.trim().toLowerCase()
-        if (q) {
-            list = list.filter(s =>
-                s.name.toLowerCase().includes(q) ||
-                s.id.toLowerCase().includes(q) ||
-                s.description.toLowerCase().includes(q)
-            )
-        }
-        if (selectedCategory.value) {
-            list = list.filter(s => s.category === selectedCategory.value)
-        }
-        return list
+        if (!q) return skills.value
+        return skills.value.filter(skill =>
+            skill.name.toLowerCase().includes(q) ||
+            skill.id.toLowerCase().includes(q) ||
+            skill.description.toLowerCase().includes(q)
+        )
     })
 
-    /** 已启用的技能列表 */
-    const enabledSkills = computed(() => skills.value.filter(s => s.enabled))
+    const enabledSkills = computed(() => skills.value.filter(skill => skill.enabled))
+    const enabledSkillIds = computed(() => new Set(enabledSkills.value.map(skill => skill.id)))
+    const hasMoreMarketplaceSkills = computed(() => marketplaceSkills.value.length < marketplaceTotal.value)
+    const installing = computed(() => localInstalling.value || marketplaceInstallingId.value !== null)
 
-    /** 已启用技能的 ID 集合（快速查找） */
-    const enabledSkillIds = computed(() =>
-        new Set(enabledSkills.value.map(s => s.id))
-    )
-
-    /** 按分类分组 */
-    const skillsByCategory = computed(() => {
-        const map: Record<string, Skill[]> = {}
-        for (const s of skills.value) {
-            const cat = s.category || '未分类'
-            if (!map[cat]) map[cat] = []
-            map[cat].push(s)
-        }
-        return map
-    })
-
-    // === Actions ===
-
-    /** 加载技能列表 */
     async function fetchSkills() {
         loading.value = true
         try {
@@ -79,66 +53,117 @@ export const useSkillsStore = defineStore('skills', () => {
         }
     }
 
-    /** 创建或更新技能 (sync) — prompt 型 */
+    async function searchMarketplace(reset = true) {
+        if (marketplaceLoading.value) return
+        if (reset) marketplacePage.value = 1
+        marketplaceLoading.value = true
+        marketplaceError.value = ''
+        try {
+            const res = await apiSearchMarketplaceSkills(
+                marketplaceQuery.value.trim(),
+                marketplacePage.value,
+                marketplacePageSize
+            )
+            if (reset) {
+                marketplaceSkills.value = res.data.skills
+            } else {
+                const existing = new Set(marketplaceSkills.value.map(skill => skill.id))
+                marketplaceSkills.value.push(...res.data.skills.filter(skill => !existing.has(skill.id)))
+            }
+            marketplaceTotal.value = res.data.total
+            marketplacePage.value = res.data.pageNumber
+        } catch (e: any) {
+            marketplaceError.value = e?.response?.data?.message || e?.message || '技能社区暂时不可用'
+        } finally {
+            marketplaceLoading.value = false
+        }
+    }
+
+    async function loadMoreMarketplace() {
+        if (!hasMoreMarketplaceSkills.value || marketplaceLoading.value) return
+        marketplacePage.value += 1
+        await searchMarketplace(false)
+    }
+
+    async function installMarketplace(skill: MarketplaceSkill) {
+        if (marketplaceInstallingId.value) return
+        marketplaceInstallingId.value = skill.id
+        marketplaceError.value = ''
+        try {
+            const res = await apiInstallMarketplaceSkill(skill.id)
+            upsertSkill(res.data)
+            const item = marketplaceSkills.value.find(candidate => candidate.id === skill.id)
+            if (item) item.installed = true
+            return res.data
+        } catch (e: any) {
+            marketplaceError.value = e?.response?.data?.message || e?.message || '技能安装失败'
+            throw e
+        } finally {
+            marketplaceInstallingId.value = null
+        }
+    }
+
+    /** 旧版 prompt 同步接口，仅保留兼容调用；技能中心不再提供创建入口。 */
     async function saveSkill(data: SkillFormData) {
         const res = await apiSyncSkill(data)
-        const idx = skills.value.findIndex(s => s.id === res.data.id)
-        if (idx >= 0) {
-            skills.value[idx] = res.data
-        } else {
-            skills.value.push(res.data)
-        }
+        upsertSkill(res.data)
         return res.data
     }
 
-    /** 安装 ZIP 技能包 — package 型 */
     async function installPackage(file: File) {
-        installing.value = true
+        localInstalling.value = true
         try {
             const res = await apiInstallPackage(file)
-            const idx = skills.value.findIndex(s => s.id === res.data.id)
-            if (idx >= 0) {
-                skills.value[idx] = res.data
-            } else {
-                skills.value.push(res.data)
-            }
+            upsertSkill(res.data)
             return res.data
         } finally {
-            installing.value = false
+            localInstalling.value = false
         }
     }
 
-    /** 删除技能 */
     async function deleteSkill(id: string) {
+        const removed = skills.value.find(skill => skill.id === id)
         await apiDeleteSkill(id)
-        skills.value = skills.value.filter(s => s.id !== id)
+        skills.value = skills.value.filter(skill => skill.id !== id)
+        if (removed?.sourceRef) {
+            const marketSkill = marketplaceSkills.value.find(skill => skill.id === removed.sourceRef)
+            if (marketSkill) marketSkill.installed = false
+        }
     }
 
-    /** 启用/禁用技能 */
     async function toggleSkillEnabled(skill: Skill) {
         const newEnabled = !skill.enabled
         await apiSetSkillEnabled(skill.id, newEnabled)
-        const idx = skills.value.findIndex(s => s.id === skill.id)
-        if (idx >= 0) {
-            skills.value[idx] = {...skills.value[idx], enabled: newEnabled}
-        }
+        const idx = skills.value.findIndex(item => item.id === skill.id)
+        if (idx >= 0) skills.value[idx] = {...skills.value[idx], enabled: newEnabled}
+    }
+
+    function upsertSkill(skill: Skill) {
+        const idx = skills.value.findIndex(item => item.id === skill.id)
+        if (idx >= 0) skills.value[idx] = skill
+        else skills.value.push(skill)
     }
 
     return {
-        // state
         skills,
         loading,
         installing,
+        localInstalling,
         searchQuery,
-        selectedCategory,
-        // computed
-        categories,
+        marketplaceSkills,
+        marketplaceQuery,
+        marketplaceLoading,
+        marketplaceError,
+        marketplaceTotal,
+        marketplaceInstallingId,
         filteredSkills,
         enabledSkills,
         enabledSkillIds,
-        skillsByCategory,
-        // actions
+        hasMoreMarketplaceSkills,
         fetchSkills,
+        searchMarketplace,
+        loadMoreMarketplace,
+        installMarketplace,
         saveSkill,
         installPackage,
         deleteSkill,

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import top.jionjion.agentdesk.dto.skill.SkillDefinitionDto;
+import top.jionjion.agentdesk.dto.skill.MarketplaceSkillDto;
 import top.jionjion.agentdesk.dto.skill.SkillResponseDto;
 import top.jionjion.agentdesk.entity.Skill;
 import top.jionjion.agentdesk.entity.UserSkillPreference;
@@ -16,6 +17,8 @@ import top.jionjion.agentdesk.repository.UserSkillPreferenceRepository;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +43,7 @@ public class SkillService {
     private static final int MAX_ITERS = 10;
     private static final String SKILL_TYPE_PACKAGE = "package";
     private static final String SKILL_TYPE_PROMPT = "prompt";
+    private static final String MODELSCOPE_TAG_PREFIX = "source:modelscope:";
     private static final String SKILL_ID_PATTERN = "^[a-z0-9-]+$";
     private static final int MAX_SKILL_ID_LENGTH = 64;
     private static final int MAX_SYS_PROMPT_LENGTH = 8192;
@@ -147,6 +151,68 @@ public class SkillService {
         }
 
         return toResponse(skill, true);
+    }
+
+    /**
+     * 注册从技能社区安装的能力包，并保留社区来源，供更新检测和 UI 展示使用。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public SkillResponseDto registerMarketplacePackage(SkillPackageService.SkillInstallResult result,
+                                                       MarketplaceSkillDto marketplaceSkill,
+                                                       Long userId) {
+        String skillId = result.id();
+        if (skillRepository.existsByIdAndBuiltinTrue(skillId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "社区技能与内置技能重名，无法安装: " + skillId);
+        }
+
+        Skill skill = skillRepository.findById(skillId).orElse(null);
+        long now = System.currentTimeMillis();
+        if (skill != null && !userId.equals(skill.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "该技能 ID 已被占用: " + skillId);
+        }
+        if (skill == null) {
+            skill = new Skill();
+            skill.setId(skillId);
+            skill.setBuiltin(false);
+            skill.setUserId(userId);
+            skill.setCreatedAt(now);
+        }
+
+        String fallbackName = result.name() == null || result.name().isBlank() ? skillId : result.name();
+        String fallbackDescription = result.description() == null ? "" : result.description();
+        skill.setName(limit(firstNonBlank(marketplaceSkill.displayName(), fallbackName), 128));
+        skill.setDescription(limit(firstNonBlank(marketplaceSkill.description(), fallbackDescription), 512));
+        skill.setAuthor(limit(firstNonBlank(marketplaceSkill.developer(),
+                firstNonBlank(marketplaceSkill.owner(), "ModelScope 社区")), 128));
+        skill.setVersion("latest");
+        skill.setCategory(limit(firstNonBlank(marketplaceSkill.category(), "other"), 32));
+        skill.setTags(marketplaceTags(marketplaceSkill));
+        skill.setIcon(null);
+        skill.setBgColor(null);
+        skill.setSysPrompt("");
+        skill.setMaxIters(5);
+        skill.setTools(List.of());
+        skill.setSkillType(SKILL_TYPE_PACKAGE);
+        skill.setInstallPath(Path.of(skillsBaseDir, String.valueOf(userId), skillId).toString());
+        skill.setUpdatedAt(now);
+        skillRepository.save(skill);
+
+        UserSkillPreference preference = preferenceRepository.findByUserIdAndSkillId(userId, skillId)
+                .orElse(new UserSkillPreference(userId, skillId, true));
+        preference.setEnabled(true);
+        preferenceRepository.save(preference);
+        return toResponse(skill, true);
+    }
+
+    /** 当前用户已经安装的 ModelScope 社区技能 ID。 */
+    public Set<String> getInstalledMarketplaceRefs(Long userId) {
+        return skillRepository.findByBuiltinTrueOrUserId(userId).stream()
+                .filter(skill -> !skill.isBuiltin())
+                .flatMap(skill -> safeList(skill.getTags()).stream())
+                .filter(tag -> tag.startsWith(MODELSCOPE_TAG_PREFIX))
+                .map(tag -> tag.substring(MODELSCOPE_TAG_PREFIX.length()))
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     /**
@@ -304,6 +370,15 @@ public class SkillService {
     }
 
     private SkillResponseDto toResponse(Skill skill, boolean enabled) {
+        String sourceRef = safeList(skill.getTags()).stream()
+                .filter(tag -> tag.startsWith(MODELSCOPE_TAG_PREFIX))
+                .map(tag -> tag.substring(MODELSCOPE_TAG_PREFIX.length()))
+                .findFirst()
+                .orElse(null);
+        String source = skill.isBuiltin()
+                ? "builtin"
+                : sourceRef != null ? "modelscope"
+                : SKILL_TYPE_PACKAGE.equals(skill.getSkillType()) ? "local" : "legacy";
         return new SkillResponseDto(
                 skill.getId(),
                 skill.getName(),
@@ -320,8 +395,29 @@ public class SkillService {
                 skill.isBuiltin(),
                 enabled,
                 skill.getSkillType() != null ? skill.getSkillType() : "prompt",
-                skill.getInstallPath()
+                skill.getInstallPath(),
+                source,
+                sourceRef
         );
+    }
+
+    private List<String> marketplaceTags(MarketplaceSkillDto marketplaceSkill) {
+        Set<String> tags = new LinkedHashSet<>(safeList(marketplaceSkill.tags()));
+        tags.add(MODELSCOPE_TAG_PREFIX + marketplaceSkill.id());
+        return new ArrayList<>(tags);
+    }
+
+    private List<String> safeList(List<String> values) {
+        return values == null ? List.of() : values;
+    }
+
+    private String firstNonBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String limit(String value, int maxLength) {
+        String safe = value == null ? "" : value.trim();
+        return safe.length() <= maxLength ? safe : safe.substring(0, maxLength);
     }
 
     private void deleteDirectory(Path dir) throws Exception {

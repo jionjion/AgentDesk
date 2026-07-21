@@ -145,7 +145,7 @@ public class AgentFactory {
         String basePrompt = settings.systemPrompt() != null && !settings.systemPrompt().isBlank()
                 ? settings.systemPrompt()
                 : SYS_PROMPT;
-        String prompt = appendEnabledPromptSkills(basePrompt, enabledSkills);
+        String prompt = appendLegacyPromptSkills(basePrompt, enabledSkills);
         Path workspace = Path.of(workspaceBaseDir, userId == null ? "anonymous" : userId.toString());
         try {
             Files.createDirectories(workspace);
@@ -318,8 +318,10 @@ public class AgentFactory {
         return context.build();
     }
 
-    private String appendEnabledPromptSkills(String basePrompt, List<Skill> enabledSkills) {
+    /** 仅兼容用户历史创建的 prompt 技能；内置与新安装技能统一走 AgentScope SkillRepository。 */
+    private String appendLegacyPromptSkills(String basePrompt, List<Skill> enabledSkills) {
         String promptSkills = enabledSkills.stream()
+                .filter(skill -> !skill.isBuiltin())
                 .filter(skill -> !"package".equals(skill.getSkillType()))
                 .map(Skill::getSysPrompt)
                 .filter(value -> value != null && !value.isBlank())

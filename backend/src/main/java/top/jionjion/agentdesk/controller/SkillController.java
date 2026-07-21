@@ -5,9 +5,13 @@ import org.springframework.web.multipart.MultipartFile;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.dto.skill.SkillDefinitionDto;
 import top.jionjion.agentdesk.dto.skill.SkillEnabledRequest;
+import top.jionjion.agentdesk.dto.skill.MarketplaceInstallRequest;
+import top.jionjion.agentdesk.dto.skill.MarketplaceSkillDto;
+import top.jionjion.agentdesk.dto.skill.MarketplaceSkillPageDto;
 import top.jionjion.agentdesk.dto.skill.SkillResponseDto;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.SkillPackageService;
+import top.jionjion.agentdesk.service.SkillMarketplaceService;
 import top.jionjion.agentdesk.service.SkillService;
 
 import java.util.List;
@@ -24,14 +28,41 @@ public class SkillController {
 
     private final SkillService skillService;
     private final SkillPackageService skillPackageService;
+    private final SkillMarketplaceService marketplaceService;
     private final AgentPool agentPool;
 
     public SkillController(SkillService skillService,
                            SkillPackageService skillPackageService,
+                           SkillMarketplaceService marketplaceService,
                            AgentPool agentPool) {
         this.skillService = skillService;
         this.skillPackageService = skillPackageService;
+        this.marketplaceService = marketplaceService;
         this.agentPool = agentPool;
+    }
+
+    /** 从 ModelScope 社区检索技能。 */
+    @GetMapping("/marketplace")
+    public MarketplaceSkillPageDto searchMarketplace(
+            @RequestParam(required = false, defaultValue = "") String query,
+            @RequestParam(required = false, defaultValue = "1") int page,
+            @RequestParam(required = false, defaultValue = "12") int size) {
+        return marketplaceService.search(query, page, size, UserContext.getUserId());
+    }
+
+    /** 获取社区技能详情。 */
+    @GetMapping("/marketplace/detail")
+    public MarketplaceSkillDto marketplaceDetail(@RequestParam String skillId) {
+        return marketplaceService.get(skillId, UserContext.getUserId());
+    }
+
+    /** 下载、校验并安装社区技能。 */
+    @PostMapping("/marketplace/install")
+    public SkillResponseDto installMarketplace(@RequestBody MarketplaceInstallRequest request) {
+        Long userId = UserContext.getUserId();
+        SkillResponseDto result = marketplaceService.install(request.skillId(), userId);
+        agentPool.invalidateAll(userId);
+        return result;
     }
 
     /**

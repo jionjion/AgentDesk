@@ -43,6 +43,8 @@ agentdesk:
   # 技能包存储目录（用户安装的技能解压到此目录）
   skills:
     base-dir: ${AGENTDESK_SKILLS_DIR:${user.home}/.agentdesk/skills}
+    marketplace:
+      base-url: ${AGENTDESK_SKILLS_MARKETPLACE_URL:https://modelscope.cn}
   # 联网搜索工具配置
   tools:
     web-search:

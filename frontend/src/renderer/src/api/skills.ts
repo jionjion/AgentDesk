@@ -1,5 +1,5 @@
 import request from './request'
-import type {Skill, SkillFormData} from '@/types/skill'
+import type {MarketplaceSkill, MarketplaceSkillPage, Skill, SkillFormData} from '@/types/skill'
 
 /** 列出所有技能（内置 + 用户安装，含启用状态） */
 export function getSkills() {
@@ -9,6 +9,25 @@ export function getSkills() {
 /** 获取单个技能详情 */
 export function getSkill(id: string) {
     return request.get<Skill>(`/api/skills/${encodeURIComponent(id)}`)
+}
+
+/** 从 ModelScope 社区检索技能。 */
+export function searchMarketplaceSkills(query = '', page = 1, size = 12) {
+    return request.get<MarketplaceSkillPage>('/api/skills/marketplace', {
+        params: {query, page, size}
+    })
+}
+
+/** 获取社区技能详情。 */
+export function getMarketplaceSkill(skillId: string) {
+    return request.get<MarketplaceSkill>('/api/skills/marketplace/detail', {
+        params: {skillId}
+    })
+}
+
+/** 从社区下载并安装技能。 */
+export function installMarketplaceSkill(skillId: string) {
+    return request.post<Skill>('/api/skills/marketplace/install', {skillId})
 }
 
 /** 同步/上传技能定义（upsert）— prompt 型 */
