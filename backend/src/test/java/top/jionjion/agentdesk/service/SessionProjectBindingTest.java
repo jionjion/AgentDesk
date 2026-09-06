@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.dto.session.SessionResponse;
 import top.jionjion.agentdesk.entity.Project;
@@ -146,6 +147,47 @@ class SessionProjectBindingTest {
         assertEquals("proj-1", service.bindProject("sess-2", "proj-1").projectId());
     }
 
+    @Test
+    void memoryModeIsPersistedAndInherited() {
+        SessionMetadata session = session("sess-1", null);
+        when(sessionRepository.findByIdAndUserId("sess-1", CURRENT_USER)).thenReturn(Optional.of(session));
+        when(agentPool.isBusy("sess-1")).thenReturn(false);
+        AgentHandle handle = mock(AgentHandle.class);
+        when(agentPool.getOrCreate("sess-1")).thenReturn(handle);
+
+        SessionResponse response = service.updateMemoryMode("sess-1", "NO_MEMORY");
+
+        assertEquals("NO_MEMORY", response.memoryMode());
+        assertEquals("NO_MEMORY", service.resolveMemoryMode("sess-1", "INHERIT"));
+        verify(sessionRepository).save(session);
+        // 切换记忆模式后从原始消息重建 AgentState, 清除历史轮次注入的记忆增强文本
+        verify(agentPool).resetState(CURRENT_USER, "sess-1");
+        verify(handle).restoreHistory(eq(CURRENT_USER), eq("sess-1"), any());
+    }
+
+    @Test
+    void memoryModeUnchangedDoesNotRebuildAgentState() {
+        SessionMetadata session = session("sess-1", null);
+        session.setMemoryMode("NORMAL");
+        when(sessionRepository.findByIdAndUserId("sess-1", CURRENT_USER)).thenReturn(Optional.of(session));
+        when(agentPool.isBusy("sess-1")).thenReturn(false);
+
+        assertEquals("NORMAL", service.updateMemoryMode("sess-1", "NORMAL").memoryMode());
+
+        verify(agentPool, never()).resetState(any(), any());
+        verify(agentPool, never()).getOrCreate(any());
+    }
+
+    @Test
+    void memoryModeRejectsInvalidValues() {
+        SessionMetadata session = session("sess-1", null);
+        when(sessionRepository.findByIdAndUserId("sess-1", CURRENT_USER)).thenReturn(Optional.of(session));
+        when(agentPool.isBusy("sess-1")).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateMemoryMode("sess-1", "BYPASS"));
+    }
+
     private static Project project(String id) {
         Project project = new Project();
         project.setId(id);
@@ -164,6 +206,7 @@ class SessionProjectBindingTest {
         metadata.setLastUsedAt(1L);
         metadata.setUserId(CURRENT_USER);
         metadata.setProjectId(projectId);
+        metadata.setMemoryMode("NORMAL");
         return metadata;
     }
 }

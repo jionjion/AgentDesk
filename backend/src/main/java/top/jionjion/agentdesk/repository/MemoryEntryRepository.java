@@ -23,7 +23,7 @@ public interface MemoryEntryRepository extends JpaRepository<MemoryEntry, Long> 
     List<MemoryEntry> findByStatusAndValidUntilLessThanEqual(String status, Long now);
     long countByUserIdAndStatus(Long userId, String status);
     @Query("SELECT m FROM MemoryEntry m WHERE m.userId = :userId AND m.scopeType = :scopeType " +
-            "AND ((:scopeId IS NULL AND m.scopeId IS NULL) OR m.scopeId = :scopeId) " +
+            "AND ((:scopeId IS NULL AND m.scopeId IS NULL) OR m.scopeId = CAST(:scopeId AS string)) " +
             "AND m.contentHash = :contentHash AND m.status = 'ACTIVE'")
     Optional<MemoryEntry> findActiveDuplicate(@Param("userId") Long userId,
                                               @Param("scopeType") String scopeType,

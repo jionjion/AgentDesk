@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import top.jionjion.agentdesk.agent.runtime.AgentEventBridge;
 import top.jionjion.agentdesk.agent.tool.ApiCallTool;
+import top.jionjion.agentdesk.agent.tool.AgentDeskMemoryTools;
+import top.jionjion.agentdesk.agent.tool.AgentDeskSessionSearchTool;
 import top.jionjion.agentdesk.agent.tool.BatchWebResearchTool;
 import top.jionjion.agentdesk.agent.tool.CommandRiskClassifier;
 import top.jionjion.agentdesk.agent.tool.IpLocationTool;
@@ -31,8 +33,10 @@ import top.jionjion.agentdesk.dto.settings.ModelSettingsDto;
 import top.jionjion.agentdesk.entity.McpServer;
 import top.jionjion.agentdesk.entity.Skill;
 import top.jionjion.agentdesk.repository.FileRecordRepository;
+import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.McpServerService;
+import top.jionjion.agentdesk.service.MemoryService;
 import top.jionjion.agentdesk.service.OssService;
 import top.jionjion.agentdesk.service.SettingsService;
 import top.jionjion.agentdesk.service.SkillService;
@@ -76,6 +80,8 @@ public class AgentFactory {
 
     private final ChatModelFactory chatModelFactory;
     private final FileRecordRepository fileRecordRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final MemoryService memoryService;
     private final OssService ossService;
     private final SettingsService settingsService;
     private final SkillService skillService;
@@ -93,6 +99,8 @@ public class AgentFactory {
     public AgentFactory(
             ChatModelFactory chatModelFactory,
             FileRecordRepository fileRecordRepository,
+            ChatMessageRepository chatMessageRepository,
+            MemoryService memoryService,
             OssService ossService,
             SettingsService settingsService,
             SkillService skillService,
@@ -108,6 +116,8 @@ public class AgentFactory {
             @Value("${agentdesk.remote-exec.enabled:false}") boolean remoteExecEnabled) {
         this.chatModelFactory = chatModelFactory;
         this.fileRecordRepository = fileRecordRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.memoryService = memoryService;
         this.ossService = ossService;
         this.settingsService = settingsService;
         this.skillService = skillService;
@@ -135,6 +145,8 @@ public class AgentFactory {
         toolkit.registerTool(new ApiCallTool());
         toolkit.registerTool(new IpLocationTool());
         toolkit.registerTool(new SimpleTools(fileRecordRepository, ossService, userId));
+        toolkit.registerTool(new AgentDeskMemoryTools(memoryService, userId));
+        toolkit.registerTool(new AgentDeskSessionSearchTool(chatMessageRepository, memoryService, userId));
 
         registerMcpTools(toolkit, userId, sessionId);
         registerDesktopTools(toolkit, userId, sessionId);
@@ -152,6 +164,7 @@ public class AgentFactory {
         } catch (IOException ex) {
             throw new IllegalStateException("无法创建 Agent 工作区: " + workspace, ex);
         }
+        prompt = appendWorkspaceContext(prompt, workspace);
 
         HarnessAgent.Builder builder = HarnessAgent.builder()
                 .name("assistant")
@@ -164,6 +177,9 @@ public class AgentFactory {
                 .permissionContext(buildPermissionContext(toolkit))
                 .stateStore(stateStore)
                 .workspace(workspace)
+                .disableMemoryHooks()
+                .disableMemoryTools()
+                .disableWorkspaceContext()
                 .enableTaskList()
                 .enablePlanMode()
                 .disableShellTool()
@@ -306,7 +322,7 @@ public class AgentFactory {
                 "todo_write",
                 "read_file", "write_file", "edit_file", "grep_files", "glob_files", "list_files",
                 "session_search", "session_list", "session_history",
-                "memory_get", "memory_search", "memory_save",
+                "memory_get", "memory_search", "memory_save", "memory_forget",
                 "agent_spawn", "agent_send", "agent_list",
                 "task_output", "task_cancel", "task_list",
                 "plan_enter", "plan_write", "plan_exit",
@@ -330,6 +346,27 @@ public class AgentFactory {
             return basePrompt;
         }
         return basePrompt + "\n\n[用户已启用的技能指令]\n" + promptSkills;
+    }
+
+    /** Keeps workspace guidance while preventing Harness MEMORY.md from becoming a second store. */
+    private String appendWorkspaceContext(String basePrompt, Path workspace) {
+        StringBuilder context = new StringBuilder(basePrompt)
+                .append("\n\n[AgentDesk 工作区]\n路径: ").append(workspace.toAbsolutePath())
+                .append("\n长期记忆只能通过 memory_* 工具访问；不要读取或维护 MEMORY.md 与 memory/ 目录。");
+        appendWorkspaceFile(context, workspace.resolve("AGENTS.md"), "工作区指令");
+        appendWorkspaceFile(context, workspace.resolve("knowledge").resolve("KNOWLEDGE.md"), "工作区知识");
+        return context.toString();
+    }
+
+    private void appendWorkspaceFile(StringBuilder target, Path file, String label) {
+        if (!Files.isRegularFile(file)) return;
+        try {
+            String content = Files.readString(file, StandardCharsets.UTF_8);
+            if (content.length() > 12_000) content = content.substring(0, 12_000);
+            target.append("\n\n[").append(label).append("]\n").append(content);
+        } catch (IOException ex) {
+            log.warn("Unable to load workspace context {}: {}", file, ex.getMessage());
+        }
     }
 
     private String loadPrompt(String resourcePath) {

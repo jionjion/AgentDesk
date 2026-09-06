@@ -5,12 +5,17 @@ import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.service.SessionService;
 import top.jionjion.agentdesk.service.TitleGenerationService;
+import top.jionjion.agentdesk.service.MemoryService;
+import top.jionjion.agentdesk.service.memory.MemoryJobService;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.argThat;
 
 class ChatMessageServiceTest {
 
@@ -37,6 +42,47 @@ class ChatMessageServiceTest {
         service.deleteBranchFrom("session-1", 42L);
 
         verify(repository).deleteBySessionIdAndIdGreaterThanEqual("session-1", 42L);
+    }
+
+    @Test
+    void userTurnPersistsNoMemoryPolicyForRegeneration() {
+        service.saveUserMessage("session-1", "敏感内容", List.of(), "NO_MEMORY");
+
+        verify(repository).save(argThat(message -> "NO_MEMORY".equals(message.getMemoryMode())
+                && "user".equals(message.getRole())));
+    }
+
+    @Test
+    void assistantReplyAndMemoryOutboxAreCommittedThroughOneServiceBoundary() {
+        MemoryJobService jobs = mock(MemoryJobService.class);
+        ChatMessageService transactionalService = new ChatMessageService(repository,
+                mock(SessionService.class), mock(TitleGenerationService.class),
+                mock(MemoryService.class), jobs);
+        when(repository.save(any(ChatMessage.class))).thenAnswer(invocation -> {
+            ChatMessage saved = invocation.getArgument(0);
+            saved.setId(9L);
+            return saved;
+        });
+
+        Long id = transactionalService.saveAssistantReplyAndQueueMemory(
+                "session-1", "回复", null, true, 1L, "p1", 7L, "原始问题", "NORMAL");
+
+        assertEquals(9L, id);
+        verify(jobs).enqueue(1L, "session-1", "p1", 7L, "原始问题");
+    }
+
+    @Test
+    void assistantReplyRecordsTheTurnMemoryModeForHistorySearchFiltering() {
+        when(repository.save(any(ChatMessage.class))).thenAnswer(invocation -> {
+            ChatMessage saved = invocation.getArgument(0);
+            saved.setId(10L);
+            return saved;
+        });
+
+        service.saveAssistantReply("session-1", "临时回复", null, "NO_MEMORY");
+
+        verify(repository).save(argThat(message -> "NO_MEMORY".equals(message.getMemoryMode())
+                && "assistant".equals(message.getRole())));
     }
 
     private static ChatMessage message(Long id, String role, String content) {

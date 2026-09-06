@@ -2,6 +2,7 @@ package top.jionjion.agentdesk.service;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.agent.core.AgentPool;
 import top.jionjion.agentdesk.dto.session.SessionResponse;
@@ -29,13 +30,23 @@ public class SessionService {
     private final ChatMessageRepository chatMessageRepository;
     private final ProjectRepository projectRepository;
     private final AgentPool agentPool;
+    private final MemoryService memoryService;
 
+    @Autowired
     public SessionService(SessionRepository sessionRepository, ChatMessageRepository chatMessageRepository,
-                          ProjectRepository projectRepository, AgentPool agentPool) {
+                          ProjectRepository projectRepository, AgentPool agentPool,
+                          MemoryService memoryService) {
         this.sessionRepository = sessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.projectRepository = projectRepository;
         this.agentPool = agentPool;
+        this.memoryService = memoryService;
+    }
+
+    /** Test/backward-compatible constructor. */
+    public SessionService(SessionRepository sessionRepository, ChatMessageRepository chatMessageRepository,
+                          ProjectRepository projectRepository, AgentPool agentPool) {
+        this(sessionRepository, chatMessageRepository, projectRepository, agentPool, null);
     }
 
     /**
@@ -52,6 +63,7 @@ public class SessionService {
         metadata.setCreatedAt(now);
         metadata.setLastUsedAt(now);
         metadata.setUserId(userId);
+        metadata.setMemoryMode("NORMAL");
         if (projectId != null && !projectId.isBlank()) {
             Project project = projectRepository.findByIdAndUserId(projectId, userId)
                     .orElseThrow(() -> new IllegalArgumentException("项目不存在: " + projectId));
@@ -87,6 +99,7 @@ public class SessionService {
     public void delete(String id) {
         Long userId = UserContext.getUserId();
         sessionRepository.findByIdAndUserId(id, userId).ifPresent(m -> {
+            if (memoryService != null) memoryService.invalidateSessionSources(userId, id);
             chatMessageRepository.deleteBySessionId(id);
             sessionRepository.deleteById(id);
             agentPool.remove(id);
@@ -101,6 +114,7 @@ public class SessionService {
         Long userId = UserContext.getUserId();
         for (String id : ids) {
             sessionRepository.findByIdAndUserId(id, userId).ifPresent(m -> {
+                if (memoryService != null) memoryService.invalidateSessionSources(userId, id);
                 chatMessageRepository.deleteBySessionId(id);
                 sessionRepository.deleteById(id);
                 agentPool.remove(id);
@@ -202,6 +216,47 @@ public class SessionService {
         return toResponse(metadata);
     }
 
+    public SessionResponse updateMemoryMode(String sessionId, String memoryMode) {
+        Long userId = UserContext.getUserId();
+        SessionMetadata metadata = sessionRepository.findByIdAndUserId(sessionId, userId).orElse(null);
+        if (metadata == null) return null;
+        if (agentPool.isBusy(sessionId)) {
+            throw new IllegalStateException("会话正在执行中, 无法切换记忆模式");
+        }
+        String normalized = normalizeMemoryMode(memoryMode, false);
+        boolean changed = !normalized.equals(metadata.getMemoryMode() == null ? "NORMAL" : metadata.getMemoryMode());
+        metadata.setMemoryMode(normalized);
+        sessionRepository.save(metadata);
+        if (changed) {
+            // 从原始消息重建 AgentState, 清除历史轮次注入的记忆/检索增强文本,
+            // 避免切到 NO_MEMORY 后旧记忆仍留在模型上下文中 (与 regenerate 的重建方式一致)。
+            agentPool.resetState(userId, sessionId);
+            var handle = agentPool.getOrCreate(sessionId);
+            handle.restoreHistory(userId, sessionId,
+                    chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId));
+            handle.markMemoryFreeState(true);
+        }
+        return toResponse(metadata);
+    }
+
+    /** Resolves INHERIT against the authenticated session's persisted default. */
+    public String resolveMemoryMode(String sessionId, String requestedMode) {
+        Long userId = UserContext.getUserId();
+        SessionMetadata metadata = sessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("会话不存在"));
+        if (requestedMode == null || requestedMode.isBlank() || "INHERIT".equalsIgnoreCase(requestedMode)) {
+            return normalizeMemoryMode(metadata.getMemoryMode(), false);
+        }
+        return normalizeMemoryMode(requestedMode, false);
+    }
+
+    private String normalizeMemoryMode(String value, boolean allowInherit) {
+        if (value == null || value.isBlank() || "NORMAL".equalsIgnoreCase(value)) return "NORMAL";
+        if ("NO_MEMORY".equalsIgnoreCase(value)) return "NO_MEMORY";
+        if (allowInherit && "INHERIT".equalsIgnoreCase(value)) return "INHERIT";
+        throw new IllegalArgumentException("memoryMode 只能是 NORMAL 或 NO_MEMORY");
+    }
+
     private SessionResponse toResponse(SessionMetadata metadata) {
         String projectId = metadata.getProjectId();
         String projectName = null;
@@ -216,7 +271,8 @@ public class SessionService {
                 metadata.getCreatedAt(),
                 metadata.getLastUsedAt(),
                 projectId,
-                projectName
+                projectName,
+                metadata.getMemoryMode() == null ? "NORMAL" : metadata.getMemoryMode()
         );
     }
 }

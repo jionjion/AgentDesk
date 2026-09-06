@@ -53,6 +53,13 @@ public class MemoryPolicyEngine {
         return new Decision(true, null, category, sensitivity, validUntil, subjectKey(category, clean, projectId));
     }
 
+    /** 原始用户消息是否足够稳定, 可作为自动抽取候选的证据 (假设/转述/指令型原文不可信)。 */
+    public boolean stableEvidence(String originalMessage) {
+        String clean = originalMessage == null ? "" : originalMessage.trim();
+        if (clean.isBlank()) return false;
+        return !UNSTABLE.matcher(clean).find() && !INSTRUCTION_LIKE.matcher(clean).find();
+    }
+
     public String normalizeCategory(String requested, String content) {
         if (requested != null && requested.matches("[A-Za-z_]{2,32}")) {
             String normalized = requested.toUpperCase(Locale.ROOT);

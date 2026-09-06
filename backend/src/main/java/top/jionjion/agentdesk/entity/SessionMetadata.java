@@ -56,4 +56,8 @@ public class SessionMetadata {
      */
     @Column(name = "project_id", length = 32)
     private String projectId;
+
+    /** Server-persisted default for new turns in this session. */
+    @Column(name = "memory_mode", nullable = false, length = 16)
+    private String memoryMode = "NORMAL";
 }

@@ -1,11 +1,10 @@
 import {defineStore} from 'pinia'
 import {computed, ref} from 'vue'
-import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, PlanState, SSEEventData, SubagentEventData, SubagentMessage, TaskProgressEventData} from '@/types/chat'
-import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionTitle} from '@/api/session'
+import type {AssistantMessage, Attachment, BackendChatMessage, ChatMessage, ChatSession, MemoryRecallInfo, PlanState, SSEEventData, SubagentEventData, SubagentMessage, TaskProgressEventData} from '@/types/chat'
+import {batchDeleteSessions, createSession, deleteSession, getSession, getSessions, updateSessionMemoryMode, updateSessionTitle} from '@/api/session'
 import {createChatStream, createRegenerateStream, exportChatMarkdown, getMessages, interruptChat, type ChatRuntimeSnapshot, type FetchSSE} from '@/api/chat'
 import {getSessionFiles, uploadFile} from '@/api/file'
 import {exportSessionToObsidian} from '@/api/obsidian'
-import {useProjectsStore} from '@/stores/projects'
 
 const PLAN_TOOL_NAMES = ['create_plan', 'revise_current_plan', 'update_plan_info', 'update_subtask_state', 'finish_subtask', 'view_subtasks', 'finish_plan', 'view_historical_plans', 'recover_historical_plan', 'get_subtask_count']
 
@@ -67,6 +66,9 @@ export const useChatStore = defineStore('chat', () => {
     const eventSource = ref<EventSource | FetchSSE | null>(null)
     const pinnedSessionIds = ref<Set<string>>(new Set())
 
+    /** 新对话待绑定项目 (仅用户显式选择时生效, 创建会话后清空) */
+    const pendingProjectId = ref<string | null>(null)
+
     const pendingAttachments = ref<PendingFile[]>([])
 
     /** 当前会话的消息发送队列 (按会话隔离; 流式结束后自动依次发送) */
@@ -74,6 +76,8 @@ export const useChatStore = defineStore('chat', () => {
 
     /** 当前对话长期记忆召回数量 (0 表示未召回) */
     const memoryRecalledCount = ref(0)
+    const memoryRecallState = ref<MemoryRecallInfo | null>(null)
+    const noMemorySessionIds = ref<Set<string>>(new Set())
     /** 当前对话知识库检索结果 */
     const knowledgeRetrievedResults = ref<{count: number; sources: string[]; references: {documentName: string; score: number; chunkIndex: number}[]}>({count: 0, sources: [], references: []})
 
@@ -94,6 +98,10 @@ export const useChatStore = defineStore('chat', () => {
         currentSessionId.value ? (messageQueueBySession.value[currentSessionId.value] || []) : []
     )
 
+    const temporaryNoMemory = computed(() =>
+        currentSessionId.value ? noMemorySessionIds.value.has(currentSessionId.value) : false
+    )
+
     const sortedSessions = computed(() => {
         const pinned = sessions.value.filter(s => pinnedSessionIds.value.has(s.id))
         const unpinned = sessions.value.filter(s => !pinnedSessionIds.value.has(s.id))
@@ -107,16 +115,18 @@ export const useChatStore = defineStore('chat', () => {
         try {
             const res = await getSessions()
             sessions.value = res.data
+            noMemorySessionIds.value = new Set(res.data
+                .filter(session => session.memoryMode === 'NO_MEMORY')
+                .map(session => session.id))
         } catch (e) {
             console.error('加载会话列表失败', e)
         }
     }
 
-    /** 创建新会话 (默认继承最近使用项目, 显式写入 projectId) */
+    /** 创建新会话 (仅绑定用户显式选择的待绑定项目) */
     async function createNewSession(title?: string): Promise<string> {
-        const projectsStore = useProjectsStore()
-        const lastProjectId = projectsStore.lastProject?.id ?? null
-        const res = await createSession(title, lastProjectId)
+        const res = await createSession(title, pendingProjectId.value)
+        pendingProjectId.value = null
         const session = res.data
         sessions.value.unshift(session)
         currentSessionId.value = session.id
@@ -135,7 +145,8 @@ export const useChatStore = defineStore('chat', () => {
                     .filter((a): a is Attachment => !!a)
                 if (attachments.length === 0) attachments = undefined
             }
-            return {id: String(msg.id), role: 'user', content: msg.content, timestamp: msg.createdAt, attachments}
+            return {id: String(msg.id), role: 'user', content: msg.content, timestamp: msg.createdAt,
+                attachments, memoryMode: msg.memoryMode}
         }
         if (msg.role === 'tool') {
             return {
@@ -154,7 +165,8 @@ export const useChatStore = defineStore('chat', () => {
             role: 'assistant',
             content: msg.content,
             timestamp: msg.createdAt,
-            isStreaming: false
+            isStreaming: false,
+            memoryRefs: msg.memoryRefs
         }
     }
 
@@ -213,6 +225,9 @@ export const useChatStore = defineStore('chat', () => {
             delete messagesBySession.value[id]
             delete taskProgressBySession.value[id]
             delete subtaskIdIndex[id]
+            const memoryModes = new Set(noMemorySessionIds.value)
+            memoryModes.delete(id)
+            noMemorySessionIds.value = memoryModes
             if (currentSessionId.value === id) {
                 currentSessionId.value = sessions.value.length > 0 ? sessions.value[0].id : null
             }
@@ -525,6 +540,9 @@ export const useChatStore = defineStore('chat', () => {
                 if (knowledgeRetrievedResults.value.references.length > 0) {
                     msg.knowledgeRefs = [...knowledgeRetrievedResults.value.references]
                 }
+                if (memoryRecallState.value) {
+                    msg.memoryRefs = {...memoryRecallState.value, references: [...memoryRecallState.value.references]}
+                }
             }
             cleanup()
 
@@ -559,6 +577,22 @@ export const useChatStore = defineStore('chat', () => {
                 memoryRecalledCount.value = data.memoryCount || 1
             } catch {
                 memoryRecalledCount.value = 1
+            }
+        })
+
+        es.addEventListener('memory_recall_completed', (e: MessageEvent) => {
+            try {
+                const data = JSON.parse(e.data) as MemoryRecallInfo & {count?: number}
+                memoryRecallState.value = {
+                    status: data.status,
+                    count: data.count || 0,
+                    elapsedMs: data.elapsedMs || 0,
+                    degradedReason: data.degradedReason,
+                    references: data.references || []
+                }
+                memoryRecalledCount.value = data.count || 0
+            } catch {
+                memoryRecallState.value = {status: 'DEGRADED', count: 0, elapsedMs: 0, degradedReason: 'invalid_event', references: []}
             }
         })
 
@@ -648,6 +682,7 @@ export const useChatStore = defineStore('chat', () => {
         function cleanupSilent() {
             isStreaming.value = false
             memoryRecalledCount.value = 0
+            memoryRecallState.value = null
             knowledgeRetrievedResults.value = {count: 0, sources: [], references: []}
             es.close()
             eventSource.value = null
@@ -686,6 +721,7 @@ export const useChatStore = defineStore('chat', () => {
         if (!sessionId) {
             sessionId = await createNewSession()
         }
+        const memoryMode = noMemorySessionIds.value.has(sessionId) ? 'NO_MEMORY' : 'NORMAL'
 
         // 2. 推入用户消息
         const messages = messagesBySession.value[sessionId] || []
@@ -694,7 +730,8 @@ export const useChatStore = defineStore('chat', () => {
             role: 'user',
             content: messageContent,
             timestamp: Date.now(),
-            attachments: attachments.length > 0 ? attachments : undefined
+            attachments: attachments.length > 0 ? attachments : undefined,
+            memoryMode
         })
 
         // 3. 推入助手占位消息
@@ -714,7 +751,7 @@ export const useChatStore = defineStore('chat', () => {
         // 构造项目 runtime snapshot: 会话绑定项目且本机有位置时上报
         const runtimeSnapshot = await buildRuntimeSnapshot(sessionId)
 
-        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, runtimeSnapshot)
+        const es = createChatStream(sessionId, messageContent, fileIds.length > 0 ? fileIds : undefined, kbIds, runtimeSnapshot, 'INHERIT')
         eventSource.value = es
 
         // 5. 设置监听 (携带 retry 信息, 429 时回滚并重新入队)
@@ -788,6 +825,19 @@ export const useChatStore = defineStore('chat', () => {
             console.warn('获取项目 runtime snapshot 失败', e)
             return null
         }
+    }
+
+    async function toggleTemporaryNoMemory() {
+        const sessionId = currentSessionId.value
+        if (!sessionId || isStreaming.value) return
+        const nextMode = noMemorySessionIds.value.has(sessionId) ? 'NORMAL' : 'NO_MEMORY'
+        const response = await updateSessionMemoryMode(sessionId, nextMode)
+        const next = new Set(noMemorySessionIds.value)
+        if (nextMode === 'NO_MEMORY') next.add(sessionId)
+        else next.delete(sessionId)
+        noMemorySessionIds.value = next
+        const session = sessions.value.find(item => item.id === sessionId)
+        if (session) Object.assign(session, response.data)
     }
 
     /** 中断 Agent */
@@ -903,9 +953,9 @@ export const useChatStore = defineStore('chat', () => {
             isStreaming: true
         })
 
-        // 创建 SSE 连接
+        // 创建 SSE 连接 (memoryMode 传 INHERIT, 由后端继承原轮次的记忆策略)
         isStreaming.value = true
-        const es = createRegenerateStream(sessionId, messageId)
+        const es = createRegenerateStream(sessionId, messageId, 'INHERIT')
         eventSource.value = es
 
         // 复用 SSE 监听逻辑
@@ -924,6 +974,9 @@ export const useChatStore = defineStore('chat', () => {
                 delete taskProgressBySession.value[id]
                 delete subtaskIdIndex[id]
             }
+            const memoryModes = new Set(noMemorySessionIds.value)
+            ids.forEach(id => memoryModes.delete(id))
+            noMemorySessionIds.value = memoryModes
             if (currentSessionId.value && idSet.has(currentSessionId.value)) {
                 currentSessionId.value = sessions.value.length > 0 ? sessions.value[0].id : null
             }
@@ -948,10 +1001,13 @@ export const useChatStore = defineStore('chat', () => {
         isStreaming,
         isLoadingSession,
         memoryRecalledCount,
+        memoryRecallState,
+        temporaryNoMemory,
         knowledgeRetrievedResults,
         taskProgressBySession,
         pendingAttachments,
         pinnedSessionIds,
+        pendingProjectId,
         messageQueueBySession,
         // computed
         currentSession,
@@ -979,6 +1035,7 @@ export const useChatStore = defineStore('chat', () => {
         regenerateMessage,
         exportSession,
         archiveToObsidian,
-        injectMessage
+        injectMessage,
+        toggleTemporaryNoMemory
     }
 })

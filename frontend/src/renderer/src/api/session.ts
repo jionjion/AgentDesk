@@ -30,3 +30,8 @@ export function batchDeleteSessions(ids: string[]) {
 export function updateSessionTitle(id: string, title: string) {
     return request.put<ChatSession>(`/api/sessions/${id}`, {title})
 }
+
+/** 持久化会话中新轮次的默认记忆模式 */
+export function updateSessionMemoryMode(id: string, memoryMode: 'NORMAL' | 'NO_MEMORY') {
+    return request.put<ChatSession>(`/api/sessions/${id}/memory-mode`, {memoryMode})
+}

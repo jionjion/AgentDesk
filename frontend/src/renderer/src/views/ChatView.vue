@@ -204,6 +204,19 @@
           <div class="flex items-center justify-between mt-3">
             <div class="flex items-center gap-2">
               <ProjectSelector/>
+              <Button
+                  v-if="settingsStore.memory.enabled"
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8"
+                  :class="chatStore.temporaryNoMemory ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' : ''"
+                  :title="chatStore.temporaryNoMemory ? '会话无记忆已开启并持久化：点击恢复' : '会话无记忆：本会话后续轮次不读取也不学习'"
+                  :disabled="chatStore.isStreaming"
+                  @click="chatStore.toggleTemporaryNoMemory()"
+              >
+                <EyeOff v-if="chatStore.temporaryNoMemory" :size="16"/>
+                <Brain v-else :size="16"/>
+              </Button>
               <Button variant="ghost" size="icon" class="h-8 w-8" @click="inputText = ''">
                 <Paintbrush :size="16"/>
               </Button>
@@ -245,7 +258,7 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {useRoute} from 'vue-router'
-import {AlertCircle, ArrowUp, BarChart3, Camera, FileText, ListPlus, Loader2, Paintbrush, Paperclip, Pencil, Square, X} from 'lucide-vue-next'
+import {AlertCircle, ArrowUp, BarChart3, Brain, Camera, EyeOff, FileText, ListPlus, Loader2, Paintbrush, Paperclip, Pencil, Square, X} from 'lucide-vue-next'
 import {useChatStore} from '@/stores/chat'
 import {useSettingsStore} from '@/stores/settings'
 import {Button} from '@/components/ui/button'

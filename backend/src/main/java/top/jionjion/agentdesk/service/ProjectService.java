@@ -1,6 +1,7 @@
 package top.jionjion.agentdesk.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.dto.project.ProjectCreateRequest;
 import top.jionjion.agentdesk.dto.project.ProjectResponse;
@@ -23,9 +24,17 @@ import java.util.UUID;
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final MemoryService memoryService;
 
-    public ProjectService(ProjectRepository projectRepository) {
+    @Autowired
+    public ProjectService(ProjectRepository projectRepository, MemoryService memoryService) {
         this.projectRepository = projectRepository;
+        this.memoryService = memoryService;
+    }
+
+    /** Test/backward-compatible constructor. */
+    public ProjectService(ProjectRepository projectRepository) {
+        this(projectRepository, null);
     }
 
     /**
@@ -93,6 +102,7 @@ public class ProjectService {
     public boolean delete(String id) {
         Long userId = UserContext.getUserId();
         return projectRepository.findByIdAndUserId(id, userId).map(p -> {
+            if (memoryService != null) memoryService.deleteProjectScope(userId, id);
             projectRepository.delete(p);
             return true;
         }).orElse(false);

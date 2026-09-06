@@ -70,6 +70,42 @@ public class MemoryJobService {
         if (!cancelled.isEmpty()) jobs.saveAll(cancelled);
     }
 
+    /**
+     * 清空记忆时取消该用户所有未完成的抽取任务 (含 PROCESSING), 阻止旧任务把刚删除的内容重新写回。
+     * PROCESSING 任务由 worker 在存储后复验取消状态并补偿撤销。
+     *
+     * <p>取消范围与清空范围一致:
+     * scopeType 为 null 时取消全部; USER 只取消无项目任务;
+     * PROJECT 时按 scopeId 匹配, scopeId 为 null 则取消所有项目任务。
+     */
+    @Transactional
+    public void cancelPendingForScope(Long userId, String scopeType, String scopeId) {
+        if (userId == null) return;
+        String normalizedScope = scopeType == null || scopeType.isBlank()
+                ? null : scopeType.trim().toUpperCase(java.util.Locale.ROOT);
+        long now = System.currentTimeMillis();
+        List<MemoryJob> cancelled = new java.util.ArrayList<>();
+        for (MemoryJob job : jobs.findByUserIdAndStatusIn(userId, List.of("PENDING", "RETRY", "PROCESSING"))) {
+            if (!scopeMatches(normalizedScope, scopeId, job.getProjectId())) continue;
+            job.setStatus("CANCELLED");
+            job.setUpdatedAt(now);
+            cancelled.add(job);
+        }
+        if (!cancelled.isEmpty()) jobs.saveAll(cancelled);
+    }
+
+    private boolean scopeMatches(String scopeType, String scopeId, String jobProjectId) {
+        if (scopeType == null) {
+            // 未指定范围类型: scopeId 为空表示全量清空, 否则按项目 ID 匹配 (与 deleteMemories 的过滤一致)
+            return scopeId == null || scopeId.equals(jobProjectId);
+        }
+        if ("USER".equals(scopeType)) return jobProjectId == null;
+        if ("PROJECT".equals(scopeType)) {
+            return scopeId == null ? jobProjectId != null : scopeId.equals(jobProjectId);
+        }
+        return false;
+    }
+
     @Scheduled(fixedDelayString = "${agentdesk.memory.worker-delay-ms:3000}")
     public void processDueJobs() {
         List<MemoryJob> due = jobs.findByStatusInAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(
@@ -175,8 +211,35 @@ public class MemoryJobService {
                 log.info("Memory job {} will retry (attempt {}): {}", job.getId(), attempts, ex.getMessage());
             }
         }
-        job.setUpdatedAt(System.currentTimeMillis());
-        jobs.save(job);
+        finishJob(job);
+    }
+
+    /**
+     * 以数据库最新状态收尾: 若执行期间任务被并发取消 (如清空记忆), 撤销本次写入的条目并保持取消状态,
+     * 避免 PROCESSING 竞态把刚清空的内容重新写回。
+     */
+    private void finishJob(MemoryJob processed) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            MemoryJob fresh = jobs.findById(processed.getId()).orElse(null);
+            if (fresh == null) return;
+            if ("CANCELLED".equals(fresh.getStatus()) && !"CANCELLED".equals(processed.getStatus())) {
+                // 执行期间被并发取消 (worker 自身取消时补偿已在主流程完成)
+                memoryService.invalidateMessageSources(fresh.getUserId(), List.of(fresh.getUserMessageId()));
+                return;
+            }
+            fresh.setStatus(processed.getStatus());
+            fresh.setAttempts(processed.getAttempts());
+            fresh.setNextAttemptAt(processed.getNextAttemptAt());
+            fresh.setLastError(processed.getLastError());
+            fresh.setUpdatedAt(System.currentTimeMillis());
+            try {
+                jobs.saveAndFlush(fresh);
+                return;
+            } catch (ObjectOptimisticLockingFailureException ex) {
+                // 并发取消或修改, 重读后再收尾
+            }
+        }
+        log.warn("Memory job {} finish deferred after concurrent updates", processed.getId());
     }
 
     private boolean sourceStillValid(MemoryJob job) {

@@ -179,6 +179,19 @@ class="shrink-0 rounded px-1.5 py-0.5 text-xs text-violet-600 dark:text-violet-4
             <span class="text-emerald-400 dark:text-emerald-500">{{ (item.score * 100).toFixed(0) }}%</span>
           </span>
         </div>
+        <div
+            v-if="!isUser && (message as AssistantMessage).memoryRefs?.status === 'USED'"
+            class="flex flex-wrap items-center gap-1.5 mt-2"
+        >
+          <Brain :size="12" class="text-violet-500 shrink-0"/>
+          <span
+              v-for="item in uniqueMemoryRefs" :key="item.id"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800"
+              :title="`记忆 ${item.id} · ${item.reason || 'matched'}`"
+          >
+            {{ item.scopeType === 'PROJECT' ? '项目记忆' : '个人记忆' }} · {{ memoryCategoryLabel(item.category) }}
+          </span>
+        </div>
         <!-- 图片附件（气泡外部） -->
         <div
             v-if="isUser && imageAttachments.length"
@@ -255,7 +268,7 @@ import {Marked} from 'marked'
 import hljs from 'highlight.js'
 import DOMPurify from 'dompurify'
 import {api as viewerApi} from 'v-viewer'
-import {CheckCircle2, ChevronRight, Copy, Database, FileText, Loader2, RefreshCw, Settings2, Trash2, BookMarked} from 'lucide-vue-next'
+import {Brain, CheckCircle2, ChevronRight, Copy, Database, FileText, Loader2, RefreshCw, Settings2, Trash2, BookMarked} from 'lucide-vue-next'
 import type {AssistantMessage, ChatMessage, ToolCallMessage, UserMessage} from '@/types/chat'
 import {useChatStore} from '@/stores/chat'
 import {useAppStore} from '@/stores/app'
@@ -263,6 +276,7 @@ import {useSettingsStore} from '@/stores/settings'
 import {useRemoteExecStore} from '@/stores/remoteExec'
 import aiIcon from '@/assets/icon_255.png'
 import {formatFileSize, isImageType} from '@/utils/file'
+import {memoryCategoryLabel} from '@/utils/memory'
 import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle} from '@/components/ui/alert-dialog'
 import PrecipitateDialog from '@/components/chat/PrecipitateDialog.vue'
 
@@ -491,6 +505,17 @@ const uniqueKnowledgeRefs = computed(() => {
   return refs.filter(r => {
     if (seen.has(r.documentName)) return false
     seen.add(r.documentName)
+    return true
+  })
+})
+
+const uniqueMemoryRefs = computed(() => {
+  const refs = (props.message as AssistantMessage).memoryRefs?.references
+  if (!refs?.length) return []
+  const seen = new Set<string>()
+  return refs.filter(r => {
+    if (seen.has(r.id)) return false
+    seen.add(r.id)
     return true
   })
 })

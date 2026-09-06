@@ -3,6 +3,8 @@ package top.jionjion.agentdesk.service.chat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.agent.core.AgentPool;
@@ -12,21 +14,17 @@ import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
 import top.jionjion.agentdesk.dto.chat.ChatRequest;
 import top.jionjion.agentdesk.dto.file.FileResponse;
 import top.jionjion.agentdesk.dto.knowledge.RetrievalResultDto;
-import top.jionjion.agentdesk.dto.memory.MemoryItemDto;
+import top.jionjion.agentdesk.dto.memory.MemoryRecallResult;
 import top.jionjion.agentdesk.entity.ChatMessage;
 import top.jionjion.agentdesk.security.UserContext;
 import top.jionjion.agentdesk.service.FileService;
 import top.jionjion.agentdesk.service.KnowledgeRetrievalService;
 import top.jionjion.agentdesk.service.MemoryService;
 import top.jionjion.agentdesk.service.RetrievalIntentService;
-import top.jionjion.agentdesk.service.SettingsService;
+import top.jionjion.agentdesk.service.memory.MemoryJobService;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 对话流编排: 协调文件解析、消息持久化、知识检索、prompt 组装、SSE 推送与 Agent 流订阅。
@@ -40,13 +38,6 @@ import java.util.concurrent.TimeUnit;
 public class ChatStreamOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(ChatStreamOrchestrator.class);
-    private static final ExecutorService MEMORY_EXECUTOR = new ThreadPoolExecutor(
-            1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(128), runnable -> {
-                Thread thread = new Thread(runnable, "mem0-recorder");
-                thread.setDaemon(true);
-                return thread;
-            }, new ThreadPoolExecutor.DiscardPolicy());
-
     private final AgentPool agentPool;
     private final FileService fileService;
     private final ChatMessageService chatMessageService;
@@ -56,7 +47,7 @@ public class ChatStreamOrchestrator {
     private final KnowledgeRetrievalService knowledgeRetrievalService;
     private final RetrievalIntentService retrievalIntentService;
     private final MemoryService memoryService;
-    private final SettingsService settingsService;
+    private final MemoryJobService memoryJobService;
 
     public ChatStreamOrchestrator(AgentPool agentPool,
                                   FileService fileService,
@@ -67,7 +58,7 @@ public class ChatStreamOrchestrator {
                                   KnowledgeRetrievalService knowledgeRetrievalService,
                                   RetrievalIntentService retrievalIntentService,
                                   MemoryService memoryService,
-                                  SettingsService settingsService) {
+                                  MemoryJobService memoryJobService) {
         this.agentPool = agentPool;
         this.fileService = fileService;
         this.chatMessageService = chatMessageService;
@@ -77,7 +68,7 @@ public class ChatStreamOrchestrator {
         this.knowledgeRetrievalService = knowledgeRetrievalService;
         this.retrievalIntentService = retrievalIntentService;
         this.memoryService = memoryService;
-        this.settingsService = settingsService;
+        this.memoryJobService = memoryJobService;
     }
 
     /**
@@ -87,7 +78,10 @@ public class ChatStreamOrchestrator {
         String sessionId = chatRequest.sessionId();
         String message = chatRequest.message();
         try {
-            AgentHandle handle = agentPool.getOrCreate(sessionId);
+            String memoryMode = normalizeMemoryMode(chatRequest.memoryMode());
+            Long userId = UserContext.getUserId();
+            // 本轮不允许读取长期记忆时, 确保 Agent 状态中没有历史轮次注入的记忆文本
+            AgentHandle handle = prepareHandle(userId, sessionId, memoryMode);
             SseEmitter emitter = sseEmitterManager.create();
             handle.attachEmitter(emitter);
 
@@ -100,18 +94,23 @@ public class ChatStreamOrchestrator {
                     .filter(f -> promptContextBuilder.isImageFile(f.contentType())).toList();
             List<FileResponse> nonImageFiles = files.stream()
                     .filter(f -> !promptContextBuilder.isImageFile(f.contentType())).toList();
-            chatMessageService.saveUserMessage(sessionId, message, parsedFileIds);
+            ChatMessage savedUserMessage = chatMessageService.saveUserMessage(
+                    sessionId, message, parsedFileIds, memoryMode);
 
-            Long userId = UserContext.getUserId();
-            // 解析会话绑定项目 + 客户端 snapshot -> 调用级项目上下文
+            // 解析会话绑定项目 + 客户端 snapshot -> 调用级项目上下文 (未绑定项目时为 null)
             ProjectRuntimeContext projectContext = projectContextResolver.resolve(
                     userId, sessionId, chatRequest.runtimeSnapshot());
-            MemoryContext memory = performMemoryRecall(userId, message);
+            String projectId = projectContext == null ? null : projectContext.projectId();
+            MemoryRecallResult memory = performMemoryRecall(
+                    userId, projectId, message, memoryMode);
 
             // 知识库检索增强
             RetrievalContext retrieval = performKnowledgeRetrieval(message, chatRequest.kbIds());
             String memoryAugmented = promptContextBuilder.buildMemoryAugmentedMessage(
                     retrieval.augmentedMessage(), memory.items());
+            if (!memory.items().isEmpty()) {
+                handle.markMemoryFreeState(false);
+            }
 
             // 项目上下文增强 (最外层, 模型每轮可见)
             String augmentedMessage = promptContextBuilder.buildProjectAugmentedMessage(
@@ -119,12 +118,14 @@ public class ChatStreamOrchestrator {
 
             sseEmitterManager.configureCallbacks(emitter, sessionId, handle, () -> agentPool.release(sessionId, lockToken));
             sseEmitterManager.sendKnowledgeRetrieved(emitter, retrieval.results());
-            sseEmitterManager.sendMemoryRecalled(emitter, memory.items().size());
+            sseEmitterManager.sendMemoryRecallCompleted(emitter, memory);
             // 构建用户消息并启动 Agent 流
             AgentInput input = promptContextBuilder.buildAgentInput(augmentedMessage, imageFiles, nonImageFiles);
-            AgentRunContext runContext = AgentRunContext.of(userId, sessionId, projectContext);
+            AgentRunContext runContext = AgentRunContext.of(
+                    userId, sessionId, projectContext, memoryMode, savedUserMessage.getId());
             subscribe(handle, input, runContext, sessionId, message, emitter, lockToken,
-                    memory.enabled(), userId);
+                    userId, savedUserMessage.getId(), projectId, memory,
+                    memoryMode);
 
             return emitter;
         } catch (RuntimeException e) {
@@ -138,34 +139,45 @@ public class ChatStreamOrchestrator {
      * 重新生成指定 assistant 消息。调用方需已通过鉴权且已 tryAcquire 成功获取会话锁, 并传入对应 token。
      */
     public SseEmitter regenerate(String sessionId, Long messageId,
-                                 ChatMessage userMessage, Object lockToken) {
+                                 ChatMessage userMessage, Object lockToken, String memoryMode) {
         try {
+            String effectiveMemoryMode = normalizeMemoryMode(memoryMode);
             // 重生成是一次分支回滚：删除目标回复及其后的消息，同时将 v2 AgentState
             // 重建到触发用户消息之前，避免旧回复、工具结果或后续对话污染新答案。
             List<ChatMessage> historyBeforeTurn = chatMessageService.getHistoryBefore(
                     sessionId, userMessage.getId());
-            chatMessageService.deleteBranchFrom(sessionId, messageId);
-
             Long userId = UserContext.getUserId();
+            memoryJobService.cancelUserMessages(userId,
+                    chatMessageService.getBranchUserMessageIds(sessionId, messageId));
+            chatMessageService.deleteBranchFrom(sessionId, messageId, userId);
+
             agentPool.resetState(userId, sessionId);
             AgentHandle handle = agentPool.getOrCreate(sessionId);
             handle.restoreHistory(userId, sessionId, historyBeforeTurn);
+            handle.markMemoryFreeState(true);
             SseEmitter emitter = sseEmitterManager.create();
             handle.attachEmitter(emitter);
 
             sseEmitterManager.configureCallbacks(emitter, sessionId, handle, () -> agentPool.release(sessionId, lockToken));
-            MemoryContext memory = performMemoryRecall(userId, userMessage.getContent());
-            // 重新生成读取 Session 当前绑定的 Project (GET 端点无 snapshot, 运行环境标记为离线)
+            // 重新生成读取 Session 当前绑定的 Project (GET 端点无 snapshot, 运行环境标记为离线; 未绑定项目时为 null)
             ProjectRuntimeContext projectContext = projectContextResolver.resolve(userId, sessionId, null);
+            String projectId = projectContext == null ? null : projectContext.projectId();
+            MemoryRecallResult memory = performMemoryRecall(
+                    userId, projectId, userMessage.getContent(), effectiveMemoryMode);
             String memoryAugmented = promptContextBuilder.buildMemoryAugmentedMessage(
                     userMessage.getContent(), memory.items());
+            if (!memory.items().isEmpty()) {
+                handle.markMemoryFreeState(false);
+            }
             String augmentedMessage = promptContextBuilder.buildProjectAugmentedMessage(
                     memoryAugmented, projectContext);
-            sseEmitterManager.sendMemoryRecalled(emitter, memory.items().size());
+            sseEmitterManager.sendMemoryRecallCompleted(emitter, memory);
             AgentInput input = AgentInput.text(augmentedMessage);
-            AgentRunContext runContext = AgentRunContext.of(userId, sessionId, projectContext);
+            AgentRunContext runContext = AgentRunContext.of(
+                    userId, sessionId, projectContext, effectiveMemoryMode, userMessage.getId());
             subscribe(handle, input, runContext, sessionId, userMessage.getContent(), emitter,
-                    lockToken, memory.enabled(), userId);
+                    lockToken, userId, userMessage.getId(), projectId, memory,
+                    effectiveMemoryMode);
 
             return emitter;
         } catch (RuntimeException e) {
@@ -179,10 +191,11 @@ public class ChatStreamOrchestrator {
      */
     private void subscribe(AgentHandle handle, AgentInput input, AgentRunContext runContext,
                            String sessionId, String triggeringMessage, SseEmitter emitter,
-                           Object lockToken, boolean memoryEnabled, Long userId) {
+                           Object lockToken, Long userId, Long userMessageId, String projectId,
+                           MemoryRecallResult memoryRecall, String memoryMode) {
         handle.stream(input, runContext)
                 .doOnComplete(() -> onStreamComplete(sessionId, triggeringMessage, handle, emitter,
-                        userId, memoryEnabled))
+                        userId, userMessageId, projectId, memoryRecall, memoryMode))
                 .doOnError(e -> {
                     if (handle.isClientDisconnected() || sseEmitterManager.isClientDisconnect(e)) {
                         log.debug("Session {} Agent流处理中客户端已断开", sessionId);
@@ -207,45 +220,83 @@ public class ChatStreamOrchestrator {
      */
     private void onStreamComplete(String sessionId, String triggeringMessage,
                                   AgentHandle handle, SseEmitter emitter,
-                                  Long userId, boolean memoryEnabled) {
+                                  Long userId, Long userMessageId, String projectId,
+                                  MemoryRecallResult memoryRecall, String memoryMode) {
         try {
             String reply = handle.lastReply();
-            Long savedId = chatMessageService.saveAssistantReply(sessionId, reply);
+            boolean queueMemory = shouldQueueMemory(userId, projectId, memoryMode, memoryRecall);
+            Long savedId = chatMessageService.saveAssistantReplyAndQueueMemory(
+                    sessionId, reply, memoryRecall, queueMemory, userId,
+                    projectId, userMessageId, triggeringMessage, memoryMode);
             if (savedId != null && !handle.isClientDisconnected()) {
                 sseEmitterManager.sendMessageSaved(emitter, savedId);
             }
             chatMessageService.finalizeSession(sessionId, triggeringMessage);
-            if (memoryEnabled && userId != null && reply != null && !reply.isBlank()) {
-                MEMORY_EXECUTOR.execute(() -> memoryService.addConversation(
-                        userId, triggeringMessage, reply));
-            }
             if (!handle.isClientDisconnected()) {
                 emitter.complete();
             }
         } catch (Exception e) {
-            log.debug("Session {} SSE complete 时客户端已断开: {}", sessionId, e.getMessage());
+            if (handle.isClientDisconnected() || sseEmitterManager.isClientDisconnect(e)) {
+                log.debug("Session {} SSE complete 时客户端已断开: {}", sessionId, e.getMessage());
+                return;
+            }
+            log.error("Session {} 保存助手回复或记忆 outbox 失败", sessionId, e);
+            try {
+                sseEmitterManager.sendError(emitter, "回复保存失败，请重试");
+                emitter.completeWithError(e);
+            } catch (Exception sendError) {
+                log.debug("Session {} 无法发送保存失败事件: {}", sessionId, sendError.getMessage());
+            }
+        }
+    }
+
+    private boolean shouldQueueMemory(Long userId, String projectId,
+                                      String memoryMode, MemoryRecallResult memoryRecall) {
+        try {
+            return !"NO_MEMORY".equalsIgnoreCase(memoryMode)
+                    && !"DISABLED".equals(memoryRecall.status())
+                    && memoryService.shouldAutoLearn(userId, projectId);
+        } catch (RuntimeException ex) {
+            log.warn("Unable to evaluate memory queue policy for userId={}: {}",
+                    userId, ex.getClass().getSimpleName());
+            return false;
         }
     }
 
     private record RetrievalContext(String augmentedMessage, List<RetrievalResultDto> results) {
     }
 
-    private record MemoryContext(boolean enabled, List<MemoryItemDto> items) {
+    private MemoryRecallResult performMemoryRecall(Long userId, String projectId,
+                                                    String message, String memoryMode) {
+        return memoryService.recall(userId, projectId, message, memoryMode);
     }
 
-    private MemoryContext performMemoryRecall(Long userId, String message) {
-        if (userId == null) {
-            return new MemoryContext(false, List.of());
+    /**
+     * 获取会话 Agent。本轮为 NO_MEMORY 或用户已关闭长期记忆时, 若状态尚未确认干净,
+     * 则从原始消息重建 AgentState, 保证历史轮次召回的记忆文本不再对模型可见。
+     * 重建结果由 {@link AgentHandle#isMemoryFreeState()} 缓存, 避免每轮重复重建。
+     */
+    private AgentHandle prepareHandle(Long userId, String sessionId, String memoryMode) {
+        boolean requireClean = "NO_MEMORY".equalsIgnoreCase(memoryMode)
+                || !memoryService.isEnabled(userId);
+        AgentHandle handle = agentPool.getOrCreate(sessionId);
+        if (requireClean && !handle.isMemoryFreeState()) {
+            agentPool.resetState(userId, sessionId);
+            handle = agentPool.getOrCreate(sessionId);
+            handle.restoreHistory(userId, sessionId, chatMessageService.getHistory(sessionId));
+            handle.markMemoryFreeState(true);
         }
-        try {
-            if (!Boolean.TRUE.equals(settingsService.getMemorySettings(userId).enabled())) {
-                return new MemoryContext(false, List.of());
-            }
-            return new MemoryContext(true, memoryService.searchMemories(userId, message));
-        } catch (Exception e) {
-            log.warn("长期记忆召回失败，当前请求降级继续: {}", e.getMessage());
-            return new MemoryContext(true, List.of());
+        return handle;
+    }
+
+    private String normalizeMemoryMode(String value) {
+        if (value == null || value.isBlank() || "NORMAL".equalsIgnoreCase(value)) {
+            return "NORMAL";
         }
+        if ("NO_MEMORY".equalsIgnoreCase(value)) {
+            return "NO_MEMORY";
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不支持的记忆模式");
     }
 
     private RetrievalContext performKnowledgeRetrieval(String message, String kbIds) {

@@ -15,6 +15,7 @@ import top.jionjion.agentdesk.agent.runtime.AgentEventBridge;
 import top.jionjion.agentdesk.agent.runtime.AgentInput;
 import top.jionjion.agentdesk.agent.runtime.AgentRunContext;
 import top.jionjion.agentdesk.agent.runtime.ProjectRuntimeContext;
+import top.jionjion.agentdesk.agent.runtime.MemoryRuntimeContext;
 import top.jionjion.agentdesk.entity.ChatMessage;
 
 import java.util.ArrayList;
@@ -26,10 +27,23 @@ public final class AgentHandle implements AutoCloseable {
 
     private final HarnessAgent agent;
     private final AgentEventBridge eventBridge;
+    /**
+     * 会话状态是否确认不含长期记忆增强文本。
+     * 新建 handle 默认 false (持久化状态未知); 从原始消息重建后置 true; 注入记忆后置 false。
+     */
+    private volatile boolean memoryFreeState;
 
     public AgentHandle(HarnessAgent agent, AgentEventBridge eventBridge) {
         this.agent = Objects.requireNonNull(agent);
         this.eventBridge = Objects.requireNonNull(eventBridge);
+    }
+
+    public boolean isMemoryFreeState() {
+        return memoryFreeState;
+    }
+
+    public void markMemoryFreeState(boolean memoryFreeState) {
+        this.memoryFreeState = memoryFreeState;
     }
 
     public Flux<AgentEvent> stream(AgentInput input, AgentRunContext context) {
@@ -41,6 +55,9 @@ public final class AgentHandle implements AutoCloseable {
         if (context.projectContext() != null) {
             // 类型化注入: 工具方法声明 ProjectRuntimeContext 参数即可获得本次调用的项目上下文
             builder.put(ProjectRuntimeContext.class, context.projectContext());
+        }
+        if (context.memoryContext() != null) {
+            builder.put(MemoryRuntimeContext.class, context.memoryContext());
         }
         return agent.streamEvents(toUserMessage(input), builder.build())
                 .doOnNext(eventBridge::accept);

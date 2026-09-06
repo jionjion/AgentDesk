@@ -8,6 +8,7 @@ public record ChatRequest(
         String message,
         String fileIds,
         String kbIds,
+        String memoryMode,
 
         /* 本设备针对会话所绑项目的 runtime snapshot（可空; 未绑定项目或本机无位置时为 null）*/
         RuntimeSnapshot runtimeSnapshot

@@ -9,7 +9,7 @@ import java.util.Map;
  * {@code projectContext} 作为类型化属性放入 RuntimeContext, 由工具方法按类型注入。
  */
 public record AgentRunContext(String userId, String sessionId, Map<String, Object> attributes,
-                              ProjectRuntimeContext projectContext) {
+                              ProjectRuntimeContext projectContext, MemoryRuntimeContext memoryContext) {
 
     public AgentRunContext {
         if (sessionId == null || sessionId.isBlank()) {
@@ -19,10 +19,24 @@ public record AgentRunContext(String userId, String sessionId, Map<String, Objec
     }
 
     public static AgentRunContext of(Long userId, String sessionId) {
-        return new AgentRunContext(userId == null ? null : String.valueOf(userId), sessionId, Map.of(), null);
+        return new AgentRunContext(userId == null ? null : String.valueOf(userId), sessionId,
+                Map.of(), null, new MemoryRuntimeContext(true));
     }
 
     public static AgentRunContext of(Long userId, String sessionId, ProjectRuntimeContext projectContext) {
-        return new AgentRunContext(userId == null ? null : String.valueOf(userId), sessionId, Map.of(), projectContext);
+        return new AgentRunContext(userId == null ? null : String.valueOf(userId), sessionId,
+                Map.of(), projectContext, new MemoryRuntimeContext(true));
+    }
+
+    public static AgentRunContext of(Long userId, String sessionId, ProjectRuntimeContext projectContext,
+                                     String memoryMode) {
+        return of(userId, sessionId, projectContext, memoryMode, null);
+    }
+
+    public static AgentRunContext of(Long userId, String sessionId, ProjectRuntimeContext projectContext,
+                                     String memoryMode, Long userMessageId) {
+        return new AgentRunContext(userId == null ? null : String.valueOf(userId), sessionId,
+                Map.of(), projectContext,
+                new MemoryRuntimeContext(!"NO_MEMORY".equalsIgnoreCase(memoryMode), sessionId, userMessageId));
     }
 }

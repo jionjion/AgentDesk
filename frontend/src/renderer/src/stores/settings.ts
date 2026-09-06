@@ -78,7 +78,12 @@ const DEFAULT_APP: AppSettings = {
 
 /** 长期记忆默认值 */
 const DEFAULT_MEMORY: MemorySettings = {
-    enabled: false
+    schemaVersion: 2,
+    enabled: false,
+    autoLearningEnabled: true,
+    projectMemoryEnabled: true,
+    showMemorySources: true,
+    sensitiveMemoryPolicy: 'EXPLICIT_ONLY'
 }
 
 /** Obsidian 知识沉淀默认值 */
@@ -117,7 +122,7 @@ export const useSettingsStore = defineStore('settings', () => {
         profile.value = res.data.profile
         model.value = res.data.model
         app.value = res.data.app
-        memory.value = res.data.memory ?? {...DEFAULT_MEMORY}
+        memory.value = {...DEFAULT_MEMORY, ...(res.data.memory ?? {})}
         obsidian.value = res.data.obsidian ?? {...DEFAULT_OBSIDIAN}
         loaded.value = true
 

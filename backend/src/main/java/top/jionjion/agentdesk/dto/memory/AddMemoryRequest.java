@@ -6,5 +6,6 @@ package top.jionjion.agentdesk.dto.memory;
  * @param content 记忆内容
  * @author Jion
  */
-public record AddMemoryRequest(String content) {
+public record AddMemoryRequest(String content, String scopeType, String scopeId, String category,
+                               Long validUntil, Double importance, Boolean sensitiveConfirmed) {
 }

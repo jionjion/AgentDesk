@@ -18,6 +18,7 @@ public interface MemoryJobRepository extends JpaRepository<MemoryJob, Long> {
     List<MemoryJob> findTop100ByUserIdOrderByUpdatedAtDesc(Long userId);
     java.util.Optional<MemoryJob> findByIdAndUserId(Long id, Long userId);
     long countByUserIdAndStatus(Long userId, String status);
+    List<MemoryJob> findByUserIdAndStatusIn(Long userId, List<String> statuses);
 
     @Modifying
     @Query(value = """

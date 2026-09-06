@@ -92,7 +92,10 @@ const open = ref(false)
 const currentSession = computed(() =>
     chatStore.sessions.find(s => s.id === chatStore.currentSessionId)
 )
-const currentProjectId = computed(() => currentSession.value?.projectId ?? null)
+/** 已有会话取会话绑定的项目; 新对话 (无会话) 取待绑定项目 */
+const currentProjectId = computed(() =>
+    currentSession.value ? currentSession.value.projectId ?? null : chatStore.pendingProjectId
+)
 const currentProject = computed(() =>
     currentProjectId.value ? projectsStore.projectMap[currentProjectId.value] ?? null : null
 )
@@ -152,6 +155,8 @@ async function unbindSession() {
 async function bindToCurrentSession(projectId: string | null) {
   const sessionId = chatStore.currentSessionId
   if (!sessionId) {
+    // 新对话尚未创建会话: 记录为待绑定项目, 首次提问时随会话创建一并绑定
+    chatStore.pendingProjectId = projectId
     if (projectId) projectsStore.rememberLastProject(projectId)
     return
   }

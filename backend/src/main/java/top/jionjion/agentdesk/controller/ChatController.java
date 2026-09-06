@@ -85,11 +85,19 @@ public class ChatController {
         if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
         }
+        String resolvedMemoryMode;
+        try {
+            resolvedMemoryMode = sessionService.resolveMemoryMode(sessionId, chatRequest.memoryMode());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
+        ChatRequest effectiveRequest = new ChatRequest(chatRequest.sessionId(), chatRequest.message(),
+                chatRequest.fileIds(), chatRequest.kbIds(), resolvedMemoryMode, chatRequest.runtimeSnapshot());
         Object lockToken = agentPool.tryAcquire(sessionId);
         if (lockToken == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
         }
-        return chatStreamOrchestrator.startChat(chatRequest, lockToken);
+        return chatStreamOrchestrator.startChat(effectiveRequest, lockToken);
     }
 
     /**
@@ -98,7 +106,8 @@ public class ChatController {
     @RateLimit(maxRequests = 10, windowSeconds = 70, message = "对话请求过于频繁, 请稍后再试")
     @GetMapping(value = "/regenerate", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter regenerate(@RequestParam String sessionId,
-                                 @RequestParam Long messageId) {
+                                 @RequestParam Long messageId,
+                                 @RequestParam(required = false) String memoryMode) {
         validateSessionId(sessionId);
         if (!sessionService.belongsToUser(sessionId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该会话");
@@ -108,12 +117,16 @@ public class ChatController {
         chatMessageService.requireAssistantMessage(sessionId, messageId);
         List<ChatMessage> history = chatMessageService.getHistory(sessionId);
         ChatMessage userMessage = chatMessageService.findTriggeringUserMessageEntity(messageId, history);
+        String effectiveMemoryMode = memoryMode == null || memoryMode.isBlank()
+                || "INHERIT".equalsIgnoreCase(memoryMode)
+                ? userMessage.getMemoryMode() : memoryMode;
 
         Object lockToken = agentPool.tryAcquire(sessionId);
         if (lockToken == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session is busy");
         }
-        return chatStreamOrchestrator.regenerate(sessionId, messageId, userMessage, lockToken);
+        return chatStreamOrchestrator.regenerate(
+                sessionId, messageId, userMessage, lockToken, effectiveMemoryMode);
     }
 
     /**

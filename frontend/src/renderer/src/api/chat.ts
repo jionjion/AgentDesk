@@ -33,7 +33,7 @@ export interface ChatRuntimeSnapshot {
     pythonVersion?: string
 }
 
-export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[], runtimeSnapshot?: ChatRuntimeSnapshot | null): FetchSSE {
+export function createChatStream(sessionId: string, message: string, fileIds?: number[], kbIds?: number[], runtimeSnapshot?: ChatRuntimeSnapshot | null, memoryMode: 'NORMAL' | 'NO_MEMORY' | 'INHERIT' = 'INHERIT'): FetchSSE {
     const token = localStorage.getItem('auth_token') || ''
     const url = `${BASE_URL}/api/chat/stream`
 
@@ -59,6 +59,7 @@ export function createChatStream(sessionId: string, message: string, fileIds?: n
     ;(async () => {
         try {
             const body: Record<string, unknown> = {sessionId, message}
+            body.memoryMode = memoryMode
             if (fileIds && fileIds.length > 0) body.fileIds = fileIds.join(',')
             if (kbIds && kbIds.length > 0) body.kbIds = kbIds.join(',')
             if (runtimeSnapshot) body.runtimeSnapshot = runtimeSnapshot
@@ -148,8 +149,8 @@ export function exportChatMarkdown(sessionId: string) {
 /**
  * 创建重新生成的 SSE 流连接
  */
-export function createRegenerateStream(sessionId: string, messageId: string): EventSource {
+export function createRegenerateStream(sessionId: string, messageId: string, memoryMode: 'NORMAL' | 'NO_MEMORY' | 'INHERIT' = 'INHERIT'): EventSource {
     const token = localStorage.getItem('auth_token') || ''
-    const url = `${BASE_URL}/api/chat/regenerate?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}&token=${encodeURIComponent(token)}`
+    const url = `${BASE_URL}/api/chat/regenerate?sessionId=${encodeURIComponent(sessionId)}&messageId=${encodeURIComponent(messageId)}&memoryMode=${memoryMode}&token=${encodeURIComponent(token)}`
     return new EventSource(url)
 }

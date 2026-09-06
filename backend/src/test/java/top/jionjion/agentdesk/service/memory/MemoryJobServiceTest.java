@@ -111,9 +111,85 @@ class MemoryJobServiceTest {
         verify(memoryService).invalidateMessageSources(1L, List.of(42L));
     }
 
+    @Test
+    void clearAllCancelsEveryUnfinishedJobIncludingProcessing() {
+        MemoryJob pending = job("PENDING");
+        MemoryJob processing = job("PROCESSING");
+        when(jobs.findByUserIdAndStatusIn(1L, List.of("PENDING", "RETRY", "PROCESSING")))
+                .thenReturn(List.of(pending, processing));
+
+        service.cancelPendingForScope(1L, null, null);
+
+        assertEquals("CANCELLED", pending.getStatus());
+        assertEquals("CANCELLED", processing.getStatus());
+        verify(jobs).saveAll(List.of(pending, processing));
+    }
+
+    @Test
+    void projectScopedClearOnlyCancelsMatchingProjectJobs() {
+        MemoryJob projectJob = job("PENDING");
+        projectJob.setProjectId("p1");
+        MemoryJob otherJob = job("PENDING");
+        when(jobs.findByUserIdAndStatusIn(1L, List.of("PENDING", "RETRY", "PROCESSING")))
+                .thenReturn(List.of(projectJob, otherJob));
+
+        service.cancelPendingForScope(1L, "PROJECT", "p1");
+
+        assertEquals("CANCELLED", projectJob.getStatus());
+        assertEquals("PENDING", otherJob.getStatus());
+    }
+
+    @Test
+    void userScopedClearOnlyCancelsNonProjectJobs() {
+        MemoryJob projectJob = job("PENDING");
+        projectJob.setProjectId("p1");
+        MemoryJob userJob = job("RETRY");
+        when(jobs.findByUserIdAndStatusIn(1L, List.of("PENDING", "RETRY", "PROCESSING")))
+                .thenReturn(List.of(projectJob, userJob));
+
+        service.cancelPendingForScope(1L, "USER", null);
+
+        assertEquals("PENDING", projectJob.getStatus());
+        assertEquals("CANCELLED", userJob.getStatus());
+    }
+
+    @Test
+    void projectScopeWithoutIdCancelsEveryProjectJob() {
+        MemoryJob projectJob = job("PENDING");
+        projectJob.setProjectId("p1");
+        MemoryJob userJob = job("PENDING");
+        when(jobs.findByUserIdAndStatusIn(1L, List.of("PENDING", "RETRY", "PROCESSING")))
+                .thenReturn(List.of(projectJob, userJob));
+
+        service.cancelPendingForScope(1L, "PROJECT", null);
+
+        assertEquals("CANCELLED", projectJob.getStatus());
+        assertEquals("PENDING", userJob.getStatus());
+    }
+
+    @Test
+    void concurrentClearDuringProcessingRevertsFreshlyStoredMemories() throws Exception {
+        MemoryJob job = job("PENDING");
+        whenDue(job);
+        mockSourceMessage();
+        when(chatMessages.existsByIdAndSessionId(42L, "s1")).thenReturn(true);
+        when(memoryService.extractAndStore(1L, "s1", null, 42L, "原始用户消息"))
+                .thenReturn(1);
+        // 抽取存储完成后, 数据库中的任务已被清空操作并发置为 CANCELLED
+        MemoryJob concurrentlyCancelled = job("CANCELLED");
+        when(jobs.findById(7L)).thenReturn(Optional.of(concurrentlyCancelled));
+
+        service.processDueJobs();
+
+        verify(memoryService).invalidateMessageSources(1L, List.of(42L));
+        // 收尾时不得把 DONE 覆盖到已取消的任务上 (仅认领时的一次 saveAndFlush)
+        verify(jobs, times(1)).saveAndFlush(any());
+    }
+
     private void whenDue(MemoryJob job) {
         when(jobs.findByStatusInAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(
                 anyList(), anyLong(), any(Pageable.class))).thenReturn(List.of(job));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
     }
 
     private void mockSourceMessage() {

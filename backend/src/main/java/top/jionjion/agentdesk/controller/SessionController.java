@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import top.jionjion.agentdesk.dto.session.SessionCreateRequest;
 import top.jionjion.agentdesk.dto.session.SessionProjectBindRequest;
+import top.jionjion.agentdesk.dto.session.SessionMemoryModeRequest;
 import top.jionjion.agentdesk.dto.session.SessionResponse;
 import top.jionjion.agentdesk.service.SessionService;
 
@@ -105,6 +106,21 @@ public class SessionController {
         if (response == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在");
         }
+        return response;
+    }
+
+    @PutMapping("/{id}/memory-mode")
+    public SessionResponse updateMemoryMode(@PathVariable String id,
+                                            @RequestBody SessionMemoryModeRequest request) {
+        SessionResponse response;
+        try {
+            response = sessionService.updateMemoryMode(id, request.memoryMode());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+        if (response == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在");
         return response;
     }
 }

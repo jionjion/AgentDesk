@@ -8,6 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import top.jionjion.agentdesk.agent.core.AgentHandle;
 import top.jionjion.agentdesk.dto.chat.ChatEventDto;
 import top.jionjion.agentdesk.dto.knowledge.RetrievalResultDto;
+import top.jionjion.agentdesk.dto.memory.MemoryRecallResult;
 
 import java.util.List;
 import java.util.Map;
@@ -133,6 +134,35 @@ public class SseEmitterManager {
                     .data(OBJECT_MAPPER.writeValueAsString(ChatEventDto.memoryRecalled(count))));
         } catch (Exception ex) {
             log.debug("Failed to send memory_recalled event: {}", ex.getMessage());
+        }
+    }
+
+    /** Always emits a terminal recall state, including empty, disabled and degraded outcomes. */
+    public void sendMemoryRecallCompleted(SseEmitter emitter, MemoryRecallResult result) {
+        try {
+            List<Map<String, Object>> references = result.items().stream()
+                    .map(item -> {
+                        Map<String, Object> ref = new java.util.LinkedHashMap<>();
+                        ref.put("id", item.id());
+                        ref.put("scopeType", item.scopeType());
+                        ref.put("scopeId", item.scopeId());
+                        ref.put("category", item.category());
+                        ref.put("reason", item.recallReason());
+                        ref.put("score", item.score());
+                        return ref;
+                    }).toList();
+            Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("status", result.status());
+            payload.put("count", result.items().size());
+            payload.put("elapsedMs", result.elapsedMs());
+            payload.put("degradedReason", result.degradedReason());
+            payload.put("references", references);
+            emitter.send(SseEmitter.event().name("memory_recall_completed")
+                    .data(OBJECT_MAPPER.writeValueAsString(payload)));
+            // Compatibility for older desktop clients.
+            sendMemoryRecalled(emitter, result.items().size());
+        } catch (Exception ex) {
+            log.debug("Failed to send memory_recall_completed event: {}", ex.getMessage());
         }
     }
 

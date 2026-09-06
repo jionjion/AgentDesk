@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.entity.ChatMessage;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 对话消息 — JPA 持久层
@@ -14,6 +15,9 @@ import java.util.List;
  * @author Jion
  */
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+
+    boolean existsByIdAndSessionId(Long id, String sessionId);
+    Optional<ChatMessage> findByIdAndSessionId(Long id, String sessionId);
 
     /**
      * 根据会话ID查询消息列表, 按创建时间升序排列
@@ -57,4 +61,22 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             "AND m.role IN ('user', 'assistant') " +
             "ORDER BY m.createdAt DESC")
     List<ChatMessage> searchByContent(@Param("userId") Long userId, @Param("keyword") String keyword);
+
+    /**
+     * 范围化全文搜索: 仅在当前项目 (或未绑定项目) 的会话中搜索, 并排除临时无记忆轮次的消息。
+     *
+     * @param userId    用户ID
+     * @param keyword   搜索关键词
+     * @param projectId 当前项目ID; 为 null 时仅搜索未绑定项目的会话
+     * @return 匹配的消息列表
+     */
+    @Query("SELECT m FROM ChatMessage m WHERE m.sessionId IN " +
+            "(SELECT s.id FROM SessionMetadata s WHERE s.userId = :userId " +
+            "AND ((:projectId IS NULL AND s.projectId IS NULL) OR s.projectId = CAST(:projectId AS string))) " +
+            "AND (m.memoryMode IS NULL OR m.memoryMode <> 'NO_MEMORY') " +
+            "AND m.content IS NOT NULL AND LOWER(m.content) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "AND m.role IN ('user', 'assistant') " +
+            "ORDER BY m.createdAt DESC")
+    List<ChatMessage> searchByContentScoped(@Param("userId") Long userId, @Param("keyword") String keyword,
+                                            @Param("projectId") String projectId);
 }

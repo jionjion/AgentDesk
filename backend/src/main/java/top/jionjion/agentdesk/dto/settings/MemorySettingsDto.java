@@ -9,9 +9,28 @@ package top.jionjion.agentdesk.dto.settings;
  * @author Jion
  */
 public record MemorySettingsDto(
-        Boolean enabled
+        Integer schemaVersion,
+        Boolean enabled,
+        Boolean autoLearningEnabled,
+        Boolean projectMemoryEnabled,
+        Boolean showMemorySources,
+        String sensitiveMemoryPolicy
 ) {
+    public MemorySettingsDto {
+        schemaVersion = schemaVersion != null ? schemaVersion : 2;
+        enabled = enabled != null ? enabled : false;
+        autoLearningEnabled = autoLearningEnabled != null ? autoLearningEnabled : true;
+        projectMemoryEnabled = projectMemoryEnabled != null ? projectMemoryEnabled : true;
+        showMemorySources = showMemorySources != null ? showMemorySources : true;
+        sensitiveMemoryPolicy = "EXPLICIT_ONLY";
+    }
+
+    public MemorySettingsDto(Boolean enabled, Boolean autoLearningEnabled,
+                             Boolean projectMemoryEnabled, Boolean showMemorySources) {
+        this(2, enabled, autoLearningEnabled, projectMemoryEnabled, showMemorySources, "EXPLICIT_ONLY");
+    }
+
     public static MemorySettingsDto defaults() {
-        return new MemorySettingsDto(false);
+        return new MemorySettingsDto(2, false, true, true, true, "EXPLICIT_ONLY");
     }
 }

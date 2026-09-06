@@ -77,6 +77,15 @@ public class ChatMessage {
     @Column(name = "file_ids", columnDefinition = "jsonb")
     private List<Long> fileIds;
 
+    /** Memory policy used for this user turn. */
+    @Column(name = "memory_mode", nullable = false, length = 16)
+    private String memoryMode = "NORMAL";
+
+    /** Memory recall metadata used to produce an assistant response. */
+    @Convert(converter = JsonMapConverter.class)
+    @Column(name = "memory_refs", columnDefinition = "jsonb")
+    private Map<String, Object> memoryRefs;
+
     /**
      * 创建时间, 毫秒时间戳
      */

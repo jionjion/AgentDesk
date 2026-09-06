@@ -17,5 +17,7 @@ public record SessionResponse(
         /** 可选关联项目ID */
         String projectId,
         /** 可选关联项目名称 */
-        String projectName) {
+        String projectName,
+        /** 新轮次默认记忆策略 */
+        String memoryMode) {
 }

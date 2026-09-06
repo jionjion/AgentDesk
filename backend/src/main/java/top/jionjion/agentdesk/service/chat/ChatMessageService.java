@@ -4,14 +4,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import top.jionjion.agentdesk.entity.ChatMessage;
+import top.jionjion.agentdesk.dto.memory.MemoryRecallResult;
 import top.jionjion.agentdesk.repository.ChatMessageRepository;
 import top.jionjion.agentdesk.service.SessionService;
+import top.jionjion.agentdesk.service.MemoryService;
 import top.jionjion.agentdesk.service.TitleGenerationService;
+import top.jionjion.agentdesk.service.memory.MemoryJobService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -44,35 +50,95 @@ public class ChatMessageService {
     private final ChatMessageRepository chatMessageRepository;
     private final SessionService sessionService;
     private final TitleGenerationService titleGenerationService;
+    private final MemoryService memoryService;
+    private final MemoryJobService memoryJobService;
 
+    @Autowired
     public ChatMessageService(ChatMessageRepository chatMessageRepository,
                               SessionService sessionService,
-                              TitleGenerationService titleGenerationService) {
+                              TitleGenerationService titleGenerationService,
+                              MemoryService memoryService,
+                              MemoryJobService memoryJobService) {
         this.chatMessageRepository = chatMessageRepository;
         this.sessionService = sessionService;
         this.titleGenerationService = titleGenerationService;
+        this.memoryService = memoryService;
+        this.memoryJobService = memoryJobService;
+    }
+
+    /** Test/backward-compatible constructor. */
+    public ChatMessageService(ChatMessageRepository chatMessageRepository,
+                              SessionService sessionService,
+                              TitleGenerationService titleGenerationService) {
+        this(chatMessageRepository, sessionService, titleGenerationService, null, null);
     }
 
     /**
      * 持久化用户消息
      */
-    public void saveUserMessage(String sessionId, String message, List<Long> fileIds) {
+    public ChatMessage saveUserMessage(String sessionId, String message, List<Long> fileIds) {
+        return saveUserMessage(sessionId, message, fileIds, "NORMAL");
+    }
+
+    public ChatMessage saveUserMessage(String sessionId, String message, List<Long> fileIds,
+                                       String memoryMode) {
         ChatMessage chatMsg = new ChatMessage(sessionId, ROLE_USER, message);
+        chatMsg.setMemoryMode(memoryMode);
         if (fileIds != null && !fileIds.isEmpty()) {
             chatMsg.setFileIds(fileIds);
         }
-        chatMessageRepository.save(chatMsg);
+        return chatMessageRepository.save(chatMsg);
     }
 
     /**
      * 持久化助手回复, 返回数据库消息ID。回复为空时返回 null。
      */
     public Long saveAssistantReply(String sessionId, String reply) {
+        return saveAssistantReply(sessionId, reply, null);
+    }
+
+    public Long saveAssistantReply(String sessionId, String reply, MemoryRecallResult memoryRecall) {
+        return saveAssistantReply(sessionId, reply, memoryRecall, null);
+    }
+
+    public Long saveAssistantReply(String sessionId, String reply, MemoryRecallResult memoryRecall,
+                                   String memoryMode) {
         if (reply == null || reply.isEmpty()) {
             return null;
         }
-        ChatMessage saved = chatMessageRepository.save(new ChatMessage(sessionId, ROLE_ASSISTANT, reply));
+        ChatMessage message = new ChatMessage(sessionId, ROLE_ASSISTANT, reply);
+        if (memoryMode != null && !memoryMode.isBlank()) {
+            // 记录该轮真实记忆策略, 供 session_search 等历史检索排除临时轮次内容
+            message.setMemoryMode(memoryMode);
+        }
+        if (memoryRecall != null) {
+            message.setMemoryRefs(Map.of(
+                    "status", memoryRecall.status(),
+                    "elapsedMs", memoryRecall.elapsedMs(),
+                    "references", memoryRecall.items().stream().map(item -> Map.of(
+                            "id", item.id(),
+                            "scopeType", item.scopeType(),
+                            "category", item.category(),
+                            "reason", item.recallReason() == null ? "matched" : item.recallReason()
+                    )).toList()
+            ));
+        }
+        ChatMessage saved = chatMessageRepository.save(message);
         return saved.getId();
+    }
+
+    /** Atomically persists the visible reply and its durable extraction outbox row. */
+    @Transactional
+    public Long saveAssistantReplyAndQueueMemory(String sessionId, String reply,
+                                                 MemoryRecallResult memoryRecall,
+                                                 boolean queueMemory, Long userId,
+                                                 String projectId, Long userMessageId,
+                                                 String originalUserMessage, String memoryMode) {
+        Long savedId = saveAssistantReply(sessionId, reply, memoryRecall, memoryMode);
+        if (savedId != null && queueMemory && memoryJobService != null) {
+            memoryJobService.enqueue(userId, sessionId, projectId, userMessageId, originalUserMessage);
+        }
+        return savedId;
     }
 
     /**
@@ -118,6 +184,22 @@ public class ChatMessageService {
     /** Removes the selected assistant reply and every later branch message. */
     public void deleteBranchFrom(String sessionId, Long messageId) {
         chatMessageRepository.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
+    }
+
+    public void deleteBranchFrom(String sessionId, Long messageId, Long userId) {
+        if (memoryService != null) {
+            List<Long> deletedUserMessageIds = getBranchUserMessageIds(sessionId, messageId);
+            memoryService.invalidateMessageSources(userId, deletedUserMessageIds);
+        }
+        deleteBranchFrom(sessionId, messageId);
+    }
+
+    public List<Long> getBranchUserMessageIds(String sessionId, Long messageId) {
+        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream()
+                .filter(message -> message.getId() != null && message.getId() >= messageId)
+                .filter(message -> ROLE_USER.equals(message.getRole()))
+                .map(ChatMessage::getId)
+                .toList();
     }
 
     /** Returns durable messages before the user turn that will be regenerated. */

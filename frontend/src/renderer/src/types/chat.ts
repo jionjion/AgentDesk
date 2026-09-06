@@ -12,6 +12,8 @@ export interface ChatSession {
     projectId?: string | null
     /** 可选关联项目名称 */
     projectName?: string | null
+    /** 服务端持久化的新轮次默认记忆模式 */
+    memoryMode: 'NORMAL' | 'NO_MEMORY'
 }
 
 /** 附件信息 */
@@ -30,6 +32,7 @@ export interface UserMessage {
     content: string
     timestamp: number
     attachments?: Attachment[]
+    memoryMode?: 'NORMAL' | 'NO_MEMORY'
 }
 
 /** 助手消息 */
@@ -40,6 +43,24 @@ export interface AssistantMessage {
     timestamp: number
     isStreaming: boolean
     knowledgeRefs?: {documentName: string; score: number; chunkIndex: number}[]
+    memoryRefs?: MemoryRecallInfo
+}
+
+export interface MemoryRecallReference {
+    id: string
+    scopeType: 'USER' | 'PROJECT'
+    scopeId?: string | null
+    category: string
+    reason?: string | null
+    score?: number
+}
+
+export interface MemoryRecallInfo {
+    status: 'USED' | 'EMPTY' | 'DISABLED' | 'DEGRADED'
+    count?: number
+    elapsedMs: number
+    degradedReason?: string | null
+    references: MemoryRecallReference[]
 }
 
 /** 工具调用消息 */
@@ -178,6 +199,8 @@ export interface BackendChatMessage {
     result?: string
     fileIds?: number[]
     createdAt: number
+    memoryRefs?: MemoryRecallInfo
+    memoryMode?: 'NORMAL' | 'NO_MEMORY'
 }
 
 /** SSE 事件数据 */

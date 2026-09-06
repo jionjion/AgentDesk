@@ -6,6 +6,7 @@ CLAUDE.md
 
 .idea
 target
+*.iml
 
 
 dist
@@ -23,6 +24,7 @@ frontend/tsconfig.web.tsbuildinfo
 
 frontend/src/renderer/public/pyodide/
 
+docs/*.md
 
 test-space/
 

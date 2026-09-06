@@ -370,6 +370,7 @@ const isNewTaskActive = computed(() => {
 function handleNewSession() {
   if (chatStore.isStreaming) return
   chatStore.currentSessionId = null
+  chatStore.pendingProjectId = null
   router.push('/chat')
 }
 

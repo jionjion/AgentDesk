@@ -142,7 +142,7 @@ class MemoryServiceTest {
 
     @Test
     void extractionReceivesOnlyOriginalUserTextAndCreatesProjectMemory() throws Exception {
-        when(mem0.extract(1L, "原始用户消息"))
+        when(mem0.extract(1L, "这个项目以后都使用 Java 21"))
                 .thenReturn(List.of(new Mem0Client.ExtractedMemory("provider-1", "项目偏好使用 Java 21")));
         when(entries.findActiveDuplicate(any(), any(), any(), any())).thenReturn(Optional.empty());
         when(entries.save(any())).thenAnswer(invocation -> {
@@ -151,10 +151,10 @@ class MemoryServiceTest {
             return saved;
         });
 
-        int count = service.extractAndStore(1L, "s1", "p1", 99L, "原始用户消息");
+        int count = service.extractAndStore(1L, "s1", "p1", 99L, "这个项目以后都使用 Java 21");
 
         assertEquals(1, count);
-        verify(mem0).extract(1L, "原始用户消息");
+        verify(mem0).extract(1L, "这个项目以后都使用 Java 21");
         verify(entries).save(argThat(entry -> "PROJECT".equals(entry.getScopeType())
                 && "p1".equals(entry.getScopeId())
                 && !entry.getContent().contains("assistant")));
@@ -173,6 +173,121 @@ class MemoryServiceTest {
         assertEquals(0, count);
         verify(entries, never()).save(any());
         verify(sources, never()).save(any());
+    }
+
+    @Test
+    void hypotheticalOriginalRejectsRewrittenCandidateAndCleansProviderEntry() throws Exception {
+        // 探针场景: 原文是假设句, provider 改写为肯定句后也不得入库, 且需删除抽取时创建的 provider 条目
+        when(mem0.extract(1L, "假如我喜欢英文回答就好了"))
+                .thenReturn(List.of(new Mem0Client.ExtractedMemory("provider-7", "用户喜欢英文回答")));
+
+        int count = service.extractAndStore(1L, "s1", null, 102L, "假如我喜欢英文回答就好了");
+
+        assertEquals(0, count);
+        verify(entries, never()).save(any());
+        verify(sources, never()).save(any());
+        verify(mem0).delete("provider-7");
+    }
+
+    @Test
+    void candidateWithoutLexicalSupportInOriginalIsRejected() throws Exception {
+        when(mem0.extract(1L, "帮我写一段周报"))
+                .thenReturn(List.of(new Mem0Client.ExtractedMemory("provider-8", "用户住在北京朝阳区")));
+
+        int count = service.extractAndStore(1L, "s1", null, 103L, "帮我写一段周报");
+
+        assertEquals(0, count);
+        verify(entries, never()).save(any());
+        verify(mem0).delete("provider-8");
+    }
+
+    @Test
+    void negatedPreferenceCannotBeFlippedIntoAffirmativeMemory() throws Exception {
+        // 探针场景: "我不喜欢英文回答" 被 provider 改写为肯定句, 否定极性冲突必须拒绝
+        when(mem0.extract(1L, "我不喜欢英文回答"))
+                .thenReturn(List.of(new Mem0Client.ExtractedMemory("provider-10", "用户喜欢英文回答")));
+
+        int count = service.extractAndStore(1L, "s1", null, 105L, "我不喜欢英文回答");
+
+        assertEquals(0, count);
+        verify(entries, never()).save(any());
+        verify(mem0).delete("provider-10");
+    }
+
+    @Test
+    void inventedNumberNotPresentInOriginalIsRejected() throws Exception {
+        // 探针场景: 原文 Java 21, 候选臆造为 Java 17, 数字必须逐一出现在原文
+        when(mem0.extract(1L, "这个项目以后都使用 Java 21"))
+                .thenReturn(List.of(new Mem0Client.ExtractedMemory("provider-11", "项目使用 Java 17")));
+
+        int count = service.extractAndStore(1L, "s1", "p1", 106L, "这个项目以后都使用 Java 21");
+
+        assertEquals(0, count);
+        verify(entries, never()).save(any());
+        verify(mem0).delete("provider-11");
+    }
+
+    @Test
+    void failedProviderCleanupLeavesRejectedTombstoneForReconciliation() throws Exception {
+        when(mem0.extract(1L, "这是原始消息"))
+                .thenReturn(List.of(new Mem0Client.ExtractedMemory("provider-9", "password: hunter2secret")));
+        doThrow(new java.io.IOException("mem0 unavailable")).when(mem0).delete("provider-9");
+
+        int count = service.extractAndStore(1L, "s1", null, 104L, "这是原始消息");
+
+        assertEquals(0, count);
+        verify(entries).save(argThat(saved -> "DELETED".equals(saved.getStatus())
+                && "REJECTED".equals(saved.getWritePolicy())
+                && "provider-9".equals(saved.getProviderRef())
+                && !saved.getContent().contains("hunter2secret")));
+        verify(sources, never()).save(any());
+    }
+
+    @Test
+    void reconciliationPhysicallyRemovesRejectedTombstoneAfterProviderDeletion() throws Exception {
+        MemoryEntry tombstone = entry(60L, "USER", null, "[已拒绝的抽取候选]");
+        tombstone.setStatus("DELETED");
+        tombstone.setWritePolicy("REJECTED");
+        tombstone.setProviderRef("provider-9");
+        when(entries.findTop100ByStatusAndProviderRefIsNotNullOrderByUpdatedAtAsc("DELETED"))
+                .thenReturn(List.of(tombstone));
+        when(entries.findTop100ByStatusAndProviderRefIsNotNullOrderByUpdatedAtAsc("SUPERSEDED"))
+                .thenReturn(List.of());
+
+        assertEquals(1, service.reconcileProviderDeletions());
+
+        verify(mem0).delete("provider-9");
+        verify(entries).delete(tombstone);
+    }
+
+    @Test
+    void explicitChatMemoryKeepsRealSessionAndMessageSource() {
+        when(entries.findActiveDuplicate(any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(entries.save(any())).thenAnswer(invocation -> {
+            MemoryEntry saved = invocation.getArgument(0);
+            if (saved.getId() == null) saved.setId(70L);
+            return saved;
+        });
+
+        service.addExplicitChatMemory(1L, "记住我喜欢简洁回答", "USER", null, null, "s1", 88L);
+
+        verify(entries).save(argThat(saved -> "EXPLICIT".equals(saved.getWritePolicy())));
+        verify(sources).save(argThat(source -> "CHAT".equals(source.getSourceType())
+                && "88".equals(source.getSourceId())
+                && "s1".equals(source.getSessionId())
+                && "EXPLICIT".equals(source.getTrustLevel())));
+    }
+
+    @Test
+    void nonActiveMemoryCanStillBeDeletedIndividually() {
+        MemoryEntry expired = entry(80L, "USER", null, "过期记忆");
+        expired.setStatus("EXPIRED");
+        when(entries.findByIdAndUserId(80L, 1L)).thenReturn(Optional.of(expired));
+
+        service.deleteMemory(1L, "80");
+
+        assertEquals("DELETED", expired.getStatus());
+        verify(revisions).save(argThat(revision -> "DELETE".equals(revision.getReason())));
     }
 
     @Test
